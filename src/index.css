@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply bg-[#f8fafc] text-slate-800 dark:bg-[#0e1621] dark:text-[#e2e2e2] font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+    min-height: 100%;
+  }
+
+  /* Custom Clean Scrollbars */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(140, 160, 180, 0.25);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(140, 160, 180, 0.45);
+  }
+}
+
+/* Hide scrollbar for clean tab pill strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Telegram / iOS style touch momentum */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Markdown preview styles inside feed cards */
+.feed-prose {
+  font-size: 0.875rem;
+  line-height: 1.625;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.feed-prose p {
+  margin-bottom: 0.65rem;
+}
+.feed-prose p:last-child {
+  margin-bottom: 0;
+}
+.feed-prose strong {
+  font-weight: 600;
+  color: inherit;
+}
+.feed-prose a {
+  color: #2481cc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dark .feed-prose a {
+  color: #64b5f6;
+}
+.feed-prose code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82em;
+  background: rgba(100, 116, 139, 0.12);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+.dark .feed-prose code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #90caf9;
+}
+
+/* Smooth Fade In */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
