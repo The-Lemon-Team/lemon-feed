@@ -39,4 +39,12 @@ export const feedApi = {
     const res = await apiClient.get<Note>(`/notes/${id}`);
     return res.data;
   },
+
+  syncWikiToday: async (dateStr?: string): Promise<{ success: boolean; result: any }> => {
+    const res = await apiClient.post('/ingestion/wiki/sync', {}, {
+      params: dateStr ? { date: dateStr } : undefined,
+    });
+    return res.data;
+  },
 };
+

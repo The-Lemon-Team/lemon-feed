@@ -20,8 +20,10 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
   totalCount,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const allLabel = streamSource === 'classic' ? 'Все события' : 'Все каналы';
-  const allEmoji = streamSource === 'classic' ? '🏛️' : '📡';
+  const isClassic = streamSource === 'classic';
+  const isSeasons = streamSource === 'seasons';
+  const allLabel = isClassic ? 'Все события' : isSeasons ? 'Все ленты' : 'Все каналы';
+  const allEmoji = isClassic ? '🏛️' : isSeasons ? '🍋' : '📡';
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY !== 0 && scrollRef.current) {

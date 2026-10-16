@@ -199,36 +199,42 @@ export function resolveSparkFeeds(
     }
   }
 
-  // 3. Scan notes for dynamically ingested folders (e.g. note.folders: ["Spark/Crypto"])
+  // 3. Scan notes for dynamically ingested folders (e.g. note.folderPath: "Spark/Crypto")
   for (const n of notes) {
+    const rawPaths: string[] = [];
+    if (n.folderPath) rawPaths.push(n.folderPath);
     if (n.folders && Array.isArray(n.folders)) {
       for (const f of n.folders) {
-        const folderPath = f.folder?.path || f.folder?.name || '';
-        if (folderPath.toLowerCase().startsWith('spark/')) {
-          const subfolderName = folderPath.slice(6).trim();
-          if (subfolderName) {
-            const dynamicSlug = `spark-${subfolderName.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '-')}`;
-            if (!processedSlugs.has(dynamicSlug)) {
-              const palette = getDynamicPalette(subfolderName);
-              result.push({
-                id: `dynamic-${dynamicSlug}`,
-                slug: dynamicSlug,
-                title: `${subfolderName} (Spark)`,
-                shortTitle: subfolderName,
-                emoji: palette.emoji,
-                category: subfolderName,
-                accentColor: palette.accent,
-                badgeBgLight: palette.badgeBgLight,
-                badgeTextLight: palette.badgeTextLight,
-                badgeBgDark: palette.badgeBgDark,
-                badgeTextDark: palette.badgeTextDark,
-                description: `Папка ${subfolderName} из каталога Spark`,
-                notesCount: 1,
-                isCustomFolder: true,
-                folderPath,
-              });
-              processedSlugs.add(dynamicSlug);
-            }
+        const fp = f.folder?.path || f.folder?.name;
+        if (fp) rawPaths.push(fp);
+      }
+    }
+
+    for (const folderPath of rawPaths) {
+      if (folderPath.toLowerCase().startsWith('spark/')) {
+        const subfolderName = folderPath.slice(6).trim();
+        if (subfolderName) {
+          const dynamicSlug = `spark-${subfolderName.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '-')}`;
+          if (!processedSlugs.has(dynamicSlug)) {
+            const palette = getDynamicPalette(subfolderName);
+            result.push({
+              id: `dynamic-${dynamicSlug}`,
+              slug: dynamicSlug,
+              title: `${subfolderName} (Spark)`,
+              shortTitle: subfolderName,
+              emoji: palette.emoji,
+              category: subfolderName,
+              accentColor: palette.accent,
+              badgeBgLight: palette.badgeBgLight,
+              badgeTextLight: palette.badgeTextLight,
+              badgeBgDark: palette.badgeBgDark,
+              badgeTextDark: palette.badgeTextDark,
+              description: `Папка ${subfolderName} из каталога Spark`,
+              notesCount: 1,
+              isCustomFolder: true,
+              folderPath,
+            });
+            processedSlugs.add(dynamicSlug);
           }
         }
       }

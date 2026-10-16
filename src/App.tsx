@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useFeedNotes, useFeedSources } from './api/queries';
+import { feedApi } from './api/client';
 import {
   FEED_ADAPTERS,
   FeedSourceMode,
@@ -15,10 +16,15 @@ import { FeedDetailModal } from './components/FeedDetailModal';
 import { LemonSeasonsModal } from './components/LemonSeasonsModal';
 import { TelegramStreamView } from './components/TelegramStreamView';
 import { Radio, Inbox, X } from 'lucide-react';
+import { useFeedRouter } from './utils/feedRouter';
 
 export const App: React.FC = () => {
-  const [streamSource, setStreamSource] = useState<FeedSourceMode>('spark');
-  const [selectedFeedSlug, setSelectedFeedSlug] = useState<string | undefined>(undefined);
+  const {
+    streamSource,
+    selectedFeedSlug,
+    setStreamSource,
+    setSelectedFeedSlug,
+  } = useFeedRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -48,6 +54,24 @@ export const App: React.FC = () => {
   // Data fetching
   const { data: notes = [], isLoading, refetch, isRefetching } = useFeedNotes();
   const { data: allFeeds = [] } = useFeedSources();
+
+  // On-demand Wiki calendar feed auto-sync: when user switches to Wiki and no notes exist yet
+  const wikiSyncTriggered = useRef(false);
+  useEffect(() => {
+    if (selectedFeedSlug === 'wiki' && !wikiSyncTriggered.current) {
+      const hasWikiNotes = notes.some(
+        (n) => n.feed?.slug === 'wiki' || n.feed?.slug === 'wiki-history'
+      );
+      if (!hasWikiNotes) {
+        wikiSyncTriggered.current = true;
+        feedApi.syncWikiToday().then(() => {
+          refetch();
+        }).catch((e) => {
+          console.warn('[Wiki Sync] Auto-fetch error:', e);
+        });
+      }
+    }
+  }, [selectedFeedSlug, notes, refetch]);
 
   // Active adapter
   const activeAdapter = useMemo(() => {

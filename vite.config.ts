@@ -10,7 +10,27 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5175,
+    port: 5177,
+    proxy: {
+      '/api/external': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/notes': 'http://localhost:3001',
+      '/feeds': 'http://localhost:3001',
+      '/taxonomy': 'http://localhost:3001',
+      '/hashtags': 'http://localhost:3001',
+      '/folders': 'http://localhost:3001',
+      '/sync': 'http://localhost:3001',
+      '/storage': 'http://localhost:3001',
+      '/uploads': 'http://localhost:3001',
+      '/keys': 'http://localhost:3001',
+      '/containers': 'http://localhost:3001',
+      '/health': 'http://localhost:3001',
+      '/stats': 'http://localhost:3001',
+      '/api': 'http://localhost:3001',
+      '/ingestion': 'http://localhost:3001',
+    },
   },
   build: {
     chunkSizeWarningLimit: 600,

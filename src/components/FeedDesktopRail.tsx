@@ -34,9 +34,12 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
 }) => {
   const isClassic = sourceType === 'classic';
   const isTelegram = sourceType === 'telegram';
+  const isSeasons = sourceType === 'seasons';
 
   const headerCategory = activeFeed
     ? activeFeed.category
+    : isSeasons
+    ? 'Lemon Seasons'
     : isClassic
     ? 'Все события'
     : isTelegram
@@ -45,6 +48,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
 
   const headerEmoji = activeFeed
     ? activeFeed.emoji
+    : isSeasons
+    ? '🍋'
     : isClassic
     ? '🏛️'
     : isTelegram
@@ -53,6 +58,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
 
   const headerTitle = activeFeed
     ? activeFeed.title
+    : isSeasons
+    ? 'Lemon Seasons Ленты'
     : isClassic
     ? 'Все календари и праздники'
     : isTelegram
@@ -61,6 +68,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
 
   const headerDescription = activeFeed
     ? activeFeed.description
+    : isSeasons
+    ? 'Официальные ленты, городские события и хроники платформы Lemon Seasons'
     : isClassic
     ? 'Хронологический поток государственных, религиозных и мировых дат'
     : isTelegram
@@ -68,13 +77,15 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     : 'Объединенный новостной поток всех тематических папок Spark';
 
   const displayCount = isTelegram ? 624 : (activeFeed ? activeFeed.count : totalCount);
-  const categoriesLabel = isClassic ? 'тем' : 'папок';
-  const widgetTitle = isClassic
+  const categoriesLabel = isSeasons ? 'лент' : isClassic ? 'тем' : 'папок';
+  const widgetTitle = isSeasons
+    ? 'Ленты Seasons'
+    : isClassic
     ? 'Категории календаря'
     : isTelegram
     ? 'Папки Telegram'
     : 'Папки в Spark';
-  const allLabel = isClassic ? 'Все события' : isTelegram ? 'Все папки' : 'Все каналы';
+  const allLabel = isSeasons ? 'Все ленты' : isClassic ? 'Все события' : isTelegram ? 'Все папки' : 'Все каналы';
 
   return (
     <aside className="w-72 xl:w-80 shrink-0 hidden lg:flex flex-col space-y-3.5 select-none text-xs sticky top-20">

@@ -34,6 +34,7 @@ interface FeedModeOption {
 
 const FEED_MODES: FeedModeOption[] = [
   { id: 'spark', label: 'Spark', emoji: '✨' },
+  { id: 'seasons', label: 'Seasons', emoji: '🍋' },
   { id: 'classic', label: 'Classic', emoji: '🏛️' },
   { id: 'telegram', label: 'TG', emoji: '✈️', badge: 'live' },
 ];
@@ -173,7 +174,7 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
         </div>
 
         {/* Segmented Mode Switcher (Mobile: below sm) */}
-        <div className="sm:hidden grid grid-cols-3 p-0.5 rounded-xl bg-slate-100/90 dark:bg-[#131b24] border border-slate-200/60 dark:border-white/5 text-xs font-medium w-full">
+        <div className="sm:hidden grid grid-cols-4 p-0.5 rounded-xl bg-slate-100/90 dark:bg-[#131b24] border border-slate-200/60 dark:border-white/5 text-xs font-medium w-full">
           {FEED_MODES.map((mode) => {
             const isActive = streamSource === mode.id;
             return (

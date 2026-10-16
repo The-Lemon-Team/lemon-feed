@@ -55,6 +55,7 @@ export const SparkFeedAdapter: FeedAdapter = {
     // 1. Strictly filter only Spark ecosystem notes
     let matched = notes.filter((n) => {
       if (n.feed?.slug && isSparkSlug(n.feed.slug)) return true;
+      if (n.folderPath && n.folderPath.toLowerCase().startsWith('spark/')) return true;
       if (n.folders && Array.isArray(n.folders)) {
         return n.folders.some((f) => {
           const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
@@ -68,10 +69,12 @@ export const SparkFeedAdapter: FeedAdapter = {
     if (activeFeedSlug) {
       matched = matched.filter((n) => {
         if (n.feed?.slug === activeFeedSlug) return true;
+        const sub = activeFeedSlug.replace(/^spark-/, '').toLowerCase();
+        if (n.folderPath && n.folderPath.toLowerCase().includes(sub)) return true;
         if (n.folders && Array.isArray(n.folders)) {
           return n.folders.some((f) => {
             const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
-            return p.includes(activeFeedSlug.replace(/^spark-/, ''));
+            return p.includes(sub);
           });
         }
         return false;

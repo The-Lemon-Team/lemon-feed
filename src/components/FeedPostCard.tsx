@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Sparkles,
   Check,
+  Folder,
 } from 'lucide-react';
 
 export interface FeedPostCardProps {
@@ -208,6 +209,14 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
               <Sparkles className="w-3 h-3 text-[#2481cc]" />
               <span>{item.curator}</span>
             </div>
+          )}
+
+          {/* Folder Path badge */}
+          {(item.rawPayload as any)?.folderPath && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
+              <Folder className="w-3 h-3 text-[#2481cc]" />
+              <span>{(item.rawPayload as any).folderPath}</span>
+            </span>
           )}
 
           {/* Hashtags */}
