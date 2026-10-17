@@ -19,6 +19,8 @@ export interface FeedDesktopRailProps {
   availableTags?: string[];
   onSelectTag?: (tag: string) => void;
   onOpenLemonSeasons?: () => void;
+  onNavigateToCalendar?: () => void;
+  currentMonthName?: string;
 }
 
 export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
@@ -31,6 +33,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   availableTags = [],
   onSelectTag,
   onOpenLemonSeasons,
+  onNavigateToCalendar,
+  currentMonthName = 'октябрь 2026',
 }) => {
   const isClassic = sourceType === 'classic';
   const isTelegram = sourceType === 'telegram';
@@ -88,7 +92,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   const allLabel = isSeasons ? 'Все ленты' : isClassic ? 'Все события' : isTelegram ? 'Все папки' : 'Все каналы';
 
   return (
-    <aside className="w-72 xl:w-80 shrink-0 hidden lg:flex flex-col space-y-3.5 select-none text-xs sticky top-20">
+    <aside className="w-72 xl:w-80 shrink-0 hidden md:flex flex-col space-y-3.5 select-none text-xs sticky top-20">
       {/* 1. Channel Overview Card */}
       <div className="p-4 rounded-2xl bg-white/95 dark:bg-[#18222d]/95 border border-slate-200/80 dark:border-white/[0.08] shadow-soft space-y-2.5">
         <div className="flex items-center justify-between">
@@ -194,49 +198,28 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
         </div>
       </div>
 
-      {/* 3. Link to Calendar (Временно закомментирована оригинальная ссылка на localhost:5174, пока календарь в разработке) */}
-      {/*
+      {/* 3. Link to Calendar (Календарная сетка) */}
       <div className="p-4 rounded-2xl bg-gradient-to-br from-[#2481cc]/10 to-indigo-500/10 border border-[#2481cc]/25 shadow-soft space-y-2">
         <div className="flex items-center gap-2 text-[#2481cc] font-semibold">
           <Calendar className="w-3.5 h-3.5" />
           <span>Календарная сетка</span>
         </div>
         <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-          Просматривайте эти же заметки, распределенные по дням в основном календаре.
-        </p>
-        <a
-          href="http://localhost:5174/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#2481cc] hover:bg-[#1e6cb0] text-white font-medium shadow-xs transition-colors duration-150"
-        >
-          <span>Открыть календарь</span>
-          <ArrowRight className="w-3 h-3" />
-        </a>
-      </div>
-      */}
-
-      {/* 3. Блок Lemon Seasons в фирменном стиле с логотипом */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-yellow-500/10 to-lime-500/10 border border-amber-400/30 dark:border-yellow-500/20 shadow-soft space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-amber-900 dark:text-yellow-200 font-semibold text-xs">
-            <LemonLogo size={20} glow={false} />
-            <span>Lemon Seasons</span>
-          </div>
-          <span className="text-[9px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-yellow-300 border border-amber-500/20">
-            В разработке
-          </span>
-        </div>
-        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-          Календарная сетка и хроника заметок сейчас обновляются и готовятся к релизу.
+          Просматривайте эти же даты, распределенные по дням в <span className="font-semibold">{currentMonthName}</span>.
         </p>
         <button
           type="button"
-          onClick={onOpenLemonSeasons}
-          className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-xs transition-all duration-150 cursor-pointer"
+          onClick={() => {
+            if (onNavigateToCalendar) {
+              onNavigateToCalendar();
+            } else {
+              window.open('http://localhost:5174/', '_blank');
+            }
+          }}
+          className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#2481cc] hover:bg-[#1e6cb0] text-white font-medium shadow-xs transition-colors duration-150 cursor-pointer"
         >
-          <Sparkles className="w-3 h-3" />
-          <span>Подробнее о календаре</span>
+          <span>Открыть месяц</span>
+          <ArrowRight className="w-3 h-3" />
         </button>
       </div>
 

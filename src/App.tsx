@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
+import dayjs from 'dayjs';
 import { useFeedNotes, useFeedSources } from './api/queries';
 import { feedApi } from './api/client';
 import {
@@ -7,27 +8,32 @@ import {
   UnifiedFeedItem,
   UnifiedFeedTab,
 } from './adapters/feeds';
-import { FeedTopBar } from './components/FeedTopBar';
-import { FeedTabsBar } from './components/FeedTabsBar';
-import { FeedPostCard } from './components/FeedPostCard';
+import { FeedToolbar } from './components/FeedToolbar';
+import { FeedStreamView } from './components/FeedStreamView';
 import { FeedDesktopRail } from './components/FeedDesktopRail';
 import { FeedBottomNav } from './components/FeedBottomNav';
 import { FeedDetailModal } from './components/FeedDetailModal';
 import { LemonSeasonsModal } from './components/LemonSeasonsModal';
-import { TelegramStreamView } from './components/TelegramStreamView';
-import { Radio, Inbox, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
 
 export const App: React.FC = () => {
   const {
     streamSource,
     selectedFeedSlug,
+    layoutMode,
+    isEmbed,
     setStreamSource,
     setSelectedFeedSlug,
+    toggleLayoutMode,
   } = useFeedRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Month navigation & filter
+  const [selectedMonth, setSelectedMonth] = useState(() => dayjs('2026-10-17'));
+  const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
+
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
   const [selectedDetailItem, setSelectedDetailItem] = useState<UnifiedFeedItem | null>(null);
   const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(false);
@@ -55,7 +61,7 @@ export const App: React.FC = () => {
   const { data: notes = [], isLoading, refetch, isRefetching } = useFeedNotes();
   const { data: allFeeds = [] } = useFeedSources();
 
-  // On-demand Wiki calendar feed auto-sync: when user switches to Wiki and no notes exist yet
+  // On-demand Wiki calendar feed auto-sync
   const wikiSyncTriggered = useRef(false);
   useEffect(() => {
     if (selectedFeedSlug === 'wiki' && !wikiSyncTriggered.current) {
@@ -94,18 +100,25 @@ export const App: React.FC = () => {
     return activeAdapter.adaptNotes(notes, undefined, '').length;
   }, [activeAdapter, notes]);
 
-  // Filtered feed items (uses deferredSearchQuery so typing never lags)
+  // Filtered feed items (search query + optional month filter)
   const feedItems: UnifiedFeedItem[] = useMemo(() => {
-    return activeAdapter.adaptNotes(notes, selectedFeedSlug, deferredSearchQuery);
-  }, [activeAdapter, notes, selectedFeedSlug, deferredSearchQuery]);
+    let items = activeAdapter.adaptNotes(notes, selectedFeedSlug, deferredSearchQuery);
+    if (isMonthFilterActive) {
+      items = items.filter((item) => {
+        const itemDate = dayjs(item.publishedAt);
+        return itemDate.isValid() && itemDate.isSame(selectedMonth, 'month');
+      });
+    }
+    return items;
+  }, [activeAdapter, notes, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
 
-  // Progressive infinite loading (render in lightweight 24-item batches)
+  // Progressive infinite loading
   const BATCH_SIZE = 24;
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-  }, [streamSource, selectedFeedSlug, deferredSearchQuery]);
+  }, [streamSource, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
 
   const visibleFeedItems = useMemo(() => {
     return feedItems.slice(0, visibleCount);
@@ -138,7 +151,6 @@ export const App: React.FC = () => {
 
   const handleSelectTag = useCallback((tag: string) => {
     setSearchQuery(tag);
-    setIsSearchOpen(true);
   }, []);
 
   // Available hashtags
@@ -164,9 +176,37 @@ export const App: React.FC = () => {
     setActiveMobileNav('stream');
   };
 
-  const handleOpenCalendar = () => {
+  const handlePrevMonth = useCallback(() => {
+    setSelectedMonth((prev) => prev.subtract(1, 'month'));
+    setIsMonthFilterActive(true);
+  }, []);
+
+  const handleNextMonth = useCallback(() => {
+    setSelectedMonth((prev) => prev.add(1, 'month'));
+    setIsMonthFilterActive(true);
+  }, []);
+
+  const handleSelectMonth = useCallback((year: number, monthIndex: number) => {
+    setSelectedMonth(dayjs().year(year).month(monthIndex));
+    setIsMonthFilterActive(true);
+  }, []);
+
+  const handleResetMonthFilter = useCallback(() => {
+    setIsMonthFilterActive(false);
+  }, []);
+
+  const handleToday = useCallback(() => {
+    setSelectedMonth(dayjs());
+    setIsMonthFilterActive(true);
+  }, []);
+
+  const handleOpenCalendar = useCallback(() => {
     window.open('http://localhost:5174/', '_blank');
-  };
+  }, []);
+
+  const handleOpenTimeline = useCallback(() => {
+    window.open('http://localhost:5174/?view=timeline', '_blank');
+  }, []);
 
   // Close categories drawer on ESC key
   useEffect(() => {
@@ -183,106 +223,89 @@ export const App: React.FC = () => {
   }, [activeMobileNav]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0e1621] text-slate-800 dark:text-[#e2e2e2] flex flex-col transition-colors pb-16 sm:pb-8 w-full max-w-full overflow-x-hidden">
-      {/* 1. Header (Sticky Top Bar) */}
-      <FeedTopBar
-        streamSource={streamSource}
-        onSetStreamSource={handleSelectSource}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        isSearchOpen={isSearchOpen}
-        onToggleSearch={() => setIsSearchOpen((prev) => !prev)}
-        onRefresh={() => refetch()}
-        isRefreshing={isRefetching}
-        onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
-      />
-
-      {/* 2. Main Content Container */}
-      <main className="flex-1 max-w-5xl xl:max-w-6xl mx-auto w-full min-w-0 px-4 sm:px-6 py-4 flex justify-center gap-6 xl:gap-8 items-start">
-        {/* Left/Center Stream Column (Reading width) */}
-        <section className="flex-1 max-w-2xl w-full space-y-3.5 min-w-0">
-          {/* Filter Chips Bar (Spark & Classic modes) */}
-          {streamSource !== 'telegram' && (
-            <FeedTabsBar
-              streamSource={streamSource}
-              tabs={activeTabs}
-              activeFeedSlug={selectedFeedSlug}
-              isAllSelected={!selectedFeedSlug}
-              onSelectFeed={handleSelectFeed}
-              totalCount={totalCount}
-            />
-          )}
-
-          {streamSource === 'telegram' ? (
-            <TelegramStreamView
-              selectedFolderSlug={selectedFeedSlug}
-              onSelectFolderSlug={handleSelectFeed}
-            />
-          ) : (
-            <>
-              {isLoading ? (
-                <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-2">
-                  <Radio className="w-5 h-5 animate-pulse text-[#2481cc]" />
-                  <span className="text-xs font-mono">Загрузка ленты...</span>
-                </div>
-              ) : feedItems.length === 0 ? (
-                <div className="p-10 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-center text-slate-400 space-y-2">
-                  <Inbox className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Нет публикаций
-                  </h4>
-                  <p className="text-xs max-w-sm mx-auto text-slate-500">
-                    {searchQuery
-                      ? 'По вашему запросу ничего не найдено.'
-                      : 'В выбранной ленте пока нет записей.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {visibleFeedItems.map((item) => (
-                    <FeedPostCard
-                      key={item.id}
-                      item={item}
-                      onOpenDetail={handleOpenDetail}
-                      onSelectTag={handleSelectTag}
-                    />
-                  ))}
-
-                  {visibleCount < feedItems.length && (
-                    <div
-                      ref={loadMoreRef}
-                      className="py-4 text-center text-xs font-mono text-slate-400 dark:text-slate-500 animate-pulse flex items-center justify-center gap-1.5"
-                    >
-                      <Radio className="w-3.5 h-3.5 text-[#2481cc]" />
-                      <span>Показано {visibleFeedItems.length} из {feedItems.length} публикаций...</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* Right Desktop Rail */}
-        <FeedDesktopRail
-          sourceType={streamSource}
-          activeFeed={activeTabObj}
+    <div
+      className={`min-h-screen bg-[#f8fafc] dark:bg-[#0e1621] text-slate-800 dark:text-[#e2e2e2] flex flex-col transition-colors w-full max-w-full overflow-x-hidden ${
+        isEmbed ? 'pb-4' : 'pb-16 sm:pb-8'
+      }`}
+    >
+      {/* Main Responsive Container */}
+      <main className="flex-1 max-w-5xl xl:max-w-6xl mx-auto w-full min-w-0 px-3 py-4 sm:px-5 sm:py-5 space-y-4">
+        {/* Unified Top Toolbar matching calendar-app */}
+        <FeedToolbar
+          streamSource={streamSource}
+          onSetStreamSource={handleSelectSource}
           tabs={activeTabs}
-          selectedFeedSlug={selectedFeedSlug}
+          activeFeedSlug={selectedFeedSlug}
+          isAllSelected={!selectedFeedSlug}
           onSelectFeed={handleSelectFeed}
           totalCount={totalCount}
-          availableTags={availableTags}
-          onSelectTag={(tag) => {
-            setSearchQuery(tag);
-            setIsSearchOpen(true);
-          }}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectedMonth={selectedMonth}
+          isMonthFilterActive={isMonthFilterActive}
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+          onSelectMonth={handleSelectMonth}
+          onResetMonthFilter={handleResetMonthFilter}
+          onToday={handleToday}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          onRefresh={() => refetch()}
+          isRefreshing={isRefetching}
           onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
+          onNavigateToCalendar={handleOpenCalendar}
+          onNavigateToTimeline={handleOpenTimeline}
+          layoutMode={layoutMode}
+          onToggleLayoutMode={toggleLayoutMode}
         />
+
+        {/* Responsive Body: Stream-only or Split layout with desktop rail */}
+        <div
+          className={`flex flex-col ${
+            layoutMode === 'split' ? 'md:flex-row gap-5 items-start' : 'gap-4 items-center'
+          } w-full`}
+        >
+          {/* Feed Stream Component (Reusable & Exportable) */}
+          <FeedStreamView
+            streamSource={streamSource}
+            feedItems={feedItems}
+            visibleFeedItems={visibleFeedItems}
+            selectedFeedSlug={selectedFeedSlug}
+            onSelectFeed={handleSelectFeed}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            isMonthFilterActive={isMonthFilterActive}
+            selectedMonth={selectedMonth}
+            onResetMonthFilter={handleResetMonthFilter}
+            onOpenDetail={handleOpenDetail}
+            onSelectTag={handleSelectTag}
+            visibleCount={visibleCount}
+            loadMoreRef={loadMoreRef}
+            layoutMode={layoutMode}
+          />
+
+          {/* Right Desktop Rail: Folders, Metrics, Calendar, Tags (Only shown in split mode) */}
+          {layoutMode === 'split' && (
+            <FeedDesktopRail
+              sourceType={streamSource}
+              activeFeed={activeTabObj}
+              tabs={activeTabs}
+              selectedFeedSlug={selectedFeedSlug}
+              onSelectFeed={handleSelectFeed}
+              totalCount={totalCount}
+              availableTags={availableTags}
+              onSelectTag={(tag) => {
+                setSearchQuery(tag);
+              }}
+              onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
+              onNavigateToCalendar={handleOpenCalendar}
+              currentMonthName={selectedMonth.format('MMMM YYYY')}
+            />
+          )}
+        </div>
       </main>
 
-      {/* 4. Mobile Bottom Sheet for Categories (when 'categories' tab is selected) */}
+      {/* Mobile Bottom Sheet for Categories */}
       {activeMobileNav === 'categories' && (
         <div
           className="fixed inset-0 z-40 sm:hidden bg-black/50 backdrop-blur-xs flex items-end animate-fade-in"
@@ -338,22 +361,20 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Mobile Detail Modal */}
+      {/* Mobile Detail Modal */}
       <FeedDetailModal
         item={selectedDetailItem}
         onClose={() => setSelectedDetailItem(null)}
         onSelectTag={(tag) => {
           setSearchQuery(tag);
-          setIsSearchOpen(true);
         }}
       />
 
-      {/* 6. Mobile Bottom Navigation Bar */}
+      {/* Mobile Bottom Navigation Bar */}
       <FeedBottomNav
         activeTab={activeMobileNav}
         onSelectTab={(tab) => {
           if (tab === 'search') {
-            setIsSearchOpen(true);
             setActiveMobileNav('stream');
           } else {
             setActiveMobileNav(tab);
@@ -363,7 +384,7 @@ export const App: React.FC = () => {
         onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
       />
 
-      {/* 7. Lemon Seasons Status Modal */}
+      {/* Lemon Seasons Status Modal */}
       <LemonSeasonsModal
         isOpen={isLemonSeasonsModalOpen}
         onClose={() => setIsLemonSeasonsModalOpen(false)}

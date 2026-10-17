@@ -1,15 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FeedSourceMode } from '../adapters/feeds/types';
 
+export type FeedLayoutMode = 'split' | 'stream';
+
 export interface FeedRouteState {
   streamSource: FeedSourceMode;
   selectedFeedSlug?: string;
+  layoutMode: FeedLayoutMode;
+  isEmbed: boolean;
 }
 
 /**
- * Maps a FeedSourceMode to its canonical primary URL path.
+ * Maps a FeedSourceMode and route options to its canonical primary URL path.
  */
-export function getPathForFeedSource(source: FeedSourceMode, feedSlug?: string): string {
+export function getPathForFeedSource(
+  source: FeedSourceMode,
+  feedSlug?: string,
+  layoutMode?: FeedLayoutMode,
+  isEmbed?: boolean
+): string {
   let basePath = '/';
   switch (source) {
     case 'seasons':
@@ -27,11 +36,19 @@ export function getPathForFeedSource(source: FeedSourceMode, feedSlug?: string):
       break;
   }
 
+  const params = new URLSearchParams();
   if (feedSlug && feedSlug.trim()) {
-    return `${basePath}?feed=${encodeURIComponent(feedSlug.trim())}`;
+    params.set('feed', feedSlug.trim());
+  }
+  if (layoutMode === 'stream') {
+    params.set('layout', 'stream');
+  }
+  if (isEmbed) {
+    params.set('embed', 'true');
   }
 
-  return basePath;
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
 }
 
 /**
@@ -39,59 +56,68 @@ export function getPathForFeedSource(source: FeedSourceMode, feedSlug?: string):
  */
 export function parseCurrentFeedRoute(): FeedRouteState {
   if (typeof window === 'undefined') {
-    return { streamSource: 'spark' };
+    return { streamSource: 'spark', layoutMode: 'split', isEmbed: false };
   }
 
   const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
   const searchParams = new URLSearchParams(window.location.search);
   const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '');
 
-  // 1. Check direct query param ?tab=... or ?source=...
+  // 1. Embed & Layout parameters
+  const layoutParam = searchParams.get('layout') || searchParams.get('view');
+  const streamOnly = searchParams.get('streamOnly') === 'true' || searchParams.get('only') === 'stream';
+  const embedParam = searchParams.get('embed') === 'true';
+  const isEmbed = embedParam || (typeof window !== 'undefined' && window.self !== window.top);
+  const layoutMode: FeedLayoutMode = (layoutParam === 'stream' || streamOnly) ? 'stream' : 'split';
+
+  // 2. Check direct query param ?tab=... or ?source=...
   const tabParam = searchParams.get('tab') || searchParams.get('source');
   const feedParam = searchParams.get('feed') || undefined;
 
   if (tabParam) {
-    if (tabParam === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: feedParam };
-    if (tabParam === 'classic') return { streamSource: 'classic', selectedFeedSlug: feedParam };
-    if (tabParam === 'tg' || tabParam === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: feedParam };
-    if (tabParam === 'spark') return { streamSource: 'spark', selectedFeedSlug: feedParam };
+    if (tabParam === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: feedParam, layoutMode, isEmbed };
+    if (tabParam === 'classic') return { streamSource: 'classic', selectedFeedSlug: feedParam, layoutMode, isEmbed };
+    if (tabParam === 'tg' || tabParam === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: feedParam, layoutMode, isEmbed };
+    if (tabParam === 'spark') return { streamSource: 'spark', selectedFeedSlug: feedParam, layoutMode, isEmbed };
   }
 
-  // 2. Check Hash Route (#/classic, #seasons, #tg, etc.)
+  // 3. Check Hash Route (#/classic, #seasons, #tg, etc.)
   if (hash) {
     const [hashPath, hashQuery] = hash.split('?');
     const hashParams = new URLSearchParams(hashQuery || '');
     const hashFeed = hashParams.get('feed') || feedParam;
 
-    if (hashPath === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: hashFeed };
-    if (hashPath === 'classic') return { streamSource: 'classic', selectedFeedSlug: hashFeed };
-    if (hashPath === 'tg' || hashPath === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: hashFeed };
-    if (hashPath === 'wiki') return { streamSource: 'classic', selectedFeedSlug: 'wiki' };
-    if (hashPath === 'spark') return { streamSource: 'spark', selectedFeedSlug: hashFeed };
+    if (hashPath === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
+    if (hashPath === 'classic') return { streamSource: 'classic', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
+    if (hashPath === 'tg' || hashPath === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
+    if (hashPath === 'wiki') return { streamSource: 'classic', selectedFeedSlug: 'wiki', layoutMode, isEmbed };
+    if (hashPath === 'spark') return { streamSource: 'spark', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
   }
 
-  // 3. Check HTML5 Pathname (/spark, /seasons, /classic, /tg, /telegram, /wiki)
+  // 4. Check HTML5 Pathname (/spark, /seasons, /classic, /tg, /telegram, /wiki)
   const segments = pathname.split('/').filter(Boolean);
   const primarySegment = segments[0] || '';
   const subSegment = segments[1] || feedParam;
 
   if (primarySegment === 'seasons') {
-    return { streamSource: 'seasons', selectedFeedSlug: subSegment };
+    return { streamSource: 'seasons', selectedFeedSlug: subSegment, layoutMode, isEmbed };
   }
   if (primarySegment === 'classic') {
-    return { streamSource: 'classic', selectedFeedSlug: subSegment };
+    return { streamSource: 'classic', selectedFeedSlug: subSegment, layoutMode, isEmbed };
   }
   if (primarySegment === 'tg' || primarySegment === 'telegram') {
-    return { streamSource: 'telegram', selectedFeedSlug: subSegment };
+    return { streamSource: 'telegram', selectedFeedSlug: subSegment, layoutMode, isEmbed };
   }
   if (primarySegment === 'wiki') {
-    return { streamSource: 'classic', selectedFeedSlug: 'wiki' };
+    return { streamSource: 'classic', selectedFeedSlug: 'wiki', layoutMode, isEmbed };
   }
 
   // Default to spark
   return {
     streamSource: 'spark',
     selectedFeedSlug: primarySegment === 'spark' ? subSegment : feedParam,
+    layoutMode,
+    isEmbed,
   };
 }
 
@@ -114,36 +140,79 @@ export function useFeedRouter() {
   }, []);
 
   // Navigate to a new source / feed tab with history push
-  const navigateTo = useCallback((source: FeedSourceMode, feedSlug?: string, replace = false) => {
-    setRouteState({ streamSource: source, selectedFeedSlug: feedSlug });
+  const navigateTo = useCallback(
+    (source: FeedSourceMode, feedSlug?: string, newLayoutMode?: FeedLayoutMode, replace = false) => {
+      setRouteState((curr) => {
+        const layoutMode = newLayoutMode ?? curr.layoutMode;
+        if (typeof window !== 'undefined') {
+          const newUrl = getPathForFeedSource(source, feedSlug, layoutMode, curr.isEmbed);
+          const currentUrl = window.location.pathname + window.location.search;
+          if (newUrl !== currentUrl) {
+            if (replace) {
+              window.history.replaceState(null, '', newUrl);
+            } else {
+              window.history.pushState(null, '', newUrl);
+            }
+          }
+        }
+        return {
+          ...curr,
+          streamSource: source,
+          selectedFeedSlug: feedSlug,
+          layoutMode,
+        };
+      });
+    },
+    []
+  );
 
-    if (typeof window !== 'undefined') {
-      const newUrl = getPathForFeedSource(source, feedSlug);
-      const currentUrl = window.location.pathname + window.location.search;
-      if (newUrl !== currentUrl) {
-        if (replace) {
-          window.history.replaceState(null, '', newUrl);
-        } else {
+  const setStreamSource = useCallback(
+    (source: FeedSourceMode) => {
+      navigateTo(source, undefined);
+    },
+    [navigateTo]
+  );
+
+  const setSelectedFeedSlug = useCallback(
+    (feedSlug?: string | ((prev?: string) => string | undefined)) => {
+      setRouteState((curr) => {
+        const nextSlug = typeof feedSlug === 'function' ? feedSlug(curr.selectedFeedSlug) : feedSlug;
+        if (typeof window !== 'undefined') {
+          const newUrl = getPathForFeedSource(curr.streamSource, nextSlug, curr.layoutMode, curr.isEmbed);
           window.history.pushState(null, '', newUrl);
         }
-      }
-    }
-  }, []);
+        return {
+          ...curr,
+          selectedFeedSlug: nextSlug,
+        };
+      });
+    },
+    []
+  );
 
-  const setStreamSource = useCallback((source: FeedSourceMode) => {
-    navigateTo(source, undefined);
-  }, [navigateTo]);
-
-  const setSelectedFeedSlug = useCallback((feedSlug?: string | ((prev?: string) => string | undefined)) => {
+  const setLayoutMode = useCallback((layoutMode: FeedLayoutMode) => {
     setRouteState((curr) => {
-      const nextSlug = typeof feedSlug === 'function' ? feedSlug(curr.selectedFeedSlug) : feedSlug;
       if (typeof window !== 'undefined') {
-        const newUrl = getPathForFeedSource(curr.streamSource, nextSlug);
+        const newUrl = getPathForFeedSource(curr.streamSource, curr.selectedFeedSlug, layoutMode, curr.isEmbed);
         window.history.pushState(null, '', newUrl);
       }
       return {
         ...curr,
-        selectedFeedSlug: nextSlug,
+        layoutMode,
+      };
+    });
+  }, []);
+
+  const toggleLayoutMode = useCallback(() => {
+    setRouteState((curr) => {
+      const nextMode: FeedLayoutMode = curr.layoutMode === 'stream' ? 'split' : 'stream';
+      if (typeof window !== 'undefined') {
+        const newUrl = getPathForFeedSource(curr.streamSource, curr.selectedFeedSlug, nextMode, curr.isEmbed);
+        window.history.pushState(null, '', newUrl);
+      }
+      return {
+        ...curr,
+        layoutMode: nextMode,
       };
     });
   }, []);
@@ -151,8 +220,12 @@ export function useFeedRouter() {
   return {
     streamSource: routeState.streamSource,
     selectedFeedSlug: routeState.selectedFeedSlug,
+    layoutMode: routeState.layoutMode,
+    isEmbed: routeState.isEmbed,
     setStreamSource,
     setSelectedFeedSlug,
+    setLayoutMode,
+    toggleLayoutMode,
     navigateTo,
   };
 }
