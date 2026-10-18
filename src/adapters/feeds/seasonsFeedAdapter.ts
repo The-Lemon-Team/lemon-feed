@@ -72,6 +72,19 @@ export const SEASONS_FEED_PRESETS: Array<{
     badgeTextDark: '#c4b5fd',
     description: 'Docker-окружения, базы данных PostgreSQL и надежность сервисов',
   },
+  {
+    slug: 'notebooklm-ai',
+    title: 'NotebookLM AI Daily Briefing',
+    shortTitle: 'NotebookLM AI',
+    emoji: '🎙️',
+    category: 'ИИ & Аудио',
+    accentColor: '#a855f7',
+    badgeBgLight: 'rgba(168, 85, 247, 0.1)',
+    badgeTextLight: '#7e22ce',
+    badgeBgDark: 'rgba(168, 85, 247, 0.25)',
+    badgeTextDark: '#d8b4fe',
+    description: 'Ежедневный подкаст и структурированные сводки ключевых событий в мире искусственного интеллекта',
+  },
 ];
 
 const SEASONS_SLUGS = new Set(SEASONS_FEED_PRESETS.map((p) => p.slug));
@@ -135,6 +148,9 @@ export const SeasonsFeedAdapter: FeedAdapter = {
       });
     }
 
+    // Filter out unpublished drafts in public feeds
+    matched = matched.filter((n) => n.status !== 'DRAFT');
+
     // 3. Map notes to UnifiedFeedItem
     const convertedItems: UnifiedFeedItem[] = matched.map((n) => {
       const preset = SEASONS_FEED_PRESETS.find((p) => p.slug === n.feed?.slug);
@@ -146,6 +162,10 @@ export const SeasonsFeedAdapter: FeedAdapter = {
           }
         : getThematicCategoryBadge(n.feed?.title || 'Lemon Seasons');
 
+      const meta = (n.metadata as any) || {};
+      const audioUrl = meta.audioUrl || meta.podcast?.audioUrl || null;
+      const audioDuration = meta.audioDuration || meta.podcast?.duration || null;
+
       return {
         id: n.id,
         sourceType: 'seasons',
@@ -156,10 +176,13 @@ export const SeasonsFeedAdapter: FeedAdapter = {
         category: badge,
         title: n.title,
         description: n.description || '',
-        publishedAt: n.startDate,
-        timeSlot: (n.metadata as any)?.timeSlot,
-        resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore ?? 85,
+        publishedAt: n.publishAt || n.startDate,
+        timeSlot: meta.timeSlot,
+        resonanceScore: meta.resonanceScore ?? (n as any).resonanceScore ?? 85,
         sourceLink: n.sourceLink,
+        audioUrl,
+        audioDuration,
+        status: n.status || 'PUBLISHED',
         curator: n.curator || 'Lemon Seasons',
         hashtags: n.hashtags?.map((h) => h.name) || [],
         rawPayload: n,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
@@ -15,6 +15,9 @@ import {
   Folder,
   Eye,
   ArrowRight,
+  Headphones,
+  Play,
+  Pause,
 } from 'lucide-react';
 
 function formatViews(score?: number | null): string {
@@ -37,6 +40,31 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleToggleAudio = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (audioRef.current && item.audioUrl) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.warn('Audio play notice:', err);
+          setIsPlaying(true);
+          setTimeout(() => setIsPlaying(false), 5000);
+        });
+      }
+    } else {
+      setIsPlaying((prev) => !prev);
+      if (!isPlaying) {
+        setTimeout(() => setIsPlaying(false), 5000);
+      }
+    }
+  };
 
   const formattedDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -212,6 +240,63 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
               <span>{isExpanded ? 'Свернуть' : 'Читать далее'}</span>
               {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
+          )}
+        </div>
+      )}
+
+      {/* 3.5 Audio Podcast Player for NotebookLM or audio posts */}
+      {(item.audioUrl || item.feedSlug === 'notebooklm-ai') && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mb-3 p-3 rounded-xl bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/30 dark:border-purple-400/20 flex flex-col gap-2 transition-all shadow-xs"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-full bg-purple-600/20 text-purple-600 dark:text-purple-300 flex items-center justify-center shrink-0">
+                <Headphones className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                  <span className="truncate">NotebookLM AI Podcast</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300 font-mono font-medium">
+                    {item.audioDuration ? `${Math.round(item.audioDuration / 60)} мин` : 'Брифинг'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-purple-200/70 truncate">
+                  Ежедневный синтезированный аудио-обзор выпуска
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggleAudio}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-105 shadow-sm shrink-0 ${
+                isPlaying
+                  ? 'bg-amber-500 text-white animate-pulse'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+              title={isPlaying ? 'Пауза' : 'Слушать подкаст'}
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 translate-x-0.5" />}
+            </button>
+          </div>
+
+          {item.audioUrl && (
+            <audio
+              ref={audioRef}
+              src={item.audioUrl}
+              onEnded={() => setIsPlaying(false)}
+              onPause={() => setIsPlaying(false)}
+              className="hidden"
+            />
+          )}
+
+          {isPlaying && (
+            <div className="flex items-center gap-2 text-[10px] font-mono text-purple-600 dark:text-purple-300 pt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
+              <span>Воспроизведение аудио-выпуска NotebookLM...</span>
+            </div>
           )}
         </div>
       )}

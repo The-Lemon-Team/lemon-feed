@@ -169,7 +169,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
             {item.curator && (
               <>
                 <Sparkles className="w-3.5 h-3.5 text-[#2481cc]" />
-                <span>Куратор: {item.curator}</span>
+                <span>Автор: {item.curator}</span>
               </>
             )}
           </div>
