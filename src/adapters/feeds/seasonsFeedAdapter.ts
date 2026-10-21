@@ -104,7 +104,14 @@ export const SeasonsFeedAdapter: FeedAdapter = {
       }
     }
 
-    return SEASONS_FEED_PRESETS.map((preset) => {
+    return SEASONS_FEED_PRESETS
+      .filter((preset) => {
+        // Only include if present in user's accessible feeds or has accessible notes or is public preset
+        const isPresent = context.allFeeds.some((f) => f.slug === preset.slug);
+        const hasNotes = (countsBySlug[preset.slug] || 0) > 0;
+        return isPresent || hasNotes || preset.slug === 'design-systems' || preset.slug === 'jm-daily';
+      })
+      .map((preset) => {
       const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
       let count = countsBySlug[preset.slug] ?? dbFeed?._count?.notes ?? 0;
 

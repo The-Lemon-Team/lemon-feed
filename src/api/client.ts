@@ -16,6 +16,27 @@ export const apiClient = axios.create({
   timeout: 15000,
 });
 
+let currentFeedAuthToken: string | null = null;
+let currentFeedUserKey: string | null = null;
+
+export const setFeedAuthToken = (token: string | null, userKey?: string | null) => {
+  currentFeedAuthToken = token;
+  currentFeedUserKey = userKey || null;
+};
+
+export const getFeedAuthToken = () => currentFeedAuthToken;
+export const getFeedUserKey = () => currentFeedUserKey;
+
+apiClient.interceptors.request.use((config) => {
+  if (currentFeedAuthToken) {
+    config.headers.Authorization = `Bearer ${currentFeedAuthToken}`;
+  }
+  if (currentFeedUserKey) {
+    config.headers['x-user-key'] = currentFeedUserKey;
+  }
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

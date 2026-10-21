@@ -146,10 +146,13 @@ export function resolveSparkFeeds(
   const result: SparkFeedItem[] = [];
   const processedSlugs = new Set<string>();
 
-  // 1. Add primary Spark feeds
+  // 1. Add primary Spark feeds (if present in user's accessible feeds or has notes)
   for (const primary of PRIMARY_SPARK_FEEDS) {
     const existing = allFeeds.find((f) => f.slug === primary.slug);
     const count = countsBySlug[primary.slug] || (existing ? existing._count?.notes ?? 0 : 0);
+
+    // If the feed is private and not accessible to the current user (not in allFeeds and 0 notes), skip
+    if (!existing && count === 0) continue;
 
     result.push({
       id: existing?.id || primary.slug,

@@ -125,7 +125,13 @@ export const ClassicFeedAdapter: FeedAdapter = {
       }
     }
 
-    return CLASSIC_FEED_PRESETS.map((preset) => {
+    return CLASSIC_FEED_PRESETS
+      .filter((preset) => {
+        const hasDbFeed = context.allFeeds.some((f) => preset.matchingSlugs.includes(f.slug));
+        const hasNotes = (countsByPreset[preset.slug] || 0) > 0;
+        return hasDbFeed || hasNotes;
+      })
+      .map((preset) => {
       const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
       const dbCount = context.allFeeds
         .filter((f) => preset.matchingSlugs.includes(f.slug))

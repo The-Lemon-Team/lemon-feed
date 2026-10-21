@@ -16,6 +16,7 @@ import { FeedDetailModal } from './components/FeedDetailModal';
 import { LemonSeasonsModal } from './components/LemonSeasonsModal';
 import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
+import { useFeedAuthSync } from './hooks/useFeedAuthSync';
 
 export const App: React.FC = () => {
   const {
@@ -27,11 +28,25 @@ export const App: React.FC = () => {
     setSelectedFeedSlug,
     toggleLayoutMode,
   } = useFeedRouter();
+
+  // Synchronize authentication token and session from parent host via postMessage
+  const authSync = useFeedAuthSync(isEmbed);
+
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // Month navigation & filter
-  const [selectedMonth, setSelectedMonth] = useState(() => dayjs('2026-10-17'));
+  // Month navigation & filter (supports start / startDate from host app URL)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlDate = sp.get('startDate') || sp.get('start');
+      if (urlDate) {
+        const parsed = dayjs(urlDate);
+        if (parsed.isValid()) return parsed;
+      }
+    }
+    return dayjs('2026-10-17');
+  });
   const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
 
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
@@ -268,6 +283,7 @@ export const App: React.FC = () => {
           {/* Feed Stream Component (Reusable & Exportable) */}
           <FeedStreamView
             streamSource={streamSource}
+            onSetStreamSource={handleSelectSource}
             feedItems={feedItems}
             visibleFeedItems={visibleFeedItems}
             selectedFeedSlug={selectedFeedSlug}

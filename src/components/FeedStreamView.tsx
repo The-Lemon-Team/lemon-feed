@@ -7,6 +7,7 @@ import { TelegramStreamView } from './TelegramStreamView';
 
 export interface FeedStreamViewProps {
   streamSource: FeedSourceMode;
+  onSetStreamSource?: (mode: FeedSourceMode) => void;
   feedItems: UnifiedFeedItem[];
   visibleFeedItems: UnifiedFeedItem[];
   selectedFeedSlug?: string;
@@ -29,6 +30,7 @@ export interface FeedStreamViewProps {
  */
 export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   streamSource,
+  onSetStreamSource,
   feedItems,
   visibleFeedItems,
   selectedFeedSlug,
@@ -67,19 +69,32 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
               <span className="text-xs font-mono">Загрузка ленты...</span>
             </div>
           ) : feedItems.length === 0 ? (
-            <div className="p-10 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-center text-slate-400 space-y-2">
+            <div className="p-10 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-center text-slate-400 space-y-3">
               <Inbox className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
               <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Нет публикаций
+                {streamSource === 'spark' && !searchQuery
+                  ? 'Приватный контур Spark'
+                  : 'Нет публикаций'}
               </h4>
               <p className="text-xs max-w-sm mx-auto text-slate-500">
                 {searchQuery
                   ? 'По вашему запросу ничего не найдено.'
                   : isMonthFilterActive
                   ? `В ${selectedMonth.format('MMMM YYYY')} нет записей для этой папки.`
+                  : streamSource === 'spark'
+                  ? 'Ленты Spark содержат закрытую внутреннюю информацию и доступны только с токеном администратора. Общедоступные календари открыты в разделе Classic.'
                   : 'В выбранной ленте пока нет записей.'}
               </p>
-              {isMonthFilterActive && !searchQuery && (
+              {streamSource === 'spark' && onSetStreamSource && !searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSetStreamSource('classic')}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2481cc]/15 hover:bg-[#2481cc]/25 text-[#2481cc] dark:text-[#64b5f6] text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Перейти в Classic ленты →
+                </button>
+              )}
+              {isMonthFilterActive && !searchQuery && streamSource !== 'spark' && (
                 <button
                   type="button"
                   onClick={onResetMonthFilter}

@@ -21,6 +21,9 @@ export function getPathForFeedSource(
 ): string {
   let basePath = '/';
   switch (source) {
+    case 'dev':
+      basePath = '/dev';
+      break;
     case 'seasons':
       basePath = '/seasons';
       break;
@@ -75,6 +78,7 @@ export function parseCurrentFeedRoute(): FeedRouteState {
   const feedParam = searchParams.get('feed') || undefined;
 
   if (tabParam) {
+    if (tabParam === 'dev' || tabParam === 'devhub') return { streamSource: 'dev', selectedFeedSlug: feedParam, layoutMode, isEmbed };
     if (tabParam === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: feedParam, layoutMode, isEmbed };
     if (tabParam === 'classic') return { streamSource: 'classic', selectedFeedSlug: feedParam, layoutMode, isEmbed };
     if (tabParam === 'tg' || tabParam === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: feedParam, layoutMode, isEmbed };
@@ -87,6 +91,7 @@ export function parseCurrentFeedRoute(): FeedRouteState {
     const hashParams = new URLSearchParams(hashQuery || '');
     const hashFeed = hashParams.get('feed') || feedParam;
 
+    if (hashPath === 'dev' || hashPath === 'devhub') return { streamSource: 'dev', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
     if (hashPath === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
     if (hashPath === 'classic') return { streamSource: 'classic', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
     if (hashPath === 'tg' || hashPath === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
@@ -99,6 +104,9 @@ export function parseCurrentFeedRoute(): FeedRouteState {
   const primarySegment = segments[0] || '';
   const subSegment = segments[1] || feedParam;
 
+  if (primarySegment === 'dev' || primarySegment === 'devhub') {
+    return { streamSource: 'dev', selectedFeedSlug: subSegment, layoutMode, isEmbed };
+  }
   if (primarySegment === 'seasons') {
     return { streamSource: 'seasons', selectedFeedSlug: subSegment, layoutMode, isEmbed };
   }

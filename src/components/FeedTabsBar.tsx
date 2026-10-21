@@ -22,8 +22,16 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isClassic = streamSource === 'classic';
   const isSeasons = streamSource === 'seasons';
-  const allLabel = isClassic ? 'Все события' : isSeasons ? 'Все ленты' : 'Все каналы';
-  const allEmoji = isClassic ? '🏛️' : isSeasons ? '🍋' : '📡';
+  const isDev = streamSource === 'dev';
+  const allLabel = isDev ? 'Все Dev ленты' : isClassic ? 'Все события' : isSeasons ? 'Все ленты' : 'Все каналы';
+  const allEmoji = isDev ? '💻' : isClassic ? '🏛️' : isSeasons ? '🍋' : '📡';
+
+  const activeTabWithSubtopics = tabs.find(
+    (t) =>
+      t.subtopics &&
+      t.subtopics.length > 0 &&
+      (activeFeedSlug === t.slug || t.subtopics.some((s) => s.slug === activeFeedSlug))
+  );
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY !== 0 && scrollRef.current) {
@@ -32,7 +40,7 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
   };
 
   return (
-    <div className="w-full min-w-0 select-none pb-1">
+    <div className="w-full min-w-0 select-none pb-1 space-y-1">
       <div
         ref={scrollRef}
         onWheel={handleWheel}
@@ -63,7 +71,9 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
 
         {/* Individual Thematic Tabs */}
         {tabs.map((tab) => {
-          const isSelected = activeFeedSlug === tab.slug;
+          const isSelected =
+            activeFeedSlug === tab.slug ||
+            Boolean(tab.subtopics && tab.subtopics.some((s) => s.slug === activeFeedSlug));
           return (
             <button
               key={tab.id}
@@ -103,6 +113,46 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
           </button>
         )}
       </div>
+
+      {/* Subtopics Row (for tabs with subtopics, e.g. Changelogs) */}
+      {activeTabWithSubtopics && activeTabWithSubtopics.subtopics && activeTabWithSubtopics.subtopics.length > 0 && (
+        <div className="w-full overflow-x-auto no-scrollbar touch-scroll py-0.5 flex items-center gap-1 sm:gap-1.5 pl-2 border-l-2 border-[#2481cc]/40 dark:border-[#2481cc]/50">
+          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+            Подтемы:
+          </span>
+          <button
+            type="button"
+            onClick={() => onSelectFeed(activeTabWithSubtopics.slug)}
+            className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors select-none ${
+              activeFeedSlug === activeTabWithSubtopics.slug
+                ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <span>Все {activeTabWithSubtopics.shortTitle}</span>
+            <span className="font-mono text-[9px] opacity-80">{activeTabWithSubtopics.count}</span>
+          </button>
+          {activeTabWithSubtopics.subtopics.map((sub) => {
+            const isSubSelected = activeFeedSlug === sub.slug;
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => onSelectFeed(sub.slug)}
+                className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors select-none ${
+                  isSubSelected
+                    ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <span>{sub.emoji}</span>
+                <span>{sub.title}</span>
+                <span className="font-mono text-[9px] opacity-80">{sub.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

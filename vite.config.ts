@@ -3,15 +3,36 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
+  envDir: path.resolve(__dirname, '../../'),
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      '@tanstack/react-query',
+      'dayjs',
+      'dayjs/locale/ru',
+      'lucide-react',
+      'axios',
+      'clsx',
+      'tailwind-merge',
+    ],
   },
   server: {
     port: 5175,
     host: true,
+    hmr: {
+      clientPort: 5175,
+      port: 5175,
+    },
     proxy: {
       '/api/external': {
         target: 'http://localhost:4000',

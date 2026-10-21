@@ -1,6 +1,6 @@
 import { Note } from '@lenta/shared';
 
-export type FeedSourceMode = 'spark' | 'seasons' | 'classic' | 'telegram';
+export type FeedSourceMode = 'spark' | 'dev' | 'seasons' | 'classic' | 'telegram';
 
 export interface ThematicCategoryBadge {
   label: string;
@@ -31,6 +31,16 @@ export interface UnifiedFeedItem {
   rawPayload: Note | any;
 }
 
+export interface UnifiedSubtopic {
+  id: string;
+  slug: string;
+  subfolder: string;
+  title: string;
+  emoji: string;
+  count: number;
+  accentColor?: string;
+}
+
 export interface UnifiedFeedTab {
   id: string;
   slug: string;
@@ -46,6 +56,7 @@ export interface UnifiedFeedTab {
   badgeTextDark?: string;
   description?: string;
   isCustomFolder?: boolean;
+  subtopics?: UnifiedSubtopic[];
 }
 
 export interface FeedAdapterContext {

@@ -54,6 +54,7 @@ export interface FeedToolbarProps {
 
 const FEED_MODES: Array<{ id: FeedSourceMode; label: string; emoji: string; badge?: string }> = [
   { id: 'spark', label: 'Spark', emoji: '✨' },
+  { id: 'dev', label: 'Dev Hub', emoji: '💻' },
   { id: 'seasons', label: 'Seasons', emoji: '🍋' },
   { id: 'classic', label: 'Classic', emoji: '🏛️' },
   { id: 'telegram', label: 'TG', emoji: '✈️', badge: 'live' },
@@ -101,8 +102,18 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isMonthPickerOpen]);
 
-  const allLabel = streamSource === 'classic' ? 'Все события' : streamSource === 'seasons' ? 'Все ленты' : 'Все каналы';
-  const allEmoji = streamSource === 'classic' ? '🏛️' : streamSource === 'seasons' ? '🍋' : '📡';
+  const isClassic = streamSource === 'classic';
+  const isSeasons = streamSource === 'seasons';
+  const isDev = streamSource === 'dev';
+  const allLabel = isDev ? 'Все Dev ленты' : isClassic ? 'Все события' : isSeasons ? 'Все ленты' : 'Все каналы';
+  const allEmoji = isDev ? '💻' : isClassic ? '🏛️' : isSeasons ? '🍋' : '📡';
+
+  const activeTabWithSubtopics = tabs.find(
+    (t) =>
+      t.subtopics &&
+      t.subtopics.length > 0 &&
+      (activeFeedSlug === t.slug || t.subtopics.some((s) => s.slug === activeFeedSlug))
+  );
 
   return (
     <div className="relative z-20 shrink-0 w-full rounded-2xl bg-white/95 dark:bg-[#18222d]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/[0.08] p-3 sm:p-4.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3 transition-colors select-none">
@@ -266,7 +277,9 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
 
           {/* Individual Thematic Feed Tabs */}
           {tabs.map((tab) => {
-            const isSelected = activeFeedSlug === tab.slug;
+            const isSelected =
+              activeFeedSlug === tab.slug ||
+              Boolean(tab.subtopics && tab.subtopics.some((s) => s.slug === activeFeedSlug));
             return (
               <button
                 key={tab.id}
@@ -304,6 +317,55 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
+        </div>
+      )}
+
+      {/* 2.5 Subtopics Row (e.g. for Changelogs: Google, OpenAI, Anthropic) */}
+      {streamSource !== 'telegram' && activeTabWithSubtopics && activeTabWithSubtopics.subtopics && activeTabWithSubtopics.subtopics.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar touch-scroll pl-2 sm:pl-3 border-l-2 border-[#2481cc]/40 dark:border-[#2481cc]/50 my-0.5 animate-fadeIn">
+          <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1 font-semibold">
+            <span>🏷️</span>
+            <span>Подтемы:</span>
+          </span>
+
+          {/* All Subtopics in this tab */}
+          <button
+            type="button"
+            onClick={() => onSelectFeed(activeTabWithSubtopics.slug)}
+            className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors select-none ${
+              activeFeedSlug === activeTabWithSubtopics.slug
+                ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <span>Все {activeTabWithSubtopics.shortTitle}</span>
+            <span className="font-mono text-[9px] opacity-80">
+              {activeTabWithSubtopics.count}
+            </span>
+          </button>
+
+          {/* Individual Subtopics */}
+          {activeTabWithSubtopics.subtopics.map((sub) => {
+            const isSubSelected = activeFeedSlug === sub.slug;
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => onSelectFeed(sub.slug)}
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors select-none ${
+                  isSubSelected
+                    ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <span>{sub.emoji}</span>
+                <span>{sub.title}</span>
+                <span className="font-mono text-[9px] opacity-80">
+                  {sub.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
