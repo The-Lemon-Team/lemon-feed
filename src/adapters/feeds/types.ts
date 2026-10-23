@@ -20,6 +20,7 @@ export interface UnifiedFeedItem {
   description: string;
   summary?: string | null;
   publishedAt: string;
+  updatedAt?: string | null;
   timeSlot?: 'MORNING' | 'AFTERNOON' | 'EVENING';
   resonanceScore?: number;
   sourceLink?: string | null;
@@ -28,7 +29,17 @@ export interface UnifiedFeedItem {
   status?: string | null;
   curator?: string | null;
   hashtags?: string[];
+  coverUrl?: string | null;
   rawPayload: Note | any;
+}
+
+export function extractNoteCoverUrl(note: any): string | null {
+  if (!note) return null;
+  if (Array.isArray(note.images) && note.images.length > 0) {
+    const mainImg = note.images.find((img: any) => img.isMain);
+    return mainImg?.url || note.images[0]?.url || null;
+  }
+  return null;
 }
 
 export interface UnifiedSubtopic {

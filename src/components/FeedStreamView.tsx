@@ -19,6 +19,8 @@ export interface FeedStreamViewProps {
   onResetMonthFilter: () => void;
   onOpenDetail: (item: UnifiedFeedItem) => void;
   onSelectTag: (tag: string) => void;
+  onEditNote?: (item: UnifiedFeedItem) => void;
+  onAiCover?: (item: UnifiedFeedItem) => void;
   visibleCount: number;
   loadMoreRef?: RefObject<HTMLDivElement>;
   layoutMode?: 'split' | 'stream';
@@ -42,6 +44,8 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   onResetMonthFilter,
   onOpenDetail,
   onSelectTag,
+  onEditNote,
+  onAiCover,
   visibleCount,
   loadMoreRef,
   layoutMode = 'split',
@@ -112,6 +116,8 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                   item={item}
                   onOpenDetail={onOpenDetail}
                   onSelectTag={onSelectTag}
+                  onEditNote={onEditNote}
+                  onAiCover={onAiCover}
                 />
               ))}
 

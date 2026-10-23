@@ -13,6 +13,8 @@ import { FeedStreamView } from './components/FeedStreamView';
 import { FeedDesktopRail } from './components/FeedDesktopRail';
 import { FeedBottomNav } from './components/FeedBottomNav';
 import { FeedDetailModal } from './components/FeedDetailModal';
+import { FeedEditNoteModal } from './components/FeedEditNoteModal';
+import { FeedAiCoverModal } from './components/FeedAiCoverModal';
 import { LemonSeasonsModal } from './components/LemonSeasonsModal';
 import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
@@ -51,6 +53,9 @@ export const App: React.FC = () => {
 
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
   const [selectedDetailItem, setSelectedDetailItem] = useState<UnifiedFeedItem | null>(null);
+  const [editingItem, setEditingItem] = useState<UnifiedFeedItem | null>(null);
+  const [aiCoverItem, setAiCoverItem] = useState<UnifiedFeedItem | null>(null);
+  const [aiCoverTemplateId, setAiCoverTemplateId] = useState<string | undefined>(undefined);
   const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(false);
 
   // Dark / Light Theme
@@ -107,7 +112,13 @@ export const App: React.FC = () => {
   // Active tab object for sidebar detail
   const activeTabObj: UnifiedFeedTab | null = useMemo(() => {
     if (!selectedFeedSlug) return null;
-    return activeTabs.find((t) => t.slug === selectedFeedSlug) || null;
+    return (
+      activeTabs.find(
+        (t) =>
+          t.slug === selectedFeedSlug ||
+          Boolean(t.subtopics && t.subtopics.some((s) => s.slug === selectedFeedSlug))
+      ) || null
+    );
   }, [activeTabs, selectedFeedSlug]);
 
   // Mode total count
@@ -223,6 +234,15 @@ export const App: React.FC = () => {
     window.open('http://localhost:5174/?view=timeline', '_blank');
   }, []);
 
+  const handleOpenEdit = useCallback((item: UnifiedFeedItem) => {
+    setEditingItem(item);
+  }, []);
+
+  const handleOpenAiCover = useCallback((item: UnifiedFeedItem, templateId?: string) => {
+    setAiCoverTemplateId(templateId);
+    setAiCoverItem(item);
+  }, []);
+
   // Close categories drawer on ESC key
   useEffect(() => {
     if (activeMobileNav !== 'categories') return;
@@ -295,6 +315,8 @@ export const App: React.FC = () => {
             onResetMonthFilter={handleResetMonthFilter}
             onOpenDetail={handleOpenDetail}
             onSelectTag={handleSelectTag}
+            onEditNote={handleOpenEdit}
+            onAiCover={handleOpenAiCover}
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}
             layoutMode={layoutMode}
@@ -381,8 +403,40 @@ export const App: React.FC = () => {
       <FeedDetailModal
         item={selectedDetailItem}
         onClose={() => setSelectedDetailItem(null)}
+        disableEscClose={Boolean(aiCoverItem || editingItem)}
         onSelectTag={(tag) => {
           setSearchQuery(tag);
+        }}
+        onEditNote={(item) => {
+          setSelectedDetailItem(null);
+          handleOpenEdit(item);
+        }}
+        onAiCover={(item) => {
+          handleOpenAiCover(item);
+        }}
+      />
+
+      {/* Note Editor Modal */}
+      <FeedEditNoteModal
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+        disableEscClose={Boolean(aiCoverItem)}
+        onOpenAiCover={(item, templateId) => handleOpenAiCover(item, templateId)}
+        onSaved={() => {
+          refetch();
+        }}
+      />
+
+      {/* AI Cover Studio Modal */}
+      <FeedAiCoverModal
+        item={aiCoverItem}
+        initialTemplateId={aiCoverTemplateId}
+        onClose={() => {
+          setAiCoverItem(null);
+          setAiCoverTemplateId(undefined);
+        }}
+        onCoverApplied={() => {
+          refetch();
         }}
       />
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
+import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +19,7 @@ import {
   Headphones,
   Play,
   Pause,
+  Edit3,
 } from 'lucide-react';
 
 function formatViews(score?: number | null): string {
@@ -31,16 +33,21 @@ export interface FeedPostCardProps {
   item: UnifiedFeedItem;
   onOpenDetail?: (item: UnifiedFeedItem) => void;
   onSelectTag?: (tag: string) => void;
+  onEditNote?: (item: UnifiedFeedItem) => void;
+  onAiCover?: (item: UnifiedFeedItem) => void;
 }
 
 export const FeedPostCard = React.memo<FeedPostCardProps>(({
   item,
   onOpenDetail,
   onSelectTag,
+  onEditNote,
+  onAiCover,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleToggleAudio = (e: React.MouseEvent) => {
@@ -72,6 +79,18 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const coverUrl =
+    item.coverUrl ||
+    (item.rawPayload?.images?.find((img: any) => img.isMain)?.url) ||
+    item.rawPayload?.images?.[0]?.url ||
+    null;
+
+  const isUpdated = Boolean(
+    item.updatedAt &&
+    item.publishedAt &&
+    Math.abs(new Date(item.updatedAt).getTime() - new Date(item.publishedAt).getTime()) > 60000
+  );
 
   const summaryText = item.summary || (item.rawPayload as any)?.summary;
 
@@ -144,6 +163,14 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
                 <Clock className="w-3 h-3 opacity-75 shrink-0" />
                 <span>{formattedDate}</span>
               </span>
+              {isUpdated && (
+                <span
+                  className="text-[10px] text-slate-400 dark:text-slate-500 font-mono"
+                  title={`Обновлено: ${new Date(item.updatedAt!).toLocaleString('ru-RU')}`}
+                >
+                  (ред.)
+                </span>
+              )}
               {item.timeSlot && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-white/10 font-mono">
                   {item.timeSlot === 'MORNING' ? 'Утро' : item.timeSlot === 'AFTERNOON' ? 'День' : 'Вечер'}
@@ -177,6 +204,19 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
       <h3 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white leading-snug tracking-[-0.01em] mb-2 group-hover:text-[#2481cc] dark:group-hover:text-[#64b5f6] transition-colors break-words">
         {item.title}
       </h3>
+
+      {/* 2.5 Cover image banner */}
+      {coverUrl && !imageError && (
+        <div className="relative w-full h-44 sm:h-52 overflow-hidden rounded-xl mb-3 bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+          <img
+            src={resolveMediaUrl(coverUrl)}
+            alt={item.title}
+            loading="lazy"
+            onError={() => setImageError(true)}
+            className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+          />
+        </div>
+      )}
 
       {/* 3. Markdown snippet body */}
       {item.description && (
@@ -355,8 +395,36 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
           )}
         </div>
 
-        {/* Right: Actions (Share, Open Prompt) */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right: Actions (Share, Edit, AI Cover, Open Prompt) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onAiCover && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAiCover(item);
+              }}
+              className="p-1.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors"
+              title="Создать обложку (AI)"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onEditNote && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditNote(item);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-[#2481cc] dark:hover:text-[#64b5f6] hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+              title="Редактировать запись"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleShare}

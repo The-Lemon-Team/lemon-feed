@@ -4,6 +4,7 @@ import {
   FeedAdapterContext,
   UnifiedFeedItem,
   UnifiedFeedTab,
+  extractNoteCoverUrl,
 } from './types';
 import { getThematicCategoryBadge } from '../../utils/sparkFeeds';
 
@@ -184,6 +185,7 @@ export const SeasonsFeedAdapter: FeedAdapter = {
         title: n.title,
         description: n.description || '',
         publishedAt: n.publishAt || n.startDate,
+        updatedAt: n.updatedAt,
         timeSlot: meta.timeSlot,
         resonanceScore: meta.resonanceScore ?? (n as any).resonanceScore ?? 85,
         sourceLink: n.sourceLink,
@@ -192,6 +194,7 @@ export const SeasonsFeedAdapter: FeedAdapter = {
         status: n.status || 'PUBLISHED',
         curator: n.curator || 'Lemon Seasons',
         hashtags: n.hashtags?.map((h) => h.name) || [],
+        coverUrl: extractNoteCoverUrl(n),
         rawPayload: n,
       };
     });

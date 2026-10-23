@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
+import { resolveMediaUrl } from '../api/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -8,20 +9,32 @@ import {
   Flame,
   ExternalLink,
   Sparkles,
+  Edit3,
 } from 'lucide-react';
 
 export interface FeedDetailModalProps {
   item: UnifiedFeedItem | null;
   onClose: () => void;
   onSelectTag?: (tag: string) => void;
+  onEditNote?: (item: UnifiedFeedItem) => void;
+  onAiCover?: (item: UnifiedFeedItem) => void;
+  disableEscClose?: boolean;
 }
 
 export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   item,
   onClose,
   onSelectTag,
+  onEditNote,
+  onAiCover,
+  disableEscClose = false,
 }) => {
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [item?.id]);
 
   useEffect(() => {
     if (!item) return;
@@ -30,7 +43,8 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !disableEscClose) {
+        e.stopPropagation();
         onClose();
       }
     };
@@ -40,7 +54,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [item, onClose]);
+  }, [item, onClose, disableEscClose]);
 
   if (!item) return null;
 
@@ -61,6 +75,12 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     }
     mouseDownTargetRef.current = null;
   };
+
+  const coverUrl =
+    item.coverUrl ||
+    (item.rawPayload?.images?.find((img: any) => img.isMain)?.url) ||
+    item.rawPayload?.images?.[0]?.url ||
+    null;
 
   const formattedDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -118,6 +138,17 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
 
         {/* Modal Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 touch-scroll">
+          {coverUrl && !imageError && (
+            <div className="relative w-full h-52 sm:h-60 overflow-hidden rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+              <img
+                src={resolveMediaUrl(coverUrl)}
+                alt={item.title}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
             {item.title}
           </h2>
@@ -164,27 +195,51 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
         </div>
 
         {/* Modal Actions Footer */}
-        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-[#131b24] border-t border-slate-100 dark:border-white/[0.08] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            {item.curator && (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-[#2481cc]" />
-                <span>Автор: {item.curator}</span>
-              </>
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-[#131b24] border-t border-slate-100 dark:border-white/[0.08] flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            {onAiCover && (
+              <button
+                type="button"
+                onClick={() => onAiCover(item)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Обложка</span>
+              </button>
+            )}
+
+            {onEditNote && (
+              <button
+                type="button"
+                onClick={() => onEditNote(item)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-[#2481cc]" />
+                <span>Редактировать</span>
+              </button>
             )}
           </div>
 
-          {item.sourceLink && (
-            <a
-              href={item.sourceLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2481cc] hover:bg-[#1e6cb0] text-white text-xs font-medium transition-colors shadow-xs"
-            >
-              <span>Открыть оригинал</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <div className="flex items-center gap-3">
+            {item.curator && (
+              <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
+                <Sparkles className="w-3.5 h-3.5 text-[#2481cc]" />
+                <span>Автор: {item.curator}</span>
+              </div>
+            )}
+
+            {item.sourceLink && (
+              <a
+                href={item.sourceLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2481cc] hover:bg-[#1e6cb0] text-white text-xs font-medium transition-colors shadow-xs"
+              >
+                <span>Открыть оригинал</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

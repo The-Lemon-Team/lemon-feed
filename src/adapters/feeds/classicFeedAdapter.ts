@@ -4,6 +4,7 @@ import {
   FeedAdapterContext,
   UnifiedFeedItem,
   UnifiedFeedTab,
+  extractNoteCoverUrl,
 } from './types';
 import { getThematicCategoryBadge } from '../../utils/sparkFeeds';
 
@@ -203,11 +204,13 @@ export const ClassicFeedAdapter: FeedAdapter = {
         title: n.title,
         description: n.description || '',
         publishedAt: n.startDate,
+        updatedAt: n.updatedAt,
         timeSlot: (n.metadata as any)?.timeSlot,
         resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
         sourceLink: n.sourceLink,
         curator: n.curator || 'Календарь',
         hashtags: n.hashtags?.map((h) => h.name) || [],
+        coverUrl: extractNoteCoverUrl(n),
         rawPayload: n,
       };
     });
