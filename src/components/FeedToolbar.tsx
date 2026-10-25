@@ -16,6 +16,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../adapters/feeds/types';
+import { FeedAppRuntimeMode } from '../utils/appMode';
 import { FeedMonthPicker } from './FeedMonthPicker';
 import { LemonLogo } from './LemonLogo';
 
@@ -50,6 +51,8 @@ export interface FeedToolbarProps {
 
   layoutMode?: 'split' | 'stream';
   onToggleLayoutMode?: () => void;
+  appMode?: FeedAppRuntimeMode;
+  onSetAppMode?: (mode: FeedAppRuntimeMode) => void;
 }
 
 const FEED_MODES: Array<{ id: FeedSourceMode; label: string; emoji: string; badge?: string }> = [
@@ -86,6 +89,8 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   onNavigateToTimeline,
   layoutMode = 'split',
   onToggleLayoutMode,
+  appMode = 'staging',
+  onSetAppMode,
 }) => {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const monthPickerRef = useRef<HTMLDivElement>(null);
@@ -128,16 +133,70 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
 
             <div>
               <h1 className="text-xs sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5 leading-none">
-                <span>Ленты новостей</span>
-                <span className="text-[9px] sm:text-[10px] font-mono font-medium px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                  Lenta Feeds
+                <span>{appMode === 'public' ? 'Публичные ленты' : appMode === 'staging' ? 'Хаб публикаций' : 'Лента событий (Dev)'}</span>
+                <span
+                  className={`text-[9px] sm:text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-full ${
+                    appMode === 'public'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                      : appMode === 'staging'
+                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                      : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30'
+                  }`}
+                >
+                  {appMode === 'public' ? 'Public Feed :5176' : appMode === 'staging' ? 'Staging :5175' : 'Dev Feed :5175'}
                 </span>
               </h1>
               <p className="hidden md:block text-[11px] text-slate-500 dark:text-[#8292a2] mt-0.5">
-                Компактный дайджест по тематическим направлениям
+                {appMode === 'public'
+                  ? 'Одобренные модератором новости в формате Telegram и Lemon Seasons'
+                  : appMode === 'staging'
+                  ? 'Стейджинг-ленты премодерации перед публикацией в паблик'
+                  : 'Интерактивная лента событий и заметок Lemon Seasons (режим разработки)'}
               </p>
             </div>
           </div>
+
+          {/* App Runtime Mode Switcher: Dev | Staging | Public */}
+          {onSetAppMode && (
+            <div className="inline-flex p-0.5 rounded-xl bg-slate-200/80 dark:bg-[#111923] border border-slate-300/60 dark:border-white/10 text-[11px] font-mono">
+              <button
+                type="button"
+                onClick={() => onSetAppMode('dev')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  appMode === 'dev'
+                    ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Режим Dev: все заметки (приватные и рабочие)"
+              >
+                <span>💻 Dev</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetAppMode('staging')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  appMode === 'staging'
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Режим Staging: хаб премодерации перед публикацией"
+              >
+                <span>🛡️ Staging</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetAppMode('public')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  appMode === 'public'
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Режим Public: только одобренные новости"
+              >
+                <span>🌐 Public</span>
+              </button>
+            </div>
+          )}
 
           {/* Segmented Mode Switcher */}
           <div className="inline-flex p-0.5 rounded-xl bg-slate-100/90 dark:bg-[#131b24] border border-slate-200/60 dark:border-white/5 text-[11px] sm:text-xs font-medium">

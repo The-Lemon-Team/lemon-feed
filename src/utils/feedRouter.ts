@@ -1,139 +1,64 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FeedSourceMode } from '../adapters/feeds/types';
+import {
+  FeedLayoutMode,
+  FeedRouteState,
+  MicrofrontendFeedNavigatePayload,
+  PATH_TO_SOURCE,
+  decomposeFeedSlug,
+  composeFeedSlug,
+  getPathForFeedSource,
+  parseFeedRouteString,
+  parseCurrentFeedRoute,
+} from './feedRouteMappings';
 
-export type FeedLayoutMode = 'split' | 'stream';
-
-export interface FeedRouteState {
-  streamSource: FeedSourceMode;
-  selectedFeedSlug?: string;
-  layoutMode: FeedLayoutMode;
-  isEmbed: boolean;
-}
+export * from './feedRouteMappings';
 
 /**
- * Maps a FeedSourceMode and route options to its canonical primary URL path.
+ * Notifies parent host (calendar-app) via postMessage when running in microfrontend iframe.
  */
-export function getPathForFeedSource(
-  source: FeedSourceMode,
-  feedSlug?: string,
-  layoutMode?: FeedLayoutMode,
-  isEmbed?: boolean
-): string {
-  let basePath = '/';
-  switch (source) {
-    case 'dev':
-      basePath = '/dev';
-      break;
-    case 'seasons':
-      basePath = '/seasons';
-      break;
-    case 'classic':
-      basePath = '/classic';
-      break;
-    case 'telegram':
-      basePath = '/tg';
-      break;
-    case 'spark':
-    default:
-      basePath = '/spark';
-      break;
+export function notifyParentHost(type: string, payload: MicrofrontendFeedNavigatePayload) {
+  if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage(
+        {
+          type,
+          source: 'lenta-feed-app',
+          payload,
+        },
+        '*'
+      );
+    } catch {
+      // Cross-origin safety
+    }
   }
-
-  const params = new URLSearchParams();
-  if (feedSlug && feedSlug.trim()) {
-    params.set('feed', feedSlug.trim());
-  }
-  if (layoutMode === 'stream') {
-    params.set('layout', 'stream');
-  }
-  if (isEmbed) {
-    params.set('embed', 'true');
-  }
-
-  const query = params.toString();
-  return query ? `${basePath}?${query}` : basePath;
 }
 
 /**
- * Parses the current window location (path, hash, query params) into FeedRouteState.
- */
-export function parseCurrentFeedRoute(): FeedRouteState {
-  if (typeof window === 'undefined') {
-    return { streamSource: 'spark', layoutMode: 'split', isEmbed: false };
-  }
-
-  const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
-  const searchParams = new URLSearchParams(window.location.search);
-  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '');
-
-  // 1. Embed & Layout parameters
-  const layoutParam = searchParams.get('layout') || searchParams.get('view');
-  const streamOnly = searchParams.get('streamOnly') === 'true' || searchParams.get('only') === 'stream';
-  const embedParam = searchParams.get('embed') === 'true';
-  const isEmbed = embedParam || (typeof window !== 'undefined' && window.self !== window.top);
-  const layoutMode: FeedLayoutMode = (layoutParam === 'stream' || streamOnly) ? 'stream' : 'split';
-
-  // 2. Check direct query param ?tab=... or ?source=...
-  const tabParam = searchParams.get('tab') || searchParams.get('source');
-  const feedParam = searchParams.get('feed') || undefined;
-
-  if (tabParam) {
-    if (tabParam === 'dev' || tabParam === 'devhub') return { streamSource: 'dev', selectedFeedSlug: feedParam, layoutMode, isEmbed };
-    if (tabParam === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: feedParam, layoutMode, isEmbed };
-    if (tabParam === 'classic') return { streamSource: 'classic', selectedFeedSlug: feedParam, layoutMode, isEmbed };
-    if (tabParam === 'tg' || tabParam === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: feedParam, layoutMode, isEmbed };
-    if (tabParam === 'spark') return { streamSource: 'spark', selectedFeedSlug: feedParam, layoutMode, isEmbed };
-  }
-
-  // 3. Check Hash Route (#/classic, #seasons, #tg, etc.)
-  if (hash) {
-    const [hashPath, hashQuery] = hash.split('?');
-    const hashParams = new URLSearchParams(hashQuery || '');
-    const hashFeed = hashParams.get('feed') || feedParam;
-
-    if (hashPath === 'dev' || hashPath === 'devhub') return { streamSource: 'dev', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
-    if (hashPath === 'seasons') return { streamSource: 'seasons', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
-    if (hashPath === 'classic') return { streamSource: 'classic', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
-    if (hashPath === 'tg' || hashPath === 'telegram') return { streamSource: 'telegram', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
-    if (hashPath === 'wiki') return { streamSource: 'classic', selectedFeedSlug: 'wiki', layoutMode, isEmbed };
-    if (hashPath === 'spark') return { streamSource: 'spark', selectedFeedSlug: hashFeed, layoutMode, isEmbed };
-  }
-
-  // 4. Check HTML5 Pathname (/spark, /seasons, /classic, /tg, /telegram, /wiki)
-  const segments = pathname.split('/').filter(Boolean);
-  const primarySegment = segments[0] || '';
-  const subSegment = segments[1] || feedParam;
-
-  if (primarySegment === 'dev' || primarySegment === 'devhub') {
-    return { streamSource: 'dev', selectedFeedSlug: subSegment, layoutMode, isEmbed };
-  }
-  if (primarySegment === 'seasons') {
-    return { streamSource: 'seasons', selectedFeedSlug: subSegment, layoutMode, isEmbed };
-  }
-  if (primarySegment === 'classic') {
-    return { streamSource: 'classic', selectedFeedSlug: subSegment, layoutMode, isEmbed };
-  }
-  if (primarySegment === 'tg' || primarySegment === 'telegram') {
-    return { streamSource: 'telegram', selectedFeedSlug: subSegment, layoutMode, isEmbed };
-  }
-  if (primarySegment === 'wiki') {
-    return { streamSource: 'classic', selectedFeedSlug: 'wiki', layoutMode, isEmbed };
-  }
-
-  // Default to spark
-  return {
-    streamSource: 'spark',
-    selectedFeedSlug: primarySegment === 'spark' ? subSegment : feedParam,
-    layoutMode,
-    isEmbed,
-  };
-}
-
-/**
- * React hook providing reactive routing and browser history synchronization for feed tabs.
+ * React hook providing reactive routing and browser history synchronization for 3-level feeds and notes.
  */
 export function useFeedRouter() {
   const [routeState, setRouteState] = useState<FeedRouteState>(() => parseCurrentFeedRoute());
+  const initialNotifiedRef = useRef(false);
+
+  // Sync initial route with parent host on mount if running embedded
+  useEffect(() => {
+    if (initialNotifiedRef.current) return;
+    initialNotifiedRef.current = true;
+
+    const initial = parseCurrentFeedRoute();
+    if (initial.isEmbed) {
+      const decomp = decomposeFeedSlug(initial.selectedFeedSlug);
+      notifyParentHost('LENTA_FEED_NAVIGATE', {
+        url: window.location.pathname + window.location.search,
+        pathname: window.location.pathname,
+        streamSource: initial.streamSource,
+        selectedFeedSlug: initial.selectedFeedSlug,
+        subtopicSlug: initial.subtopicSlug || decomp.subtopic,
+        noteId: initial.noteId,
+      });
+    }
+  }, []);
 
   // Listen for browser popstate (back / forward navigation)
   useEffect(() => {
@@ -147,26 +72,80 @@ export function useFeedRouter() {
     };
   }, []);
 
-  // Navigate to a new source / feed tab with history push
+  // Listen for microfrontend navigation events from host app
+  useEffect(() => {
+    const handleHostMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'LENTA_NAVIGATE_FEED') {
+        const payload = event.data.payload || {};
+        if (typeof payload === 'string' || payload.route || payload.pathname) {
+          const rawRoute = typeof payload === 'string' ? payload : (payload.route || payload.pathname);
+          const parsed = parseFeedRouteString(rawRoute);
+          navigateTo(parsed.streamSource, parsed.selectedFeedSlug, parsed.subtopicSlug, parsed.noteId, undefined, true);
+          return;
+        }
+
+        const { source, feedSlug, subtopic, noteId: hostNoteId } = payload;
+        if (source && PATH_TO_SOURCE[source]) {
+          const targetSource = PATH_TO_SOURCE[source];
+          const fullSlug = subtopic ? composeFeedSlug(feedSlug || '', subtopic) : feedSlug;
+          navigateTo(targetSource, fullSlug, subtopic, hostNoteId, undefined, true);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleHostMessage);
+    return () => {
+      window.removeEventListener('message', handleHostMessage);
+    };
+  }, []);
+
   const navigateTo = useCallback(
-    (source: FeedSourceMode, feedSlug?: string, newLayoutMode?: FeedLayoutMode, replace = false) => {
+    (
+      source: FeedSourceMode,
+      feedSlug?: string,
+      subtopic?: string,
+      newNoteId?: string,
+      newLayoutMode?: FeedLayoutMode,
+      replace = false
+    ) => {
       setRouteState((curr) => {
         const layoutMode = newLayoutMode ?? curr.layoutMode;
+        const decomp = decomposeFeedSlug(feedSlug);
+        const effectiveSubtopic = subtopic || decomp.subtopic;
+        const effectiveFeedSlug = decomp.feedSlug || feedSlug;
+
         if (typeof window !== 'undefined') {
-          const newUrl = getPathForFeedSource(source, feedSlug, layoutMode, curr.isEmbed);
+          const newUrl = getPathForFeedSource(source, {
+            feedSlug: effectiveFeedSlug,
+            subtopic: effectiveSubtopic,
+            noteId: newNoteId,
+            layoutMode,
+            isEmbed: curr.isEmbed,
+          });
           const currentUrl = window.location.pathname + window.location.search;
           if (newUrl !== currentUrl) {
             if (replace) {
-              window.history.replaceState(null, '', newUrl);
+              window.history.replaceState({ noteId: newNoteId }, '', newUrl);
             } else {
-              window.history.pushState(null, '', newUrl);
+              window.history.pushState({ noteId: newNoteId }, '', newUrl);
             }
+            notifyParentHost('LENTA_FEED_NAVIGATE', {
+              url: newUrl,
+              pathname: newUrl.split('?')[0],
+              streamSource: source,
+              selectedFeedSlug: effectiveFeedSlug ? composeFeedSlug(effectiveFeedSlug, effectiveSubtopic) : undefined,
+              subtopicSlug: effectiveSubtopic,
+              noteId: newNoteId,
+            });
           }
         }
+
         return {
           ...curr,
           streamSource: source,
-          selectedFeedSlug: feedSlug,
+          selectedFeedSlug: effectiveFeedSlug ? composeFeedSlug(effectiveFeedSlug, effectiveSubtopic) : undefined,
+          subtopicSlug: effectiveSubtopic,
+          noteId: newNoteId,
           layoutMode,
         };
       });
@@ -176,7 +155,7 @@ export function useFeedRouter() {
 
   const setStreamSource = useCallback(
     (source: FeedSourceMode) => {
-      navigateTo(source, undefined);
+      navigateTo(source, undefined, undefined, undefined);
     },
     [navigateTo]
   );
@@ -185,23 +164,98 @@ export function useFeedRouter() {
     (feedSlug?: string | ((prev?: string) => string | undefined)) => {
       setRouteState((curr) => {
         const nextSlug = typeof feedSlug === 'function' ? feedSlug(curr.selectedFeedSlug) : feedSlug;
+        const decomp = decomposeFeedSlug(nextSlug);
         if (typeof window !== 'undefined') {
-          const newUrl = getPathForFeedSource(curr.streamSource, nextSlug, curr.layoutMode, curr.isEmbed);
+          const newUrl = getPathForFeedSource(curr.streamSource, {
+            feedSlug: nextSlug,
+            noteId: curr.noteId,
+            layoutMode: curr.layoutMode,
+            isEmbed: curr.isEmbed,
+          });
           window.history.pushState(null, '', newUrl);
+          notifyParentHost('LENTA_FEED_NAVIGATE', {
+            url: newUrl,
+            pathname: newUrl.split('?')[0],
+            streamSource: curr.streamSource,
+            selectedFeedSlug: nextSlug,
+            subtopicSlug: decomp.subtopic,
+            noteId: curr.noteId,
+          });
         }
         return {
           ...curr,
           selectedFeedSlug: nextSlug,
+          subtopicSlug: decomp.subtopic,
         };
       });
     },
     []
   );
 
+  const openNote = useCallback((id: string) => {
+    setRouteState((curr) => {
+      if (typeof window !== 'undefined') {
+        const newUrl = getPathForFeedSource(curr.streamSource, {
+          feedSlug: curr.selectedFeedSlug,
+          subtopic: curr.subtopicSlug,
+          noteId: id,
+          layoutMode: curr.layoutMode,
+          isEmbed: curr.isEmbed,
+        });
+        window.history.pushState({ noteId: id }, '', newUrl);
+        notifyParentHost('LENTA_FEED_NAVIGATE', {
+          url: newUrl,
+          pathname: newUrl.split('?')[0],
+          streamSource: curr.streamSource,
+          selectedFeedSlug: curr.selectedFeedSlug,
+          subtopicSlug: curr.subtopicSlug,
+          noteId: id,
+        });
+      }
+      return {
+        ...curr,
+        noteId: id,
+      };
+    });
+  }, []);
+
+  const closeNote = useCallback(() => {
+    setRouteState((curr) => {
+      if (typeof window !== 'undefined') {
+        const newUrl = getPathForFeedSource(curr.streamSource, {
+          feedSlug: curr.selectedFeedSlug,
+          subtopic: curr.subtopicSlug,
+          noteId: undefined,
+          layoutMode: curr.layoutMode,
+          isEmbed: curr.isEmbed,
+        });
+        window.history.pushState({ noteId: null }, '', newUrl);
+        notifyParentHost('LENTA_FEED_NAVIGATE', {
+          url: newUrl,
+          pathname: newUrl.split('?')[0],
+          streamSource: curr.streamSource,
+          selectedFeedSlug: curr.selectedFeedSlug,
+          subtopicSlug: curr.subtopicSlug,
+          noteId: undefined,
+        });
+      }
+      return {
+        ...curr,
+        noteId: undefined,
+      };
+    });
+  }, []);
+
   const setLayoutMode = useCallback((layoutMode: FeedLayoutMode) => {
     setRouteState((curr) => {
       if (typeof window !== 'undefined') {
-        const newUrl = getPathForFeedSource(curr.streamSource, curr.selectedFeedSlug, layoutMode, curr.isEmbed);
+        const newUrl = getPathForFeedSource(curr.streamSource, {
+          feedSlug: curr.selectedFeedSlug,
+          subtopic: curr.subtopicSlug,
+          noteId: curr.noteId,
+          layoutMode,
+          isEmbed: curr.isEmbed,
+        });
         window.history.pushState(null, '', newUrl);
       }
       return {
@@ -215,7 +269,13 @@ export function useFeedRouter() {
     setRouteState((curr) => {
       const nextMode: FeedLayoutMode = curr.layoutMode === 'stream' ? 'split' : 'stream';
       if (typeof window !== 'undefined') {
-        const newUrl = getPathForFeedSource(curr.streamSource, curr.selectedFeedSlug, nextMode, curr.isEmbed);
+        const newUrl = getPathForFeedSource(curr.streamSource, {
+          feedSlug: curr.selectedFeedSlug,
+          subtopic: curr.subtopicSlug,
+          noteId: curr.noteId,
+          layoutMode: nextMode,
+          isEmbed: curr.isEmbed,
+        });
         window.history.pushState(null, '', newUrl);
       }
       return {
@@ -228,12 +288,17 @@ export function useFeedRouter() {
   return {
     streamSource: routeState.streamSource,
     selectedFeedSlug: routeState.selectedFeedSlug,
+    subtopicSlug: routeState.subtopicSlug,
+    noteId: routeState.noteId,
     layoutMode: routeState.layoutMode,
     isEmbed: routeState.isEmbed,
+    searchQuery: routeState.searchQuery,
     setStreamSource,
     setSelectedFeedSlug,
     setLayoutMode,
     toggleLayoutMode,
+    openNote,
+    closeNote,
     navigateTo,
   };
 }

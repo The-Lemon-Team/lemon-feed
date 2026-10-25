@@ -106,37 +106,27 @@ export const SeasonsFeedAdapter: FeedAdapter = {
     }
 
     return SEASONS_FEED_PRESETS
-      .filter((preset) => {
-        // Only include if present in user's accessible feeds or has accessible notes or is public preset
-        const isPresent = context.allFeeds.some((f) => f.slug === preset.slug);
-        const hasNotes = (countsBySlug[preset.slug] || 0) > 0;
-        return isPresent || hasNotes || preset.slug === 'design-systems' || preset.slug === 'jm-daily';
-      })
+      .filter((preset) => (countsBySlug[preset.slug] || 0) > 0)
       .map((preset) => {
-      const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
-      let count = countsBySlug[preset.slug] ?? dbFeed?._count?.notes ?? 0;
+        const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
+        const count = countsBySlug[preset.slug] || 0;
 
-      // Always guarantee at least 1 note for jm-daily (fallback note)
-      if (preset.slug === 'jm-daily' && count === 0) {
-        count = 1;
-      }
-
-      return {
-        id: dbFeed?.id || preset.slug,
-        slug: preset.slug,
-        title: dbFeed?.title || preset.title,
-        shortTitle: preset.shortTitle,
-        emoji: preset.emoji,
-        category: preset.category,
-        count,
-        accentColor: preset.accentColor,
-        badgeBgLight: preset.badgeBgLight,
-        badgeTextLight: preset.badgeTextLight,
-        badgeBgDark: preset.badgeBgDark,
-        badgeTextDark: preset.badgeTextDark,
-        description: dbFeed?.description || preset.description,
-      };
-    });
+        return {
+          id: dbFeed?.id || preset.slug,
+          slug: preset.slug,
+          title: dbFeed?.title || preset.title,
+          shortTitle: preset.shortTitle,
+          emoji: preset.emoji,
+          category: preset.category,
+          count,
+          accentColor: preset.accentColor,
+          badgeBgLight: preset.badgeBgLight,
+          badgeTextLight: preset.badgeTextLight,
+          badgeBgDark: preset.badgeBgDark,
+          badgeTextDark: preset.badgeTextDark,
+          description: dbFeed?.description || preset.description,
+        };
+      });
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {
@@ -156,8 +146,7 @@ export const SeasonsFeedAdapter: FeedAdapter = {
       });
     }
 
-    // Filter out unpublished drafts in public feeds
-    matched = matched.filter((n) => n.status !== 'DRAFT');
+    // Note: DRAFT vs PUBLISHED filtering is controlled by App runtime mode (Staging Hub vs Public Feed)
 
     // 3. Map notes to UnifiedFeedItem
     const convertedItems: UnifiedFeedItem[] = matched.map((n) => {
@@ -184,6 +173,7 @@ export const SeasonsFeedAdapter: FeedAdapter = {
         category: badge,
         title: n.title,
         description: n.description || '',
+        summary: (n as any).summary || null,
         publishedAt: n.publishAt || n.startDate,
         updatedAt: n.updatedAt,
         timeSlot: meta.timeSlot,

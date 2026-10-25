@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { Radio, Inbox } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedPostCard } from './FeedPostCard';
+import { FeedAppRuntimeMode } from '../utils/appMode';
 import { TelegramStreamView } from './TelegramStreamView';
 
 export interface FeedStreamViewProps {
@@ -24,6 +25,11 @@ export interface FeedStreamViewProps {
   visibleCount: number;
   loadMoreRef?: RefObject<HTMLDivElement>;
   layoutMode?: 'split' | 'stream';
+  appMode?: FeedAppRuntimeMode;
+  onApprovePublish?: (item: UnifiedFeedItem) => void;
+  onUnpublishToStaging?: (item: UnifiedFeedItem) => void;
+  onReturnToPrivate?: (item: UnifiedFeedItem) => void;
+  isMutating?: boolean;
 }
 
 /**
@@ -49,6 +55,11 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   visibleCount,
   loadMoreRef,
   layoutMode = 'split',
+  appMode = 'staging',
+  onApprovePublish,
+  onUnpublishToStaging,
+  onReturnToPrivate,
+  isMutating,
 }) => {
   const isStreamOnly = layoutMode === 'stream';
 
@@ -116,8 +127,13 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                   item={item}
                   onOpenDetail={onOpenDetail}
                   onSelectTag={onSelectTag}
-                  onEditNote={onEditNote}
-                  onAiCover={onAiCover}
+                  onEditNote={appMode !== 'public' ? onEditNote : undefined}
+                  onAiCover={appMode !== 'public' ? onAiCover : undefined}
+                  appMode={appMode}
+                  onApprovePublish={onApprovePublish}
+                  onUnpublishToStaging={onUnpublishToStaging}
+                  onReturnToPrivate={onReturnToPrivate}
+                  isMutating={isMutating}
                 />
               ))}
 

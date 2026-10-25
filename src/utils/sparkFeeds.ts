@@ -152,13 +152,12 @@ export function resolveSparkFeeds(
   const result: SparkFeedItem[] = [];
   const processedSlugs = new Set<string>();
 
-  // 1. Add primary Spark feeds (if present in user's accessible feeds or has notes)
+  // 1. Add primary Spark feeds that have notes in the current view
   for (const primary of PRIMARY_SPARK_FEEDS) {
     const existing = allFeeds.find((f) => f.slug === primary.slug);
-    const count = countsBySlug[primary.slug] || (existing ? existing._count?.notes ?? 0 : 0);
+    const count = countsBySlug[primary.slug] ?? 0;
 
-    // If the feed is private and not accessible to the current user (not in allFeeds and 0 notes), skip
-    if (!existing && count === 0) continue;
+    if (count === 0) continue;
 
     result.push({
       id: existing?.id || primary.slug,
@@ -179,7 +178,7 @@ export function resolveSparkFeeds(
     processedSlugs.add(primary.slug);
   }
 
-  // 2. Discover additional feeds from backend that match spark-*
+  // 2. Discover additional feeds from backend that match spark-* and have notes in current view
   for (const feed of allFeeds) {
     if (
       feed.slug &&
@@ -188,6 +187,9 @@ export function resolveSparkFeeds(
       !feed.slug.startsWith('spark-changelogsfeed-') &&
       !feed.slug.startsWith('spark-notebooklmai-')
     ) {
+      const count = countsBySlug[feed.slug] ?? 0;
+      if (count === 0) continue;
+
       const palette = getDynamicPalette(feed.slug);
       const cleanTitle = feed.title
         .replace(/\s*\(Spark\)/i, '')
@@ -207,7 +209,7 @@ export function resolveSparkFeeds(
         badgeBgDark: palette.badgeBgDark,
         badgeTextDark: palette.badgeTextDark,
         description: feed.description || `Тематическая лента ${cleanTitle}`,
-        notesCount: countsBySlug[feed.slug] || feed._count?.notes || 0,
+        notesCount: count,
         isCustomFolder: true,
       });
       processedSlugs.add(feed.slug);
@@ -245,7 +247,7 @@ export function resolveSparkFeeds(
               badgeBgDark: palette.badgeBgDark,
               badgeTextDark: palette.badgeTextDark,
               description: `Папка ${subfolderName} из каталога Spark`,
-              notesCount: 1,
+              notesCount: countsBySlug[dynamicSlug] || 1,
               isCustomFolder: true,
               folderPath,
             });

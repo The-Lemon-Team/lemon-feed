@@ -66,6 +66,11 @@ export interface UpdateNotePayload {
   sourceLink?: string;
   hashtags?: string[];
   status?: string;
+  privacy?: 'private' | 'public';
+  publicFeedId?: string | null;
+  publishAt?: string | null;
+  startDate?: string;
+  endDate?: string | null;
 }
 
 export interface GenerateAiCoverPayload {

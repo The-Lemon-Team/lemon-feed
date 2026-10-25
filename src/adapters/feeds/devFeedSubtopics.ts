@@ -11,6 +11,66 @@ export const KNOWN_CHANGELOG_SUBTOPICS: Array<{
   { subfolder: 'anthropic', title: 'Anthropic', emoji: '⚡', accentColor: '#d97706' },
 ];
 
+export function buildChangelogSubtopics(
+  changelogSubCounts: Record<string, number>,
+  _allFeeds: Array<{ slug: string; _count?: { notes: number } }> = [],
+): Array<{
+  id: string;
+  slug: string;
+  subfolder: string;
+  title: string;
+  emoji: string;
+  count: number;
+  accentColor: string;
+}> {
+  const mergedCounts: Record<string, number> = { ...changelogSubCounts };
+
+  const discovered = new Set<string>();
+  const subtopics: Array<{
+    id: string;
+    slug: string;
+    subfolder: string;
+    title: string;
+    emoji: string;
+    count: number;
+    accentColor: string;
+  }> = [];
+
+  for (const known of KNOWN_CHANGELOG_SUBTOPICS) {
+    discovered.add(known.subfolder);
+    const count = mergedCounts[known.subfolder] || 0;
+    if (count > 0) {
+      subtopics.push({
+        id: `sub-${known.subfolder}`,
+        slug: `spark-changelogsfeed-${known.subfolder}`,
+        subfolder: known.subfolder,
+        title: known.title,
+        emoji: known.emoji,
+        count,
+        accentColor: known.accentColor,
+      });
+    }
+  }
+
+  for (const [sub, count] of Object.entries(mergedCounts)) {
+    if (sub !== 'other' && !discovered.has(sub) && count > 0) {
+      const cap = sub.charAt(0).toUpperCase() + sub.slice(1);
+      subtopics.push({
+        id: `sub-${sub}`,
+        slug: `spark-changelogsfeed-${sub}`,
+        subfolder: sub,
+        title: cap,
+        emoji: '📦',
+        count,
+        accentColor: '#f97316',
+      });
+      discovered.add(sub);
+    }
+  }
+
+  return subtopics;
+}
+
 export const KNOWN_NOTEBOOKLM_SUBTOPICS: Array<{
   subfolder: 'regular' | 'telegram';
   title: string;

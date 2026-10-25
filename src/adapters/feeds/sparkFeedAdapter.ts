@@ -10,6 +10,7 @@ import {
 import { resolveSparkFeeds, getThematicCategoryBadge, isSparkSlug } from '../../utils/sparkFeeds';
 import {
   KNOWN_NOTEBOOKLM_SUBTOPICS,
+  buildChangelogSubtopics,
   isNotebooklmNote,
   extractNotebooklmSubtopic,
   isChangelogsNote,
@@ -17,6 +18,11 @@ import {
 } from './devFeedAdapter';
 
 function resolveAvatarIcon(note: Note): string {
+  const changelogSub = extractChangelogSubfolder(note);
+  if (changelogSub === 'google') return '🌐';
+  if (changelogSub === 'openai') return '🧠';
+  if (changelogSub === 'anthropic') return '⚡';
+  if (isChangelogsNote(note)) return '🚀';
   const nbSub = extractNotebooklmSubtopic(note);
   if (nbSub === 'telegram') return '✈️';
   if (nbSub === 'regular') return '🎙️';
@@ -75,22 +81,9 @@ export const SparkFeedAdapter: FeedAdapter = {
           emoji: known.emoji,
           count: notebooklmSubCounts[known.subfolder] || 0,
           accentColor: known.accentColor,
-        }));
+        })).filter((sub) => sub.count > 0);
       } else if (f.slug === 'spark-changelogsfeed') {
-        const knownChangelog = [
-          { subfolder: 'google', title: 'Google', emoji: '🌐', accentColor: '#4285f4' },
-          { subfolder: 'openai', title: 'OpenAI', emoji: '🧠', accentColor: '#10a37f' },
-          { subfolder: 'anthropic', title: 'Anthropic', emoji: '⚡', accentColor: '#d97706' },
-        ];
-        subtopics = knownChangelog.map((known) => ({
-          id: `sub-${known.subfolder}`,
-          slug: `spark-changelogsfeed-${known.subfolder}`,
-          subfolder: known.subfolder,
-          title: known.title,
-          emoji: known.emoji,
-          count: changelogSubCounts[known.subfolder] || 0,
-          accentColor: known.accentColor,
-        }));
+        subtopics = buildChangelogSubtopics(changelogSubCounts, context.allFeeds);
       }
 
       return {
@@ -110,7 +103,7 @@ export const SparkFeedAdapter: FeedAdapter = {
         isCustomFolder: f.isCustomFolder,
         subtopics,
       };
-    });
+    }).filter((tab) => tab.count > 0);
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {
@@ -129,9 +122,13 @@ export const SparkFeedAdapter: FeedAdapter = {
 
     // 2. Specific feed or subtopic filter
     if (activeFeedSlug) {
-      if (activeFeedSlug.startsWith('spark-notebooklmai-')) {
+      if (activeFeedSlug === 'spark-notebooklmai') {
+        matched = matched.filter(isNotebooklmNote);
+      } else if (activeFeedSlug.startsWith('spark-notebooklmai-')) {
         const targetSub = activeFeedSlug.replace(/^spark-notebooklmai-/, '').toLowerCase();
         matched = matched.filter((n) => extractNotebooklmSubtopic(n) === targetSub);
+      } else if (activeFeedSlug === 'spark-changelogsfeed') {
+        matched = matched.filter(isChangelogsNote);
       } else if (activeFeedSlug.startsWith('spark-changelogsfeed-')) {
         const targetSub = activeFeedSlug.replace(/^spark-changelogsfeed-/, '').toLowerCase();
         matched = matched.filter((n) => extractChangelogSubfolder(n) === targetSub);
@@ -169,15 +166,41 @@ export const SparkFeedAdapter: FeedAdapter = {
     // 5. Convert to UnifiedFeedItem
     return matched.map((n) => {
       const rawTitle = n.feed?.title || 'Spark News';
+      const changelogSub = extractChangelogSubfolder(n);
       const nbSub = extractNotebooklmSubtopic(n);
-      const cleanChannelTitle =
-        nbSub === 'telegram'
-          ? 'NotebookLM • Telegram'
-          : nbSub === 'regular'
-          ? 'NotebookLM AI'
-          : rawTitle.replace(/\s*\(Spark\)/i, '').replace(/^Spark\s*[—–-]\s*/i, '').trim();
+      const cleanChannelTitle = changelogSub
+        ? `${changelogSub.charAt(0).toUpperCase() + changelogSub.slice(1)} Changelog`
+        : nbSub === 'telegram'
+        ? 'NotebookLM • Telegram'
+        : nbSub === 'regular'
+        ? 'NotebookLM AI'
+        : rawTitle.replace(/\s*\(Spark\)/i, '').replace(/^Spark\s*[—–-]\s*/i, '').trim();
       const badge =
-        nbSub === 'telegram'
+        changelogSub === 'google'
+          ? {
+              label: 'Changelog / Google',
+              emoji: '🌐',
+              colorClass: 'bg-blue-50 text-blue-700 border-blue-200/70 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/40',
+            }
+          : changelogSub === 'openai'
+          ? {
+              label: 'Changelog / OpenAI',
+              emoji: '🧠',
+              colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40',
+            }
+          : changelogSub === 'anthropic'
+          ? {
+              label: 'Changelog / Anthropic',
+              emoji: '⚡',
+              colorClass: 'bg-amber-50 text-amber-700 border-amber-200/70 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40',
+            }
+          : changelogSub
+          ? {
+              label: `Changelog / ${changelogSub.charAt(0).toUpperCase() + changelogSub.slice(1)}`,
+              emoji: '🚀',
+              colorClass: 'bg-orange-50 text-orange-700 border-orange-200/70 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800/40',
+            }
+          : nbSub === 'telegram'
           ? {
               label: 'NotebookLM / Telegram',
               emoji: '✈️',
@@ -207,6 +230,7 @@ export const SparkFeedAdapter: FeedAdapter = {
         timeSlot: (n.metadata as any)?.timeSlot,
         resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
         sourceLink: n.sourceLink,
+        status: n.status || 'PUBLISHED',
         curator: n.curator,
         hashtags: n.hashtags?.map((h) => h.name) || [],
         coverUrl: extractNoteCoverUrl(n),

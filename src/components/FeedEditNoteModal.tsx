@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { useUpdateNote } from '../api/queries';
 import { resolveMediaUrl } from '../api/client';
+import { extractCleanSnippet } from '@lenta/shared';
+import dayjs from 'dayjs';
 import {
   X,
   Edit3,
@@ -16,6 +18,9 @@ import {
   User,
   Image as ImageIcon,
   Cpu,
+  Globe,
+  Terminal,
+  ShieldCheck,
 } from 'lucide-react';
 import { FEED_IT_WORKFLOW_TEMPLATES } from './cover-studio/feedCoverStudio.constants';
 import { FeedItEditAssistant } from './cover-studio/FeedItEditAssistant';
@@ -41,6 +46,9 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   const [curator, setCurator] = useState('');
   const [sourceLink, setSourceLink] = useState('');
   const [hashtagsStr, setHashtagsStr] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>('private');
+  const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>('DRAFT');
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const updateNoteMutation = useUpdateNote();
@@ -53,6 +61,16 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       setCurator(item.curator || '');
       setSourceLink(item.sourceLink || '');
       setHashtagsStr(item.hashtags?.map((h) => `#${h.replace(/^#/, '')}`).join(' ') || '');
+      const raw = (item.rawPayload as any) || {};
+      setEventDate(
+        raw.startDate
+          ? dayjs(raw.startDate).format('YYYY-MM-DD')
+          : item.publishedAt
+          ? dayjs(item.publishedAt).format('YYYY-MM-DD')
+          : ''
+      );
+      setTargetPrivacy(raw.privacy === 'public' ? 'public' : 'private');
+      setTargetStatus(raw.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT');
       setFeedback(null);
     }
   }, [item]);
@@ -105,6 +123,10 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
           curator: curator.trim() || undefined,
           sourceLink: sourceLink.trim() || undefined,
           hashtags: tagsArray,
+          startDate: eventDate ? new Date(eventDate).toISOString() : undefined,
+          privacy: targetPrivacy,
+          status: targetStatus,
+          ...(targetStatus === 'PUBLISHED' ? { publishAt: new Date().toISOString() } : {}),
         },
       });
 
@@ -150,8 +172,8 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
                   <span>Дата события: {formattedEventDate}</span>
                 </span>
                 <span className="text-slate-300 dark:text-slate-600">•</span>
-                <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
-                  Дата события не изменяется
+                <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
+                  ✓ Дата и этап публикации редактируются свободно
                 </span>
               </div>
             </div>
@@ -247,6 +269,88 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
             </div>
           </div>
 
+          {/* Publication Stage Switcher & Date Picker */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923]">
+            {/* Stage Selector */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[#2481cc]" />
+                <span>Этап публикации (Контур)</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetPrivacy('private');
+                    setTargetStatus('DRAFT');
+                  }}
+                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                    targetPrivacy === 'private'
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold'
+                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                  }`}
+                  title="Приватный рабочий контур"
+                >
+                  <div>💻 Dev</div>
+                  <div className="text-[9px] opacity-70">Черновик</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetPrivacy('public');
+                    setTargetStatus('DRAFT');
+                  }}
+                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                    targetPrivacy === 'public' && targetStatus !== 'PUBLISHED'
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                  }`}
+                  title="Хаб публикаций (стейджинг)"
+                >
+                  <div>🛡️ Staging</div>
+                  <div className="text-[9px] opacity-70">Премодер</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetPrivacy('public');
+                    setTargetStatus('PUBLISHED');
+                  }}
+                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                    targetPrivacy === 'public' && targetStatus === 'PUBLISHED'
+                      ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300 font-bold'
+                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                  }`}
+                  title="Опубликовано в паблике"
+                >
+                  <div>🌐 Public</div>
+                  <div className="text-[9px] opacity-70">Паблик</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Event Date Picker (Retroactive & Abstract Dates Support) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#2481cc]" />
+                  <span>Дата заметки / новости</span>
+                </label>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                  Заднее число ✓
+                </span>
+              </div>
+              <input
+                type="date"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+              />
+            </div>
+          </div>
+
           {/* Title */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
@@ -297,9 +401,23 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
 
           {/* Summary */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
-              Краткое резюме / Выжимка (Summary)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Краткое резюме для ленты / Выжимка (Summary)
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const auto = extractCleanSnippet(description || '', 280, { title });
+                  if (auto) setSummary(auto);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2481cc] hover:underline cursor-pointer"
+                title="Автоматически сформировать краткую выжимку из текста описания"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Сгенерировать выжимку</span>
+              </button>
+            </div>
             <textarea
               rows={2}
               value={summary}

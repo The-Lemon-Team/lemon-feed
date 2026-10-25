@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
+import { FeedAppRuntimeMode } from '../utils/appMode';
+import { StagingCardModerationBar } from './StagingCardModerationBar';
 import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
@@ -35,6 +37,11 @@ export interface FeedPostCardProps {
   onSelectTag?: (tag: string) => void;
   onEditNote?: (item: UnifiedFeedItem) => void;
   onAiCover?: (item: UnifiedFeedItem) => void;
+  appMode?: FeedAppRuntimeMode;
+  onApprovePublish?: (item: UnifiedFeedItem) => void;
+  onUnpublishToStaging?: (item: UnifiedFeedItem) => void;
+  onReturnToPrivate?: (item: UnifiedFeedItem) => void;
+  isMutating?: boolean;
 }
 
 export const FeedPostCard = React.memo<FeedPostCardProps>(({
@@ -43,6 +50,11 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   onSelectTag,
   onEditNote,
   onAiCover,
+  appMode = 'staging',
+  onApprovePublish,
+  onUnpublishToStaging,
+  onReturnToPrivate,
+  isMutating,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -142,6 +154,15 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
       className="rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full overflow-hidden"
     >
       {/* 1. Card Header */}
+      {appMode === 'staging' && (
+        <StagingCardModerationBar
+          item={item}
+          onApprovePublish={onApprovePublish}
+          onUnpublishToStaging={onUnpublishToStaging}
+          onReturnToPrivate={onReturnToPrivate}
+          isMutating={isMutating}
+        />
+      )}
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/20 border border-slate-200 dark:border-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc] dark:text-[#64b5f6]">
@@ -367,8 +388,8 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
             </div>
           )}
 
-          {/* Folder Path badge */}
-          {(item.rawPayload as any)?.folderPath && (
+          {/* Folder Path badge (only shown in staging mode) */}
+          {appMode === 'staging' && (item.rawPayload as any)?.folderPath && (
             <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
               <Folder className="w-3 h-3 text-[#2481cc]" />
               <span>{(item.rawPayload as any).folderPath}</span>

@@ -6,14 +6,19 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5175",
+    "dev:staging": "vite --port 5175 --mode staging",
+    "dev:public": "vite --port 5176 --mode public",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "build:public": "tsc -b && vite build --mode public",
+    "preview": "vite preview --port 5175",
+    "preview:public": "vite preview --port 5176",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@lenta/shared": "workspace:*",
     "@tanstack/react-query": "^5.66.0",
+    "@tauri-apps/api": "^2.0.0",
     "axios": "^1.7.9",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",

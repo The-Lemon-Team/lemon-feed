@@ -2,12 +2,16 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isPublicMode = mode === 'public' || process.env.VITE_FEED_APP_MODE === 'public';
+  const port = isPublicMode ? 5176 : 5175;
+  return {
   envDir: path.resolve(__dirname, '../../'),
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@lenta/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
     dedupe: ['react', 'react-dom'],
   },
@@ -27,11 +31,11 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 5175,
+    port,
     host: true,
     hmr: {
-      clientPort: 5175,
-      port: 5175,
+      clientPort: port,
+      port,
     },
     proxy: {
       '/api/external': {
@@ -60,19 +64,29 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            const normalized = id.replace(/\\/g, '/');
+            if (
+              normalized.includes('/node_modules/react/') ||
+              normalized.includes('/node_modules/react-dom/') ||
+              normalized.includes('/node_modules/scheduler/')
+            ) {
               return 'vendor-react';
             }
-            if (id.includes('lucide-react')) {
+            if (normalized.includes('/node_modules/lucide-react/')) {
               return 'vendor-icons';
             }
-            if (id.includes('@tanstack')) {
+            if (normalized.includes('/node_modules/@tanstack/')) {
               return 'vendor-tanstack';
             }
-            if (id.includes('react-markdown') || id.includes('remark-gfm')) {
+            if (
+              normalized.includes('/node_modules/react-markdown/') ||
+              normalized.includes('/node_modules/remark-gfm/') ||
+              normalized.includes('/node_modules/unified/') ||
+              normalized.includes('/node_modules/micromark')
+            ) {
               return 'vendor-markdown';
             }
-            if (id.includes('dayjs')) {
+            if (normalized.includes('/node_modules/dayjs/')) {
               return 'vendor-dayjs';
             }
           }
@@ -80,4 +94,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

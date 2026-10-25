@@ -127,35 +127,27 @@ export const ClassicFeedAdapter: FeedAdapter = {
     }
 
     return CLASSIC_FEED_PRESETS
-      .filter((preset) => {
-        const hasDbFeed = context.allFeeds.some((f) => preset.matchingSlugs.includes(f.slug));
-        const hasNotes = (countsByPreset[preset.slug] || 0) > 0;
-        return hasDbFeed || hasNotes;
-      })
+      .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
       .map((preset) => {
-      const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
-      const dbCount = context.allFeeds
-        .filter((f) => preset.matchingSlugs.includes(f.slug))
-        .reduce((sum, f) => sum + (f._count?.notes || 0), 0);
+        const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
+        const count = countsByPreset[preset.slug] || 0;
 
-      const count = countsByPreset[preset.slug] ?? dbCount;
-
-      return {
-        id: dbFeed?.id || preset.slug,
-        slug: preset.slug,
-        title: preset.title,
-        shortTitle: preset.shortTitle,
-        emoji: preset.emoji,
-        category: preset.category,
-        count,
-        accentColor: preset.accentColor,
-        badgeBgLight: preset.badgeBgLight,
-        badgeTextLight: preset.badgeTextLight,
-        badgeBgDark: preset.badgeBgDark,
-        badgeTextDark: preset.badgeTextDark,
-        description: dbFeed?.description || preset.description,
-      };
-    });
+        return {
+          id: dbFeed?.id || preset.slug,
+          slug: preset.slug,
+          title: preset.title,
+          shortTitle: preset.shortTitle,
+          emoji: preset.emoji,
+          category: preset.category,
+          count,
+          accentColor: preset.accentColor,
+          badgeBgLight: preset.badgeBgLight,
+          badgeTextLight: preset.badgeTextLight,
+          badgeBgDark: preset.badgeBgDark,
+          badgeTextDark: preset.badgeTextDark,
+          description: dbFeed?.description || preset.description,
+        };
+      });
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {
@@ -184,7 +176,7 @@ export const ClassicFeedAdapter: FeedAdapter = {
     }
 
     // 3. Sort chronologically
-    matched.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    matched.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
 
     // 4. Convert to UnifiedFeedItem
     const items: UnifiedFeedItem[] = matched.map((n) => {
@@ -203,11 +195,13 @@ export const ClassicFeedAdapter: FeedAdapter = {
         category: badge,
         title: n.title,
         description: n.description || '',
+        summary: (n as any).summary || null,
         publishedAt: n.startDate,
         updatedAt: n.updatedAt,
         timeSlot: (n.metadata as any)?.timeSlot,
         resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
         sourceLink: n.sourceLink,
+        status: n.status || 'PUBLISHED',
         curator: n.curator || 'Календарь',
         hashtags: n.hashtags?.map((h) => h.name) || [],
         coverUrl: extractNoteCoverUrl(n),

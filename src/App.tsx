@@ -1,7 +1,14 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue, Suspense, lazy } from 'react';
 import dayjs from 'dayjs';
-import { useFeedNotes, useFeedSources } from './api/queries';
+import { useFeedNotes, useFeedSources, useUpdateNote } from './api/queries';
 import { feedApi } from './api/client';
+import {
+  resolveFeedAppMode,
+  FeedAppRuntimeMode,
+  normalizeNotesForPublicFeeds,
+  StagingStatusFilter,
+} from './utils/appMode';
+import { StagingHubBanner } from './components/StagingHubBanner';
 import {
   FEED_ADAPTERS,
   FeedSourceMode,
@@ -12,13 +19,14 @@ import { FeedToolbar } from './components/FeedToolbar';
 import { FeedStreamView } from './components/FeedStreamView';
 import { FeedDesktopRail } from './components/FeedDesktopRail';
 import { FeedBottomNav } from './components/FeedBottomNav';
-import { FeedDetailModal } from './components/FeedDetailModal';
-import { FeedEditNoteModal } from './components/FeedEditNoteModal';
-import { FeedAiCoverModal } from './components/FeedAiCoverModal';
-import { LemonSeasonsModal } from './components/LemonSeasonsModal';
 import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
 import { useFeedAuthSync } from './hooks/useFeedAuthSync';
+
+const FeedDetailModal = lazy(() => import('./components/FeedDetailModal').then((m) => ({ default: m.FeedDetailModal })));
+const FeedEditNoteModal = lazy(() => import('./components/FeedEditNoteModal').then((m) => ({ default: m.FeedEditNoteModal })));
+const FeedAiCoverModal = lazy(() => import('./components/FeedAiCoverModal').then((m) => ({ default: m.FeedAiCoverModal })));
+const LemonSeasonsModal = lazy(() => import('./components/LemonSeasonsModal').then((m) => ({ default: m.LemonSeasonsModal })));
 
 export const App: React.FC = () => {
   const {
@@ -26,13 +34,56 @@ export const App: React.FC = () => {
     selectedFeedSlug,
     layoutMode,
     isEmbed,
+    noteId,
     setStreamSource,
     setSelectedFeedSlug,
     toggleLayoutMode,
+    openNote,
+    closeNote,
   } = useFeedRouter();
 
   // Synchronize authentication token and session from parent host via postMessage
   const authSync = useFeedAuthSync(isEmbed);
+    const [appMode, setAppMode] = useState<FeedAppRuntimeMode>(() => resolveFeedAppMode());
+
+  const handleSetAppMode = useCallback((newMode: FeedAppRuntimeMode) => {
+    setAppMode(newMode);
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('appMode', newMode);
+        window.history.replaceState({}, '', url.toString());
+      } catch (err) {
+        console.warn('Failed to update URL:', err);
+      }
+      if (isEmbed && window.parent) {
+        window.parent.postMessage(
+          {
+            type: 'LENTA_APP_MODE_CHANGED',
+            source: 'lenta-feed-app',
+            payload: { appMode: newMode },
+          },
+          '*'
+        );
+      }
+    }
+  }, [isEmbed]);
+
+  // Synchronize mode incoming from host container
+  useEffect(() => {
+    const handleModeMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'LENTA_SET_APP_MODE') {
+        const incoming = event.data.payload?.appMode;
+        if (incoming === 'dev' || incoming === 'staging' || incoming === 'public') {
+          setAppMode(incoming);
+        }
+      }
+    };
+    window.addEventListener('message', handleModeMessage);
+    return () => window.removeEventListener('message', handleModeMessage);
+  }, []);
+  const [stagingStatusFilter, setStagingStatusFilter] = useState<StagingStatusFilter>('all');
+  const updateNoteMutation = useUpdateNote();
 
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -77,9 +128,55 @@ export const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // Data fetching
-  const { data: notes = [], isLoading, refetch, isRefetching } = useFeedNotes();
+  // Data fetching:
+  // - Dev Mode (:5175 in dev): fetches all notes with admin privileges
+  // - Staging Hub (:5175 with --mode staging): fetches all notes in the staging/public contour (privacy='public', both DRAFT & PUBLISHED)
+  // - Public Feed (:5176 with --mode public): fetches strictly approved public notes (privacy='public', status='PUBLISHED')
+  const notesQueryParams = useMemo(
+    () =>
+      appMode === 'public'
+        ? { privacy: 'public' as const, status: 'PUBLISHED' as const }
+        : appMode === 'staging'
+        ? { privacy: 'public' as const }
+        : {},
+    [appMode]
+  );
+  const { data: rawNotes = [], isLoading, refetch, isRefetching } = useFeedNotes(notesQueryParams);
   const { data: allFeeds = [] } = useFeedSources();
+
+  const allMappedNotes = useMemo(
+    () => normalizeNotesForPublicFeeds(rawNotes),
+    [rawNotes]
+  );
+
+  const stagingCounts = useMemo(() => {
+    let pending = 0;
+    let published = 0;
+    for (const n of allMappedNotes) {
+      if (n.status === 'PUBLISHED') published += 1;
+      else pending += 1;
+    }
+    return {
+      total: allMappedNotes.length,
+      pending,
+      published,
+    };
+  }, [allMappedNotes]);
+
+  const notes = useMemo(() => {
+    if (appMode === 'public') {
+      return allMappedNotes.filter((n) => n.status === 'PUBLISHED');
+    }
+    if (appMode === 'staging') {
+      if (stagingStatusFilter === 'pending') {
+        return allMappedNotes.filter((n) => n.status !== 'PUBLISHED');
+      }
+      if (stagingStatusFilter === 'published') {
+        return allMappedNotes.filter((n) => n.status === 'PUBLISHED');
+      }
+    }
+    return allMappedNotes;
+  }, [allMappedNotes, appMode, stagingStatusFilter]);
 
   // On-demand Wiki calendar feed auto-sync
   const wikiSyncTriggered = useRef(false);
@@ -104,10 +201,23 @@ export const App: React.FC = () => {
     return FEED_ADAPTERS[streamSource] || FEED_ADAPTERS.spark;
   }, [streamSource]);
 
-  // Thematic tabs
+  // Thematic tabs (only tabs that actually have notes in the current staging/public view)
   const activeTabs: UnifiedFeedTab[] = useMemo(() => {
-    return activeAdapter.getTabs({ allFeeds, notes });
+    return activeAdapter.getTabs({ allFeeds, notes }).filter((t) => t.count > 0);
   }, [activeAdapter, allFeeds, notes]);
+
+  // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
+  useEffect(() => {
+    if (!selectedFeedSlug || isLoading) return;
+    const stillExists = activeTabs.some(
+      (t) =>
+        t.slug === selectedFeedSlug ||
+        Boolean(t.subtopics && t.subtopics.some((s) => s.slug === selectedFeedSlug))
+    );
+    if (!stillExists) {
+      setSelectedFeedSlug(undefined);
+    }
+  }, [activeTabs, selectedFeedSlug, isLoading, setSelectedFeedSlug]);
 
   // Active tab object for sidebar detail
   const activeTabObj: UnifiedFeedTab | null = useMemo(() => {
@@ -121,14 +231,20 @@ export const App: React.FC = () => {
     );
   }, [activeTabs, selectedFeedSlug]);
 
-  // Mode total count
-  const totalCount = useMemo(() => {
-    return activeAdapter.adaptNotes(notes, undefined, '').length;
+  // All items for current streamSource (shared for totalCount and unfiltered view)
+  const allSourceItems = useMemo(() => {
+    return activeAdapter.adaptNotes(notes, undefined, '');
   }, [activeAdapter, notes]);
+
+  // Mode total count
+  const totalCount = allSourceItems.length;
 
   // Filtered feed items (search query + optional month filter)
   const feedItems: UnifiedFeedItem[] = useMemo(() => {
-    let items = activeAdapter.adaptNotes(notes, selectedFeedSlug, deferredSearchQuery);
+    let items =
+      !selectedFeedSlug && !deferredSearchQuery.trim()
+        ? allSourceItems
+        : activeAdapter.adaptNotes(notes, selectedFeedSlug, deferredSearchQuery);
     if (isMonthFilterActive) {
       items = items.filter((item) => {
         const itemDate = dayjs(item.publishedAt);
@@ -136,7 +252,7 @@ export const App: React.FC = () => {
       });
     }
     return items;
-  }, [activeAdapter, notes, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
+  }, [activeAdapter, notes, allSourceItems, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
 
   // Progressive infinite loading
   const BATCH_SIZE = 24;
@@ -171,9 +287,42 @@ export const App: React.FC = () => {
     };
   }, [visibleCount, feedItems.length]);
 
-  const handleOpenDetail = useCallback((item: UnifiedFeedItem) => {
-    setSelectedDetailItem(item);
-  }, []);
+  const handleOpenDetail = useCallback(
+    (item: UnifiedFeedItem) => {
+      setSelectedDetailItem(item);
+      openNote(item.id);
+    },
+    [openNote]
+  );
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedDetailItem(null);
+    closeNote();
+  }, [closeNote]);
+
+  // Synchronize open note modal with route query param (?note=...)
+  useEffect(() => {
+    if (!noteId) {
+      if (selectedDetailItem) {
+        setSelectedDetailItem(null);
+      }
+      return;
+    }
+
+    if (selectedDetailItem && selectedDetailItem.id === noteId) {
+      return;
+    }
+
+    const targetNote = allMappedNotes.find(
+      (n) => n.id === noteId || n.externalId === noteId || (n.metadata && (n.metadata as any).slug === noteId)
+    );
+    if (targetNote) {
+      const adapted = activeAdapter.adaptNotes([targetNote])[0];
+      if (adapted) {
+        setSelectedDetailItem(adapted);
+      }
+    }
+  }, [noteId, allMappedNotes, activeAdapter, selectedDetailItem]);
 
   const handleSelectTag = useCallback((tag: string) => {
     setSearchQuery(tag);
@@ -227,12 +376,34 @@ export const App: React.FC = () => {
   }, []);
 
   const handleOpenCalendar = useCallback(() => {
-    window.open('http://localhost:5174/', '_blank');
-  }, []);
+    if (isEmbed && typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: 'LENTA_HOST_NAVIGATE',
+          source: 'lenta-feed-app',
+          payload: { view: 'month' },
+        },
+        '*'
+      );
+      return;
+    }
+    window.open('http://localhost:5174/calendar', '_blank');
+  }, [isEmbed]);
 
   const handleOpenTimeline = useCallback(() => {
-    window.open('http://localhost:5174/?view=timeline', '_blank');
-  }, []);
+    if (isEmbed && typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: 'LENTA_HOST_NAVIGATE',
+          source: 'lenta-feed-app',
+          payload: { view: 'timeline' },
+        },
+        '*'
+      );
+      return;
+    }
+    window.open('http://localhost:5174/', '_blank');
+  }, [isEmbed]);
 
   const handleOpenEdit = useCallback((item: UnifiedFeedItem) => {
     setEditingItem(item);
@@ -242,6 +413,46 @@ export const App: React.FC = () => {
     setAiCoverTemplateId(templateId);
     setAiCoverItem(item);
   }, []);
+
+  const handleApprovePublish = useCallback(
+    async (item: UnifiedFeedItem) => {
+      await updateNoteMutation.mutateAsync({
+        id: item.id,
+        data: {
+          privacy: 'public',
+          status: 'PUBLISHED',
+          publishAt: new Date().toISOString(),
+        },
+      });
+    },
+    [updateNoteMutation]
+  );
+
+  const handleUnpublishToStaging = useCallback(
+    async (item: UnifiedFeedItem) => {
+      await updateNoteMutation.mutateAsync({
+        id: item.id,
+        data: {
+          privacy: 'public',
+          status: 'DRAFT',
+        },
+      });
+    },
+    [updateNoteMutation]
+  );
+
+  const handleReturnToPrivate = useCallback(
+    async (item: UnifiedFeedItem) => {
+      await updateNoteMutation.mutateAsync({
+        id: item.id,
+        data: {
+          privacy: 'private',
+          status: 'DRAFT',
+        },
+      });
+    },
+    [updateNoteMutation]
+  );
 
   // Close categories drawer on ESC key
   useEffect(() => {
@@ -292,7 +503,19 @@ export const App: React.FC = () => {
           onNavigateToTimeline={handleOpenTimeline}
           layoutMode={layoutMode}
           onToggleLayoutMode={toggleLayoutMode}
+          appMode={appMode}
+          onSetAppMode={handleSetAppMode}
         />
+
+        {appMode === 'staging' && (
+          <StagingHubBanner
+            statusFilter={stagingStatusFilter}
+            onChangeStatusFilter={setStagingStatusFilter}
+            totalCount={stagingCounts.total}
+            pendingCount={stagingCounts.pending}
+            publishedCount={stagingCounts.published}
+          />
+        )}
 
         {/* Responsive Body: Stream-only or Split layout with desktop rail */}
         <div
@@ -320,6 +543,11 @@ export const App: React.FC = () => {
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}
             layoutMode={layoutMode}
+            appMode={appMode}
+            onApprovePublish={handleApprovePublish}
+            onUnpublishToStaging={handleUnpublishToStaging}
+            onReturnToPrivate={handleReturnToPrivate}
+            isMutating={updateNoteMutation.isPending}
           />
 
           {/* Right Desktop Rail: Folders, Metrics, Calendar, Tags (Only shown in split mode) */}
@@ -399,46 +627,67 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Detail Modal */}
-      <FeedDetailModal
-        item={selectedDetailItem}
-        onClose={() => setSelectedDetailItem(null)}
-        disableEscClose={Boolean(aiCoverItem || editingItem)}
-        onSelectTag={(tag) => {
-          setSearchQuery(tag);
-        }}
-        onEditNote={(item) => {
-          setSelectedDetailItem(null);
-          handleOpenEdit(item);
-        }}
-        onAiCover={(item) => {
-          handleOpenAiCover(item);
-        }}
-      />
+      {/* Lazy-loaded Modals */}
+      <Suspense fallback={null}>
+        {selectedDetailItem && (
+          <FeedDetailModal
+            item={selectedDetailItem}
+            onClose={handleCloseDetail}
+            disableEscClose={Boolean(aiCoverItem || editingItem)}
+            onSelectTag={(tag) => {
+              setSearchQuery(tag);
+            }}
+            onEditNote={
+              appMode !== 'public'
+                ? (item) => {
+                    handleCloseDetail();
+                    handleOpenEdit(item);
+                  }
+                : undefined
+            }
+            onAiCover={
+              appMode !== 'public'
+                ? (item) => {
+                    handleOpenAiCover(item);
+                  }
+                : undefined
+            }
+          />
+        )}
 
-      {/* Note Editor Modal */}
-      <FeedEditNoteModal
-        item={editingItem}
-        onClose={() => setEditingItem(null)}
-        disableEscClose={Boolean(aiCoverItem)}
-        onOpenAiCover={(item, templateId) => handleOpenAiCover(item, templateId)}
-        onSaved={() => {
-          refetch();
-        }}
-      />
+        {editingItem && (
+          <FeedEditNoteModal
+            item={editingItem}
+            onClose={() => setEditingItem(null)}
+            disableEscClose={Boolean(aiCoverItem)}
+            onOpenAiCover={(item, templateId) => handleOpenAiCover(item, templateId)}
+            onSaved={() => {
+              refetch();
+            }}
+          />
+        )}
 
-      {/* AI Cover Studio Modal */}
-      <FeedAiCoverModal
-        item={aiCoverItem}
-        initialTemplateId={aiCoverTemplateId}
-        onClose={() => {
-          setAiCoverItem(null);
-          setAiCoverTemplateId(undefined);
-        }}
-        onCoverApplied={() => {
-          refetch();
-        }}
-      />
+        {aiCoverItem && (
+          <FeedAiCoverModal
+            item={aiCoverItem}
+            initialTemplateId={aiCoverTemplateId}
+            onClose={() => {
+              setAiCoverItem(null);
+              setAiCoverTemplateId(undefined);
+            }}
+            onCoverApplied={() => {
+              refetch();
+            }}
+          />
+        )}
+
+        {isLemonSeasonsModalOpen && (
+          <LemonSeasonsModal
+            isOpen={isLemonSeasonsModalOpen}
+            onClose={() => setIsLemonSeasonsModalOpen(false)}
+          />
+        )}
+      </Suspense>
 
       {/* Mobile Bottom Navigation Bar */}
       <FeedBottomNav
@@ -452,12 +701,6 @@ export const App: React.FC = () => {
         }}
         onOpenCalendar={handleOpenCalendar}
         onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
-      />
-
-      {/* Lemon Seasons Status Modal */}
-      <LemonSeasonsModal
-        isOpen={isLemonSeasonsModalOpen}
-        onClose={() => setIsLemonSeasonsModalOpen(false)}
       />
     </div>
   );
