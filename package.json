@@ -7,7 +7,6 @@
   "types": "./src/index.ts",
   "scripts": {
     "dev": "vite --port 5175",
-    "dev:staging": "vite --port 5175 --mode staging",
     "dev:public": "vite --port 5176 --mode public",
     "build": "tsc -b && vite build",
     "build:public": "tsc -b && vite build --mode public",

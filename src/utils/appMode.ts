@@ -1,24 +1,17 @@
 import { Note } from '@lenta/shared';
 
 export type FeedAppRuntimeMode = 'dev' | 'staging' | 'public';
-export type StagingStatusFilter = 'all' | 'pending' | 'published';
 
 /**
- * Resolves whether feed-app is running as:
- * - Developer Admin Feed (:5175 in dev mode, default)
- * - Staging Publication Hub (:5175 with --mode staging)
- * - Public Approved Feed (:5176 with --mode public)
+ * Determines whether the app is running in Public Environment:
+ * - Public port 5176
+ * - Vite build mode public (VITE_FEED_APP_MODE=public or MODE=public)
+ * - Explicit appMode=public query param in standalone public view
  */
-export function resolveFeedAppMode(): FeedAppRuntimeMode {
+export function isPublicEnvironment(): boolean {
   if (typeof window !== 'undefined') {
-    const sp = new URLSearchParams(window.location.search);
-    const paramMode = (sp.get('appMode') || sp.get('mode') || '').toLowerCase();
-    if (paramMode === 'public') return 'public';
-    if (paramMode === 'staging') return 'staging';
-    if (paramMode === 'dev' || paramMode === 'admin') return 'dev';
-
     if (window.location.port === '5176') {
-      return 'public';
+      return true;
     }
   }
 
@@ -27,11 +20,30 @@ export function resolveFeedAppMode(): FeedAppRuntimeMode {
     import.meta.env.MODE ||
     ''
   ).toLowerCase();
-  if (envMode === 'staging') {
-    return 'staging';
-  }
-  if (envMode === 'public') {
+  return envMode === 'public';
+}
+
+/**
+ * Resolves the initial active feed mode:
+ * - In Public Environment: strictly 'public' (no tabs, cut ui)
+ * - In Dev Environment: defaults to 'dev', with tabs 'dev' | 'staging' | 'public' to switch context
+ */
+export function resolveFeedAppMode(): FeedAppRuntimeMode {
+  if (isPublicEnvironment()) {
     return 'public';
+  }
+
+  if (typeof window !== 'undefined') {
+    const sp = new URLSearchParams(window.location.search);
+    const paramMode = (sp.get('appMode') || sp.get('mode') || '').toLowerCase();
+    if (paramMode === 'public') return 'public';
+    if (paramMode === 'staging') return 'staging';
+    if (paramMode === 'dev' || paramMode === 'admin') return 'dev';
+
+    const saved = localStorage.getItem('lenta_app_mode')?.toLowerCase();
+    if (saved === 'public' || saved === 'staging' || saved === 'dev') {
+      return saved as FeedAppRuntimeMode;
+    }
   }
 
   return 'dev';
