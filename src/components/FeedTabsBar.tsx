@@ -20,11 +20,35 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
   totalCount,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isClassic = streamSource === 'classic';
+  const isAll = streamSource === 'all';
+  const isItDev = streamSource === 'it_dev' || streamSource === 'spark' || streamSource === 'dev';
   const isSeasons = streamSource === 'seasons';
-  const isDev = streamSource === 'dev';
-  const allLabel = isDev ? 'Все Dev ленты' : isClassic ? 'Все события' : isSeasons ? 'Все ленты' : 'Все каналы';
-  const allEmoji = isDev ? '💻' : isClassic ? '🏛️' : isSeasons ? '🍋' : '📡';
+  const isEntertainment = streamSource === 'entertainment';
+  const isHolidays = streamSource === 'holidays' || streamSource === 'classic';
+
+  const allLabel = isAll
+    ? 'Все публикации'
+    : isItDev
+    ? 'Все IT темы'
+    : isSeasons
+    ? 'Все хроники'
+    : isEntertainment
+    ? 'Все релизы'
+    : isHolidays
+    ? 'Все праздники'
+    : 'Все каналы';
+
+  const allEmoji = isAll
+    ? '🌐'
+    : isItDev
+    ? '💻'
+    : isSeasons
+    ? '🍋'
+    : isEntertainment
+    ? '🍿'
+    : isHolidays
+    ? '🎉'
+    : '📡';
 
   const activeTabWithSubtopics = tabs.find(
     (t) =>
@@ -88,6 +112,29 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
             >
               <span>{tab.emoji}</span>
               <span>{tab.shortTitle}</span>
+              {tab.badgeLabel ? (
+                <span
+                  title={tab.badgeLabel === '(daily)' ? 'Лента из ежедневного каталога (daily sync)' : tab.badgeLabel}
+                  className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full border leading-tight font-mono ${
+                    isSelected
+                      ? 'bg-orange-500 text-white border-orange-400'
+                      : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                  }`}
+                >
+                  {tab.badgeLabel}
+                </span>
+              ) : tab.isHot ? (
+                <span
+                  title="Ежедневная синхронизация (горячая лента)"
+                  className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full border leading-tight ${
+                    isSelected
+                      ? 'bg-orange-500 text-white border-orange-400'
+                      : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                  }`}
+                >
+                  🔥 Daily
+                </span>
+              ) : null}
               <span
                 className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full leading-tight font-medium ${
                   isSelected

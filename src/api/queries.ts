@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   feedApi,
+  CreateFeedPayload,
+  UpdateFeedPayload,
   UpdateNotePayload,
   GenerateAiCoverPayload,
   GenerateAiBatchPayload,
@@ -16,7 +18,13 @@ export const queryKeys = {
 export function useFeedNotes(params?: QueryNotesParams) {
   return useQuery({
     queryKey: queryKeys.allNotes(params),
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => {
+      const prevParams = previousQuery?.queryKey?.[2] as QueryNotesParams | undefined;
+      if (prevParams?.appMode !== params?.appMode) {
+        return undefined;
+      }
+      return previousData;
+    },
     queryFn: async () => {
       const data = await feedApi.getNotes({
         limit: 500,
@@ -32,6 +40,45 @@ export function useFeedSources() {
     queryKey: queryKeys.feeds,
     queryFn: async () => {
       return await feedApi.getFeeds();
+    },
+  });
+}
+
+export function useCreateFeed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateFeedPayload) => {
+      return await feedApi.createFeed(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+    },
+  });
+}
+
+export function useUpdateFeed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateFeedPayload }) => {
+      return await feedApi.updateFeed(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+    },
+  });
+}
+
+export function useDeleteFeed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await feedApi.deleteFeed(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
     },
   });
 }

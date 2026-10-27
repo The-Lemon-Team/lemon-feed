@@ -1,21 +1,20 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue, Suspense, lazy } from 'react';
 import dayjs from 'dayjs';
 import { useFeedNotes, useFeedSources, useUpdateNote } from './api/queries';
-import { feedApi } from './api/client';
+import { feedApi, setFeedAppMode } from './api/client';
 import {
   resolveFeedAppMode,
+  isPublicEnvironment,
   FeedAppRuntimeMode,
   normalizeNotesForPublicFeeds,
-  StagingStatusFilter,
 } from './utils/appMode';
-import { StagingHubBanner } from './components/StagingHubBanner';
 import {
   FEED_ADAPTERS,
   FeedSourceMode,
   UnifiedFeedItem,
   UnifiedFeedTab,
 } from './adapters/feeds';
-import { FeedToolbar } from './components/FeedToolbar';
+import { FeedToolbar, FeedModeOption, DEFAULT_FEED_MODES } from './components/FeedToolbar';
 import { FeedStreamView } from './components/FeedStreamView';
 import { FeedDesktopRail } from './components/FeedDesktopRail';
 import { FeedBottomNav } from './components/FeedBottomNav';
@@ -27,6 +26,8 @@ const FeedDetailModal = lazy(() => import('./components/FeedDetailModal').then((
 const FeedEditNoteModal = lazy(() => import('./components/FeedEditNoteModal').then((m) => ({ default: m.FeedEditNoteModal })));
 const FeedAiCoverModal = lazy(() => import('./components/FeedAiCoverModal').then((m) => ({ default: m.FeedAiCoverModal })));
 const LemonSeasonsModal = lazy(() => import('./components/LemonSeasonsModal').then((m) => ({ default: m.LemonSeasonsModal })));
+const FeedEntityModal = lazy(() => import('./components/FeedEntityModal').then((m) => ({ default: m.FeedEntityModal })));
+const FeedSourceTabModal = lazy(() => import('./components/FeedSourceTabModal').then((m) => ({ default: m.FeedSourceTabModal })));
 
 export const App: React.FC = () => {
   const {
@@ -44,12 +45,15 @@ export const App: React.FC = () => {
 
   // Synchronize authentication token and session from parent host via postMessage
   const authSync = useFeedAuthSync(isEmbed);
-    const [appMode, setAppMode] = useState<FeedAppRuntimeMode>(() => resolveFeedAppMode());
+  const isPublicMode = isPublicEnvironment();
+  const [appMode, setAppMode] = useState<FeedAppRuntimeMode>(() => resolveFeedAppMode());
 
   const handleSetAppMode = useCallback((newMode: FeedAppRuntimeMode) => {
     setAppMode(newMode);
+    setFeedAppMode(newMode);
     if (typeof window !== 'undefined') {
       try {
+        localStorage.setItem('lenta_app_mode', newMode);
         const url = new URL(window.location.href);
         url.searchParams.set('appMode', newMode);
         window.history.replaceState({}, '', url.toString());
@@ -76,13 +80,24 @@ export const App: React.FC = () => {
         const incoming = event.data.payload?.appMode;
         if (incoming === 'dev' || incoming === 'staging' || incoming === 'public') {
           setAppMode(incoming);
+          setFeedAppMode(incoming);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('lenta_app_mode', incoming);
+              const url = new URL(window.location.href);
+              url.searchParams.set('appMode', incoming);
+              window.history.replaceState({}, '', url.toString());
+            } catch {
+              // ignore
+            }
+          }
         }
       }
     };
     window.addEventListener('message', handleModeMessage);
     return () => window.removeEventListener('message', handleModeMessage);
   }, []);
-  const [stagingStatusFilter, setStagingStatusFilter] = useState<StagingStatusFilter>('all');
+
   const updateNoteMutation = useUpdateNote();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,6 +116,7 @@ export const App: React.FC = () => {
     return dayjs('2026-10-17');
   });
   const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
+  const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(false);
 
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
   const [selectedDetailItem, setSelectedDetailItem] = useState<UnifiedFeedItem | null>(null);
@@ -108,6 +124,101 @@ export const App: React.FC = () => {
   const [aiCoverItem, setAiCoverItem] = useState<UnifiedFeedItem | null>(null);
   const [aiCoverTemplateId, setAiCoverTemplateId] = useState<string | undefined>(undefined);
   const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(false);
+
+  // Edit Mode state (available in Dev mode)
+  const [isEditMode, setIsEditMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('editMode') === 'true' || sp.get('edit') === '1') return true;
+      return localStorage.getItem('lenta_edit_mode') === 'true';
+    }
+    return false;
+  });
+
+  const handleToggleEditMode = useCallback(() => {
+    setIsEditMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('lenta_edit_mode', String(next));
+        const url = new URL(window.location.href);
+        if (next) {
+          url.searchParams.set('editMode', 'true');
+        } else {
+          url.searchParams.delete('editMode');
+          url.searchParams.delete('edit');
+        }
+        window.history.replaceState({}, '', url.toString());
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  // Custom source modes (upper tabs)
+  const [sourceModes, setSourceModes] = useState<FeedModeOption[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('lenta_custom_stream_modes');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return DEFAULT_FEED_MODES;
+  });
+
+  // Modal states for tabs and feeds
+  const [editingSourceTab, setEditingSourceTab] = useState<FeedModeOption | null>(null);
+  const [isSourceTabModalOpen, setIsSourceTabModalOpen] = useState(false);
+
+  const [editingFeedTab, setEditingFeedTab] = useState<UnifiedFeedTab | null>(null);
+  const [editingDbFeed, setEditingDbFeed] = useState<any | null>(null);
+  const [isFeedEntityModalOpen, setIsFeedEntityModalOpen] = useState(false);
+
+  const handleOpenEditSourceTab = useCallback((tab: FeedModeOption) => {
+    setEditingSourceTab(tab);
+    setIsSourceTabModalOpen(true);
+  }, []);
+
+  const handleOpenAddSourceTab = useCallback(() => {
+    setEditingSourceTab(null);
+    setIsSourceTabModalOpen(true);
+  }, []);
+
+  const handleSaveSourceTab = useCallback((tab: FeedModeOption) => {
+    setSourceModes((prev) => {
+      const existingIndex = prev.findIndex((m) => m.id === tab.id);
+      let updated: FeedModeOption[];
+      if (existingIndex >= 0) {
+        updated = [...prev];
+        updated[existingIndex] = tab;
+      } else {
+        updated = [...prev, tab];
+      }
+      try {
+        localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteSourceTab = useCallback((tabId: string) => {
+    setSourceModes((prev) => {
+      const updated = prev.filter((m) => m.id !== tabId);
+      try {
+        localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  }, []);
 
   // Dark / Light Theme
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -129,16 +240,15 @@ export const App: React.FC = () => {
   }, [isDarkMode]);
 
   // Data fetching:
-  // - Dev Mode (:5175 in dev): fetches all notes with admin privileges
-  // - Staging Hub (:5175 with --mode staging): fetches all notes in the staging/public contour (privacy='public', both DRAFT & PUBLISHED)
-  // - Public Feed (:5176 with --mode public): fetches strictly approved public notes (privacy='public', status='PUBLISHED')
+  // - In dev & funnel testing mode: fetches all notes with admin privileges (nothing hidden)
+  // - In public mode: strictly approved public notes (privacy='public', status='PUBLISHED')
   const notesQueryParams = useMemo(
     () =>
       appMode === 'public'
-        ? { privacy: 'public' as const, status: 'PUBLISHED' as const }
+        ? { appMode: 'public' as const, privacy: 'public' as const, status: 'PUBLISHED' as const }
         : appMode === 'staging'
-        ? { privacy: 'public' as const }
-        : {},
+        ? { appMode: 'staging' as const, privacy: 'public' as const }
+        : { appMode: 'dev' as const, privacy: 'all' as const },
     [appMode]
   );
   const { data: rawNotes = [], isLoading, refetch, isRefetching } = useFeedNotes(notesQueryParams);
@@ -149,34 +259,15 @@ export const App: React.FC = () => {
     [rawNotes]
   );
 
-  const stagingCounts = useMemo(() => {
-    let pending = 0;
-    let published = 0;
-    for (const n of allMappedNotes) {
-      if (n.status === 'PUBLISHED') published += 1;
-      else pending += 1;
-    }
-    return {
-      total: allMappedNotes.length,
-      pending,
-      published,
-    };
-  }, [allMappedNotes]);
-
   const notes = useMemo(() => {
     if (appMode === 'public') {
-      return allMappedNotes.filter((n) => n.status === 'PUBLISHED');
+      return allMappedNotes.filter((n) => n.privacy === 'public' && n.status === 'PUBLISHED');
     }
     if (appMode === 'staging') {
-      if (stagingStatusFilter === 'pending') {
-        return allMappedNotes.filter((n) => n.status !== 'PUBLISHED');
-      }
-      if (stagingStatusFilter === 'published') {
-        return allMappedNotes.filter((n) => n.status === 'PUBLISHED');
-      }
+      return allMappedNotes.filter((n) => n.privacy === 'public' && n.status !== 'PUBLISHED');
     }
     return allMappedNotes;
-  }, [allMappedNotes, appMode, stagingStatusFilter]);
+  }, [allMappedNotes, appMode]);
 
   // On-demand Wiki calendar feed auto-sync
   const wikiSyncTriggered = useRef(false);
@@ -198,7 +289,7 @@ export const App: React.FC = () => {
 
   // Active adapter
   const activeAdapter = useMemo(() => {
-    return FEED_ADAPTERS[streamSource] || FEED_ADAPTERS.spark;
+    return FEED_ADAPTERS[streamSource] || FEED_ADAPTERS.all;
   }, [streamSource]);
 
   // Thematic tabs (only tabs that actually have notes in the current staging/public view)
@@ -231,6 +322,22 @@ export const App: React.FC = () => {
     );
   }, [activeTabs, selectedFeedSlug]);
 
+  const handleOpenEditFeed = useCallback(
+    (tab: UnifiedFeedTab) => {
+      const dbFeed = allFeeds.find((f) => f.id === tab.id || f.slug === tab.slug);
+      setEditingFeedTab(tab);
+      setEditingDbFeed(dbFeed || null);
+      setIsFeedEntityModalOpen(true);
+    },
+    [allFeeds]
+  );
+
+  const handleOpenAddFeed = useCallback(() => {
+    setEditingFeedTab(null);
+    setEditingDbFeed(null);
+    setIsFeedEntityModalOpen(true);
+  }, []);
+
   // All items for current streamSource (shared for totalCount and unfiltered view)
   const allSourceItems = useMemo(() => {
     return activeAdapter.adaptNotes(notes, undefined, '');
@@ -251,8 +358,14 @@ export const App: React.FC = () => {
         return itemDate.isValid() && itemDate.isSame(selectedMonth, 'month');
       });
     }
+    if (filterUnassignedOnly) {
+      items = items.filter((item) => {
+        const slug = item.feedSlug?.toLowerCase() || '';
+        return !slug || slug === 'spark-general' || slug === 'general' || slug === 'unassigned' || slug === 'news' || slug === 'default';
+      });
+    }
     return items;
-  }, [activeAdapter, notes, allSourceItems, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
+  }, [activeAdapter, notes, allSourceItems, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth, filterUnassignedOnly]);
 
   // Progressive infinite loading
   const BATCH_SIZE = 24;
@@ -260,7 +373,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-  }, [streamSource, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth]);
+  }, [streamSource, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth, filterUnassignedOnly]);
 
   const visibleFeedItems = useMemo(() => {
     return feedItems.slice(0, visibleCount);
@@ -505,17 +618,17 @@ export const App: React.FC = () => {
           onToggleLayoutMode={toggleLayoutMode}
           appMode={appMode}
           onSetAppMode={handleSetAppMode}
+          isPublicMode={isPublicMode}
+          filterUnassigned={filterUnassignedOnly}
+          onToggleFilterUnassigned={() => setFilterUnassignedOnly((prev) => !prev)}
+          isEditMode={appMode === 'dev' && isEditMode}
+          onToggleEditMode={appMode === 'dev' ? handleToggleEditMode : undefined}
+          sourceModes={sourceModes}
+          onEditSourceTab={handleOpenEditSourceTab}
+          onAddSourceTab={handleOpenAddSourceTab}
+          onEditFeed={handleOpenEditFeed}
+          onAddFeed={handleOpenAddFeed}
         />
-
-        {appMode === 'staging' && (
-          <StagingHubBanner
-            statusFilter={stagingStatusFilter}
-            onChangeStatusFilter={setStagingStatusFilter}
-            totalCount={stagingCounts.total}
-            pendingCount={stagingCounts.pending}
-            publishedCount={stagingCounts.published}
-          />
-        )}
 
         {/* Responsive Body: Stream-only or Split layout with desktop rail */}
         <div
@@ -538,15 +651,15 @@ export const App: React.FC = () => {
             onResetMonthFilter={handleResetMonthFilter}
             onOpenDetail={handleOpenDetail}
             onSelectTag={handleSelectTag}
-            onEditNote={handleOpenEdit}
-            onAiCover={handleOpenAiCover}
+            onEditNote={!isPublicMode && appMode !== 'public' ? handleOpenEdit : undefined}
+            onAiCover={!isPublicMode && appMode !== 'public' ? handleOpenAiCover : undefined}
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}
             layoutMode={layoutMode}
             appMode={appMode}
-            onApprovePublish={handleApprovePublish}
-            onUnpublishToStaging={handleUnpublishToStaging}
-            onReturnToPrivate={handleReturnToPrivate}
+            onApprovePublish={!isPublicMode && appMode !== 'public' ? handleApprovePublish : undefined}
+            onUnpublishToStaging={!isPublicMode && appMode !== 'public' ? handleUnpublishToStaging : undefined}
+            onReturnToPrivate={!isPublicMode && appMode !== 'public' ? handleReturnToPrivate : undefined}
             isMutating={updateNoteMutation.isPending}
           />
 
@@ -566,6 +679,7 @@ export const App: React.FC = () => {
               onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
               onNavigateToCalendar={handleOpenCalendar}
               currentMonthName={selectedMonth.format('MMMM YYYY')}
+              isPublicMode={isPublicMode}
             />
           )}
         </div>
@@ -638,7 +752,7 @@ export const App: React.FC = () => {
               setSearchQuery(tag);
             }}
             onEditNote={
-              appMode !== 'public'
+              !isPublicMode && appMode !== 'public'
                 ? (item) => {
                     handleCloseDetail();
                     handleOpenEdit(item);
@@ -646,7 +760,7 @@ export const App: React.FC = () => {
                 : undefined
             }
             onAiCover={
-              appMode !== 'public'
+              !isPublicMode && appMode !== 'public'
                 ? (item) => {
                     handleOpenAiCover(item);
                   }
@@ -685,6 +799,35 @@ export const App: React.FC = () => {
           <LemonSeasonsModal
             isOpen={isLemonSeasonsModalOpen}
             onClose={() => setIsLemonSeasonsModalOpen(false)}
+          />
+        )}
+
+        {isFeedEntityModalOpen && (
+          <FeedEntityModal
+            feedTab={editingFeedTab}
+            feedData={editingDbFeed}
+            isOpen={isFeedEntityModalOpen}
+            onClose={() => {
+              setIsFeedEntityModalOpen(false);
+              setEditingFeedTab(null);
+              setEditingDbFeed(null);
+            }}
+            onSaved={() => {
+              refetch();
+            }}
+          />
+        )}
+
+        {isSourceTabModalOpen && (
+          <FeedSourceTabModal
+            tab={editingSourceTab}
+            isOpen={isSourceTabModalOpen}
+            onClose={() => {
+              setIsSourceTabModalOpen(false);
+              setEditingSourceTab(null);
+            }}
+            onSave={handleSaveSourceTab}
+            onDelete={handleDeleteSourceTab}
           />
         )}
       </Suspense>

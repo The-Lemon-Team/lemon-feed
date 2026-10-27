@@ -1,6 +1,16 @@
 import { Note } from '@lenta/shared';
 
-export type FeedSourceMode = 'spark' | 'dev' | 'seasons' | 'classic' | 'telegram';
+export type FeedSourceMode =
+  | 'all'
+  | 'it_dev'
+  | 'seasons'
+  | 'entertainment'
+  | 'holidays'
+  | 'telegram'
+  | 'spark'
+  | 'dev'
+  | 'classic'
+  | 'general';
 
 export interface ThematicCategoryBadge {
   label: string;
@@ -27,9 +37,11 @@ export interface UnifiedFeedItem {
   audioUrl?: string | null;
   audioDuration?: number | null;
   status?: string | null;
+  author?: string | null;
   curator?: string | null;
   hashtags?: string[];
   coverUrl?: string | null;
+  isHot?: boolean;
   rawPayload: Note | any;
 }
 
@@ -67,6 +79,8 @@ export interface UnifiedFeedTab {
   badgeTextDark?: string;
   description?: string;
   isCustomFolder?: boolean;
+  isHot?: boolean;
+  badgeLabel?: string;
   subtopics?: UnifiedSubtopic[];
 }
 

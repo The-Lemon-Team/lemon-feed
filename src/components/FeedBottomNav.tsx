@@ -78,16 +78,25 @@ export const FeedBottomNav: React.FC<FeedBottomNavProps> = ({
         */}
 
         {/* 4. Lemon Seasons (Кнопка в фирменном стиле с логотипом) */}
-        <button
-          type="button"
-          onClick={onOpenLemonSeasons || onOpenCalendar}
-          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-amber-700 dark:text-yellow-400 hover:text-amber-800 dark:hover:text-yellow-300 transition-colors group cursor-pointer"
+        <a
+          href="http://localhost:5174/"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => {
+            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              if (onOpenLemonSeasons || onOpenCalendar) {
+                e.preventDefault();
+                (onOpenLemonSeasons || onOpenCalendar)?.();
+              }
+            }
+          }}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-amber-700 dark:text-yellow-400 hover:text-amber-800 dark:hover:text-yellow-300 transition-colors group cursor-pointer no-underline"
           title="Lemon Seasons — Календарь (в разработке)"
           aria-label="Lemon Seasons — Календарь (в разработке)"
         >
           <LemonLogo size={20} glow={false} className="group-hover:scale-110 transition-transform" />
           <span className="text-[10px] font-semibold leading-none">Seasons</span>
-        </button>
+        </a>
       </div>
     </nav>
   );

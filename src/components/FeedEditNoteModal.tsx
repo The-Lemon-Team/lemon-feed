@@ -43,7 +43,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [summary, setSummary] = useState('');
-  const [curator, setCurator] = useState('');
+  const [author, setAuthor] = useState('');
   const [sourceLink, setSourceLink] = useState('');
   const [hashtagsStr, setHashtagsStr] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -58,7 +58,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       setTitle(item.title || '');
       setDescription(item.description || '');
       setSummary(item.summary || (item.rawPayload as any)?.summary || '');
-      setCurator(item.curator || '');
+      setAuthor(item.author || item.curator || '');
       setSourceLink(item.sourceLink || '');
       setHashtagsStr(item.hashtags?.map((h) => `#${h.replace(/^#/, '')}`).join(' ') || '');
       const raw = (item.rawPayload as any) || {};
@@ -120,7 +120,8 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
           title: title.trim(),
           description: description.trim(),
           summary: summary.trim() || undefined,
-          curator: curator.trim() || undefined,
+          author: author.trim() || undefined,
+          curator: author.trim() || undefined,
           sourceLink: sourceLink.trim() || undefined,
           hashtags: tagsArray,
           startDate: eventDate ? new Date(eventDate).toISOString() : undefined,
@@ -427,17 +428,17 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
             />
           </div>
 
-          {/* Curator & Source Link */}
+          {/* Author & Source Link */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
                 <User className="w-3 h-3 text-slate-400" />
-                <span>Куратор / Автор</span>
+                <span>Автор / Автор</span>
               </label>
               <input
                 type="text"
-                value={curator}
-                onChange={(e) => setCurator(e.target.value)}
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
                 placeholder="Имя куратора или канала..."
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
               />

@@ -1,9 +1,14 @@
 import axios from 'axios';
 import { Note, Feed, NotesResponse, QueryNotesParams } from '@lenta/shared';
+import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL !== undefined
     ? import.meta.env.VITE_API_URL
+    : typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+    ? ''
     : import.meta.env.PROD
     ? ''
     : 'http://localhost:3001';
@@ -21,11 +26,18 @@ export const apiClient = axios.create({
 
 let currentFeedAuthToken: string | null = null;
 let currentFeedUserKey: string | null = null;
+let currentFeedAppMode: FeedAppRuntimeMode = resolveFeedAppMode();
 
 export const setFeedAuthToken = (token: string | null, userKey?: string | null) => {
   currentFeedAuthToken = token;
   currentFeedUserKey = userKey || null;
 };
+
+export const setFeedAppMode = (mode: FeedAppRuntimeMode) => {
+  currentFeedAppMode = mode;
+};
+
+export const getFeedAppMode = (): FeedAppRuntimeMode => currentFeedAppMode;
 
 export const getFeedAuthToken = () => currentFeedAuthToken || DEFAULT_ADMIN_TOKEN;
 export const getFeedUserKey = () => currentFeedUserKey;
@@ -47,6 +59,9 @@ apiClient.interceptors.request.use((config) => {
   if (currentFeedUserKey) {
     config.headers['x-user-key'] = currentFeedUserKey;
   }
+  if (currentFeedAppMode) {
+    config.headers['x-app-mode'] = currentFeedAppMode;
+  }
   return config;
 });
 
@@ -58,10 +73,24 @@ apiClient.interceptors.response.use(
   }
 );
 
+export interface CreateFeedPayload {
+  title: string;
+  description?: string;
+  slug?: string;
+  folderPaths?: string[];
+  icon?: string;
+  color?: string;
+  privacy?: 'public' | 'private';
+  hashtags?: string[];
+}
+
+export type UpdateFeedPayload = Partial<CreateFeedPayload>;
+
 export interface UpdateNotePayload {
   title?: string;
   description?: string;
   summary?: string;
+  author?: string;
   curator?: string;
   sourceLink?: string;
   hashtags?: string[];
@@ -109,13 +138,32 @@ export interface GeneratedBatchResult {
 
 export const feedApi = {
   getNotes: async (params?: QueryNotesParams): Promise<NotesResponse> => {
-    const res = await apiClient.get<NotesResponse>('/notes', { params });
+    const res = await apiClient.get<NotesResponse>('/notes', {
+      params: {
+        appMode: currentFeedAppMode,
+        ...params,
+      },
+    });
     return res.data;
   },
 
   getFeeds: async (): Promise<Feed[]> => {
     const res = await apiClient.get<Feed[]>('/feeds');
     return res.data;
+  },
+
+  createFeed: async (data: CreateFeedPayload): Promise<Feed> => {
+    const res = await apiClient.post<Feed>('/feeds', data);
+    return res.data;
+  },
+
+  updateFeed: async (id: string, data: UpdateFeedPayload): Promise<Feed> => {
+    const res = await apiClient.patch<Feed>(`/feeds/${id}`, data);
+    return res.data;
+  },
+
+  deleteFeed: async (id: string): Promise<void> => {
+    await apiClient.delete(`/feeds/${id}`);
   },
 
   getNoteById: async (id: string): Promise<Note> => {

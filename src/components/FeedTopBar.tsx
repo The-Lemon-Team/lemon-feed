@@ -33,11 +33,12 @@ interface FeedModeOption {
 }
 
 const FEED_MODES: FeedModeOption[] = [
-  { id: 'spark', label: 'Spark', emoji: '✨' },
-  { id: 'dev', label: 'Dev Hub', emoji: '💻' },
+  { id: 'all', label: 'Все ленты', emoji: '🌐' },
+  { id: 'it_dev', label: 'IT & Dev', emoji: '💻' },
   { id: 'seasons', label: 'Seasons', emoji: '🍋' },
-  { id: 'classic', label: 'Classic', emoji: '🏛️' },
-  { id: 'telegram', label: 'TG', emoji: '✈️', badge: 'live' },
+  { id: 'entertainment', label: 'Развлечения', emoji: '🍿' },
+  { id: 'holidays', label: 'Праздники', emoji: '🎉' },
+  { id: 'telegram', label: 'TG Live', emoji: '✈️', badge: 'live' },
 ];
 
 export const FeedTopBar: React.FC<FeedTopBarProps> = ({
@@ -157,10 +158,19 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
             */}
 
             {/* Акцентная кнопка в стиле Lemon Seasons с логотипом */}
-            <button
-              type="button"
-              onClick={onOpenLemonSeasons}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-lime-500/15 hover:from-amber-500/25 hover:via-yellow-400/30 hover:to-lime-500/25 border border-amber-400/40 dark:border-yellow-400/30 text-amber-950 dark:text-yellow-200 text-xs font-semibold shadow-xs hover:shadow-[0_0_14px_-2px_rgba(234,179,8,0.35)] transition-all duration-150 group cursor-pointer"
+            <a
+              href="http://localhost:5174/"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                  if (onOpenLemonSeasons) {
+                    e.preventDefault();
+                    onOpenLemonSeasons();
+                  }
+                }
+              }}
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-lime-500/15 hover:from-amber-500/25 hover:via-yellow-400/30 hover:to-lime-500/25 border border-amber-400/40 dark:border-yellow-400/30 text-amber-950 dark:text-yellow-200 text-xs font-semibold shadow-xs hover:shadow-[0_0_14px_-2px_rgba(234,179,8,0.35)] transition-all duration-150 group cursor-pointer no-underline"
               title="Lemon Seasons — Календарь (в разработке)"
               aria-label="Lemon Seasons — Календарь (в разработке)"
             >
@@ -170,7 +180,7 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
               <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded-full bg-amber-500/15 dark:bg-yellow-400/15 text-amber-700 dark:text-yellow-300 border border-amber-500/20">
                 Dev
               </span>
-            </button>
+            </a>
           </div>
         </div>
 

@@ -22,9 +22,22 @@ export const SEASONS_FEED_PRESETS: Array<{
   description: string;
 }> = [
   {
+    slug: 'daily-logs',
+    title: 'Ежедневный дневник (Daily Logs)',
+    shortTitle: 'Дневник',
+    emoji: '📔',
+    category: 'Дневник',
+    accentColor: '#f59e0b',
+    badgeBgLight: 'rgba(245, 158, 11, 0.1)',
+    badgeTextLight: '#b45309',
+    badgeBgDark: 'rgba(245, 158, 11, 0.25)',
+    badgeTextDark: '#fde68a',
+    description: 'Личные и командные ежедневные хроники, фокус дня, чеклисты и мысли',
+  },
+  {
     slug: 'tech-strategy',
     title: 'Technical Architecture & Strategy',
-    shortTitle: 'Tech Strategy',
+    shortTitle: 'Архитектура',
     emoji: '💻',
     category: 'Инженерия',
     accentColor: '#0284c7',
@@ -37,7 +50,7 @@ export const SEASONS_FEED_PRESETS: Array<{
   {
     slug: 'product-milestones',
     title: 'Product Milestones',
-    shortTitle: 'Product',
+    shortTitle: 'Продукт',
     emoji: '🚀',
     category: 'Продукт',
     accentColor: '#10b981',
@@ -50,7 +63,7 @@ export const SEASONS_FEED_PRESETS: Array<{
   {
     slug: 'design-systems',
     title: 'Design Systems & UI',
-    shortTitle: 'Design UI',
+    shortTitle: 'Дизайн',
     emoji: '🎨',
     category: 'Дизайн',
     accentColor: '#ec4899',
@@ -73,19 +86,6 @@ export const SEASONS_FEED_PRESETS: Array<{
     badgeTextDark: '#c4b5fd',
     description: 'Docker-окружения, базы данных PostgreSQL и надежность сервисов',
   },
-  {
-    slug: 'notebooklm-ai',
-    title: 'NotebookLM AI Daily Briefing',
-    shortTitle: 'NotebookLM AI',
-    emoji: '🎙️',
-    category: 'ИИ & Аудио',
-    accentColor: '#a855f7',
-    badgeBgLight: 'rgba(168, 85, 247, 0.1)',
-    badgeTextLight: '#7e22ce',
-    badgeBgDark: 'rgba(168, 85, 247, 0.25)',
-    badgeTextDark: '#d8b4fe',
-    description: 'Ежедневный подкаст и структурированные сводки ключевых событий в мире искусственного интеллекта',
-  },
 ];
 
 const SEASONS_SLUGS = new Set(SEASONS_FEED_PRESETS.map((p) => p.slug));
@@ -100,7 +100,17 @@ export const SeasonsFeedAdapter: FeedAdapter = {
   getTabs(context: FeedAdapterContext): UnifiedFeedTab[] {
     const countsBySlug: Record<string, number> = {};
     for (const n of context.notes) {
-      if (n.feed?.slug && SEASONS_SLUGS.has(n.feed.slug)) {
+      const isDaily =
+        n.feed?.slug === 'daily-logs' ||
+        Boolean(
+          n.folderPath &&
+            (n.folderPath.toLowerCase().includes('daily_logs') ||
+              n.folderPath.toLowerCase().includes('01_daily_logs') ||
+              n.folderPath.toLowerCase().includes('дневник'))
+        );
+      if (isDaily) {
+        countsBySlug['daily-logs'] = (countsBySlug['daily-logs'] || 0) + 1;
+      } else if (n.feed?.slug && SEASONS_SLUGS.has(n.feed.slug)) {
         countsBySlug[n.feed.slug] = (countsBySlug[n.feed.slug] || 0) + 1;
       }
     }
@@ -133,13 +143,32 @@ export const SeasonsFeedAdapter: FeedAdapter = {
     // 1. Filter notes belonging to Seasons ecosystem
     let matched = notes.filter((n) => {
       if (n.feed?.slug && SEASONS_SLUGS.has(n.feed.slug)) return true;
-      if (n.folderPath && (n.folderPath.toLowerCase().startsWith('editorial/') || n.folderPath.toLowerCase().startsWith('seasons/'))) return true;
+      if (
+        n.folderPath &&
+        (n.folderPath.toLowerCase().startsWith('editorial/') ||
+          n.folderPath.toLowerCase().startsWith('seasons/') ||
+          n.folderPath.toLowerCase().startsWith('lemon-seasons/') ||
+          n.folderPath.toLowerCase().includes('daily_logs') ||
+          n.folderPath.toLowerCase().includes('01_daily_logs'))
+      )
+        return true;
       return false;
     });
 
     // 2. Specific feed filter
     if (activeFeedSlug) {
       matched = matched.filter((n) => {
+        if (activeFeedSlug === 'daily-logs') {
+          return (
+            n.feed?.slug === 'daily-logs' ||
+            Boolean(
+              n.folderPath &&
+                (n.folderPath.toLowerCase().includes('daily_logs') ||
+                  n.folderPath.toLowerCase().includes('01_daily_logs') ||
+                  n.folderPath.toLowerCase().includes('дневник'))
+            )
+          );
+        }
         if (n.feed?.slug === activeFeedSlug) return true;
         if (n.folderPath && n.folderPath.toLowerCase().includes(activeFeedSlug)) return true;
         return false;
@@ -182,7 +211,8 @@ export const SeasonsFeedAdapter: FeedAdapter = {
         audioUrl,
         audioDuration,
         status: n.status || 'PUBLISHED',
-        curator: n.curator || 'Lemon Seasons',
+        author: (n as any).author || n.curator || 'Lemon Seasons',
+        curator: (n as any).author || n.curator || 'Lemon Seasons',
         hashtags: n.hashtags?.map((h) => h.name) || [],
         coverUrl: extractNoteCoverUrl(n),
         rawPayload: n,

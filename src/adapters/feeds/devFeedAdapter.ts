@@ -53,8 +53,8 @@ export function isDevNote(note: Note): boolean {
 export const DEV_PRESETS: DevFeedPresetConfig[] = [
   {
     slug: 'spark-ai',
-    title: 'AI & Нейросети',
-    shortTitle: 'AI & ML',
+    title: 'AI & Нейросети (Spark)',
+    shortTitle: 'AI & Нейросети',
     emoji: '🤖',
     category: 'AI & Нейросети',
     accentColor: '#8b5cf6',
@@ -79,10 +79,10 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
   },
   {
     slug: 'spark-habr',
-    title: 'Хабр & IT Статьи',
-    shortTitle: 'Хабр',
+    title: 'Хабр & IT (Spark)',
+    shortTitle: 'Хабр & IT',
     emoji: '💻',
-    category: 'IT & Архитектура',
+    category: 'IT & Разработка',
     accentColor: '#0284c7',
     badgeBgLight: 'rgba(2, 132, 199, 0.1)',
     badgeTextLight: '#0369a1',
@@ -105,8 +105,8 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
   },
   {
     slug: 'spark-cyber-security',
-    title: 'Cyber Security & InfoSec',
-    shortTitle: 'CyberSec',
+    title: 'Cyber Security & InfoSec (Spark)',
+    shortTitle: 'Cyber Security',
     emoji: '🛡️',
     category: 'Кибербезопасность',
     accentColor: '#10b981',
@@ -131,8 +131,8 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
   },
   {
     slug: 'spark-xakep',
-    title: 'Журнал «Хакер» (xakep.ru)',
-    shortTitle: 'Хакер',
+    title: 'Журнал «Хакер» (Spark)',
+    shortTitle: 'Журнал «Хакер»',
     emoji: '👾',
     category: 'AppSec & Реверс',
     accentColor: '#22c55e',
@@ -157,8 +157,8 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
   },
   {
     slug: 'spark-notebooklmai',
-    title: 'NotebookLM AI Deep Dives',
-    shortTitle: 'NotebookLM',
+    title: 'NotebookLM AI (Spark)',
+    shortTitle: 'NotebookLM AI',
     emoji: '🎙️',
     category: 'Аналитика & Подкасты',
     accentColor: '#a855f7',
@@ -172,8 +172,8 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
   },
   {
     slug: 'spark-changelogsfeed',
-    title: 'Changelogs & Релизы вендоров',
-    shortTitle: 'Changelogs',
+    title: 'Changelogs & Релизы (Spark)',
+    shortTitle: 'Changelogs & Релизы',
     emoji: '🚀',
     category: 'Changelogs & Updates',
     accentColor: '#f97316',
@@ -184,6 +184,32 @@ export const DEV_PRESETS: DevFeedPresetConfig[] = [
     description: 'Официальные обновления и ченджлоги вендоров: Google, OpenAI, Anthropic и др.',
     isChangelogs: true,
     matcher: isChangelogsNote,
+  },
+  {
+    slug: 'spark-youtube-oneday',
+    title: 'YouTube • OneDay (Spark)',
+    shortTitle: 'YouTube',
+    emoji: '📺',
+    category: 'Политическая аналитика',
+    accentColor: '#ef4444',
+    badgeBgLight: 'rgba(239, 68, 68, 0.1)',
+    badgeTextLight: '#b91c1c',
+    badgeBgDark: 'rgba(239, 68, 68, 0.25)',
+    badgeTextDark: '#fca5a5',
+    description: 'Ежедневная политическая выжимка и аналитические разборы YouTube-канала OneDay',
+    matcher: (n: Note) => {
+      const slug = (n.feed?.slug || '').toLowerCase();
+      if (slug.includes('youtube') || slug.includes('oneday')) return true;
+      const fp = (n.folderPath || '').toLowerCase();
+      if (fp.includes('youtube') || fp.includes('oneday')) return true;
+      if (n.folders && Array.isArray(n.folders)) {
+        return n.folders.some((f) => {
+          const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
+          return p.includes('youtube') || p.includes('oneday');
+        });
+      }
+      return false;
+    },
   },
 ];
 
@@ -273,6 +299,7 @@ function resolveDevAvatar(note: Note): string {
 
   const slug = (note.feed?.slug || '').toLowerCase();
   const title = (note.title || '').toLowerCase();
+  if (slug.includes('youtube') || slug.includes('oneday') || title.includes('oneday')) return '📺';
   if (slug.includes('xakep') || title.includes('хакер')) return '👾';
   if (slug.includes('cyber') || title.includes('sec')) return '🛡️';
   if (slug.includes('notebooklm') || title.includes('notebooklm')) return '🎙️';
@@ -433,7 +460,8 @@ export const DevFeedAdapter: FeedAdapter = {
         audioUrl: (n.metadata as any)?.audioUrl || (n as any).audioUrl || null,
         audioDuration: (n.metadata as any)?.audioDuration || (n as any).audioDuration || null,
         status: n.status || null,
-        curator: n.curator,
+        author: (n as any).author || n.curator,
+        curator: (n as any).author || n.curator,
         hashtags: n.hashtags?.map((h) => h.name) || [],
         coverUrl: extractNoteCoverUrl(n),
         rawPayload: n,

@@ -32,19 +32,33 @@ export interface MicrofrontendFeedNavigatePayload {
 
 // 1. Declarative Route Mappings (High-order tabs & Clean aliases)
 export const SOURCE_TO_PATH: Record<FeedSourceMode, string> = {
-  spark: '/spark',
-  dev: '/dev',
+  all: '/all',
+  it_dev: '/it-dev',
   seasons: '/seasons',
-  classic: '/classic',
+  entertainment: '/entertainment',
+  holidays: '/holidays',
   telegram: '/tg',
+  spark: '/all',
+  dev: '/it-dev',
+  classic: '/holidays',
+  general: '/all',
 };
 
 export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
-  spark: 'spark',
-  dev: 'dev',
-  devhub: 'dev',
+  all: 'all',
+  'it-dev': 'it_dev',
+  it: 'it_dev',
+  tech: 'it_dev',
+  spark: 'all',
+  dev: 'it_dev',
+  devhub: 'it_dev',
   seasons: 'seasons',
-  classic: 'classic',
+  entertainment: 'entertainment',
+  marvel: 'entertainment',
+  cinema: 'entertainment',
+  holidays: 'holidays',
+  classic: 'holidays',
+  general: 'all',
   tg: 'telegram',
   telegram: 'telegram',
 };
@@ -56,6 +70,8 @@ export const FEED_SLUG_TO_ALIAS: Record<string, string> = {
   'spark-cyber-security': 'cybersec',
   'spark-xakep': 'xakep',
   'spark-notebooklmai': 'notebooklm',
+  'spark-youtube-oneday': 'youtube',
+  'spark-youtube': 'youtube',
   'tg-vibes': 'vibes',
   'tg-rf': 'rf',
   'tg-it': 'it',
@@ -74,6 +90,8 @@ export const ALIAS_TO_FEED_SLUG: Record<string, string> = {
   hacker: 'spark-xakep',
   notebooklm: 'spark-notebooklmai',
   notebooklmai: 'spark-notebooklmai',
+  youtube: 'spark-youtube-oneday',
+  oneday: 'spark-youtube-oneday',
   vibes: 'tg-vibes',
   rf: 'tg-rf',
   it: 'tg-it',
@@ -150,7 +168,7 @@ export function getPathForFeedSource(
     opts = optionsOrFeedSlug;
   }
 
-  const basePath = SOURCE_TO_PATH[source] || '/spark';
+  const basePath = SOURCE_TO_PATH[source] || '/all';
 
   let feedSlug = opts.feedSlug;
   let subtopic = opts.subtopic;
@@ -189,6 +207,16 @@ export function getPathForFeedSource(
     params.set('embed', 'true');
   }
 
+  // Preserve active appMode across internal feed navigation
+  const activeAppMode =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('appMode') ||
+        localStorage.getItem('lenta_app_mode')
+      : null;
+  if (activeAppMode) {
+    params.set('appMode', activeAppMode);
+  }
+
   const query = params.toString();
   return query ? `${fullPath}?${query}` : fullPath;
 }
@@ -207,11 +235,11 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   const isEmbed = params.get('embed') === 'true';
 
   const segments = pathPart.split('/').filter(Boolean);
-  const primarySegment = segments[0] || 'spark';
+  const primarySegment = segments[0] || 'all';
   const feedSegment = segments[1];
   const subtopicSegment = segments[2];
 
-  let streamSource: FeedSourceMode = 'spark';
+  let streamSource: FeedSourceMode = 'all';
   if (primarySegment && PATH_TO_SOURCE[primarySegment]) {
     streamSource = PATH_TO_SOURCE[primarySegment];
   }
@@ -249,7 +277,7 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
  */
 export function parseCurrentFeedRoute(): FeedRouteState {
   if (typeof window === 'undefined') {
-    return { streamSource: 'spark', layoutMode: 'split', isEmbed: false };
+    return { streamSource: 'all', layoutMode: 'split', isEmbed: false };
   }
 
   const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
@@ -262,7 +290,7 @@ export function parseCurrentFeedRoute(): FeedRouteState {
     const embedParam = searchParams.get('embed') === 'true';
     const isEmbed = embedParam || (typeof window !== 'undefined' && window.self !== window.top);
     return {
-      streamSource: 'spark',
+      streamSource: 'all',
       noteId: directNoteId || searchParams.get('note') || undefined,
       layoutMode: searchParams.get('layout') === 'stream' ? 'stream' : 'split',
       isEmbed,

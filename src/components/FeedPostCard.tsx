@@ -364,7 +364,7 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 
       {/* 4. Footer: Metrics, Share, Tags */}
       <div className="pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-[#708499]">
-        {/* Left: Views, Resonance, Curator, Tags */}
+        {/* Left: Views, Resonance, Author, Tags */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Views count */}
           <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">

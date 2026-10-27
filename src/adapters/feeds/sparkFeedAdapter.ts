@@ -101,6 +101,7 @@ export const SparkFeedAdapter: FeedAdapter = {
         badgeTextDark: f.badgeTextDark,
         description: f.description,
         isCustomFolder: f.isCustomFolder,
+        isHot: true,
         subtopics,
       };
     }).filter((tab) => tab.count > 0);
@@ -231,7 +232,9 @@ export const SparkFeedAdapter: FeedAdapter = {
         resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
         sourceLink: n.sourceLink,
         status: n.status || 'PUBLISHED',
-        curator: n.curator,
+        author: (n as any).author || n.curator,
+        curator: (n as any).author || n.curator,
+        isHot: true,
         hashtags: n.hashtags?.map((h) => h.name) || [],
         coverUrl: extractNoteCoverUrl(n),
         rawPayload: n,
