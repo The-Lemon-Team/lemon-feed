@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PeriodItem, extractPeriodMicroBadges } from '../utils/periods';
 import { PeriodMicroBadgesBar } from './PeriodMicroBadgesBar';
+import { NotePinButton } from './workspace/NotePinButton';
 import {
   Clock,
   Flame,
@@ -217,11 +218,12 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
           </div>
         </div>
 
-        {/* Category badge & External link */}
+        {/* Category badge, Pin Button & External link */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${item.category.colorClass}`}>
             {item.category.emoji} {item.category.label}
           </span>
+          <NotePinButton noteId={item.id} />
           {item.sourceLink && (
             <a
               href={item.sourceLink}

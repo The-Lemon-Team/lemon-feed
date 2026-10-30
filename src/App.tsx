@@ -30,6 +30,7 @@ import {
 } from './utils/periods';
 import { FeedPeriodActiveBanner } from './components/toolbar/FeedPeriodActiveBanner';
 import { FeedActivitiesMobileCarousel } from './components/activities/FeedActivitiesMobileCarousel';
+import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 
 const FeedDetailModal = lazy(() => import('./components/FeedDetailModal').then((m) => ({ default: m.FeedDetailModal })));
 const FeedEditNoteModal = lazy(() => import('./components/FeedEditNoteModal').then((m) => ({ default: m.FeedEditNoteModal })));
@@ -1014,6 +1015,9 @@ export const App: React.FC = () => {
         onOpenCalendar={handleOpenCalendar}
         onOpenLemonSeasons={() => setIsLemonSeasonsModalOpen(true)}
       />
+
+      {/* Floating Workspace Pinned Notes & Period Tracker Dock */}
+      <PinnedNotesDock onOpenNoteDetail={(id) => openNote(id)} />
     </div>
   );
 };
