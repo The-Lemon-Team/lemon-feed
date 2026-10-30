@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import { FeedSourceMode } from '../../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
+import { FeedHorizon } from '../../utils/periods';
 import { FeedMonthPicker } from '../FeedMonthPicker';
+import { FeedHorizonSwitcher } from './FeedHorizonSwitcher';
 
 export interface FeedSearchBarProps {
   streamSource: FeedSourceMode;
@@ -24,6 +26,10 @@ export interface FeedSearchBarProps {
   onSelectMonth: (year: number, monthIndex: number) => void;
   onResetMonthFilter: () => void;
   onToday: () => void;
+
+  horizon?: FeedHorizon;
+  onChangeHorizon?: (horizon: FeedHorizon) => void;
+  upcomingCount?: number;
 
   appMode?: FeedAppRuntimeMode;
   filterUnassigned?: boolean;
@@ -41,6 +47,9 @@ export const FeedSearchBar: React.FC<FeedSearchBarProps> = ({
   onSelectMonth,
   onResetMonthFilter,
   onToday,
+  horizon = 'recent',
+  onChangeHorizon,
+  upcomingCount,
   appMode = 'dev',
   filterUnassigned = false,
   onToggleFilterUnassigned,
@@ -112,16 +121,25 @@ export const FeedSearchBar: React.FC<FeedSearchBarProps> = ({
         )}
       </div>
 
-      {/* Date Month Navigation & Popover Picker */}
-      <div className="flex items-center gap-1.5 self-end sm:self-auto" ref={monthPickerRef}>
-        <button
-          type="button"
-          onClick={onPrevMonth}
-          className="p-1.5 rounded-lg border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-          title="Предыдущий месяц"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-        </button>
+      {/* Right Controls: Horizon Switcher ('Свежее' / 'Скоро') + Date Month Navigation */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 self-end sm:self-auto">
+        {onChangeHorizon && (
+          <FeedHorizonSwitcher
+            horizon={horizon}
+            onChangeHorizon={onChangeHorizon}
+            upcomingCount={upcomingCount}
+          />
+        )}
+
+        <div className="flex items-center gap-1.5" ref={monthPickerRef}>
+          <button
+            type="button"
+            onClick={onPrevMonth}
+            className="p-1.5 rounded-lg border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+            title="Предыдущий месяц"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
 
         <div className="relative">
           <button
@@ -169,5 +187,6 @@ export const FeedSearchBar: React.FC<FeedSearchBarProps> = ({
         </button>
       </div>
     </div>
-  );
+  </div>
+);
 };

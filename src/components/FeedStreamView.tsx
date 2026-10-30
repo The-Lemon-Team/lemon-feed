@@ -5,6 +5,7 @@ import { FeedSourceMode, UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedPostCard } from './FeedPostCard';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { TelegramStreamView } from './TelegramStreamView';
+import { PeriodItem } from '../utils/periods';
 
 export interface FeedStreamViewProps {
   streamSource: FeedSourceMode;
@@ -30,6 +31,9 @@ export interface FeedStreamViewProps {
   onUnpublishToStaging?: (item: UnifiedFeedItem) => void;
   onReturnToPrivate?: (item: UnifiedFeedItem) => void;
   isMutating?: boolean;
+  allPeriods?: PeriodItem[];
+  selectedPeriodId?: string;
+  onSelectPeriod?: (periodId: string) => void;
 }
 
 /**
@@ -60,6 +64,9 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   onUnpublishToStaging,
   onReturnToPrivate,
   isMutating,
+  allPeriods,
+  selectedPeriodId,
+  onSelectPeriod,
 }) => {
   const isStreamOnly = layoutMode === 'stream';
 
@@ -134,6 +141,9 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                   onUnpublishToStaging={onUnpublishToStaging}
                   onReturnToPrivate={onReturnToPrivate}
                   isMutating={isMutating}
+                  allPeriods={allPeriods}
+                  selectedPeriodId={selectedPeriodId}
+                  onSelectPeriod={onSelectPeriod}
                 />
               ))}
 

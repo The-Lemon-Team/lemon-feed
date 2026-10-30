@@ -28,6 +28,9 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   onSelectMonth,
   onResetMonthFilter,
   onToday,
+  horizon,
+  onChangeHorizon,
+  upcomingCount,
   isDarkMode,
   onToggleTheme,
   onRefresh,
@@ -109,6 +112,9 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         onSelectMonth={onSelectMonth}
         onResetMonthFilter={onResetMonthFilter}
         onToday={onToday}
+        horizon={horizon}
+        onChangeHorizon={onChangeHorizon}
+        upcomingCount={upcomingCount}
         appMode={appMode}
         filterUnassigned={filterUnassigned}
         onToggleFilterUnassigned={onToggleFilterUnassigned}

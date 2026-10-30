@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../adapters/feeds/types';
 import { LemonLogo } from './LemonLogo';
+import { PeriodItem } from '../utils/periods';
+import { FeedActivitiesRailSection } from './activities/FeedActivitiesRailSection';
 
 export interface FeedDesktopRailProps {
   sourceType: FeedSourceMode;
@@ -23,6 +25,10 @@ export interface FeedDesktopRailProps {
   onNavigateToCalendar?: () => void;
   currentMonthName?: string;
   isPublicMode?: boolean;
+
+  periods?: PeriodItem[];
+  selectedPeriodId?: string;
+  onSelectPeriod?: (periodId?: string) => void;
 }
 
 export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
@@ -38,6 +44,9 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   onNavigateToCalendar,
   currentMonthName = 'октябрь 2026',
   isPublicMode = false,
+  periods = [],
+  selectedPeriodId,
+  onSelectPeriod,
 }) => {
   const isAll = sourceType === 'all';
   const isItDev = sourceType === 'it_dev' || sourceType === 'spark' || sourceType === 'dev';
@@ -258,7 +267,17 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
         )}
       </div>
 
-      {/* 2. Folders Widget */}
+      {/* 2. Channel Activities / Periods Section */}
+      {onSelectPeriod && periods.length > 0 && (
+        <FeedActivitiesRailSection
+          periods={periods}
+          selectedPeriodId={selectedPeriodId}
+          onSelectPeriod={onSelectPeriod}
+          feedTitle={activeFeed?.title}
+        />
+      )}
+
+      {/* 3. Folders Widget */}
       <div className="p-4 rounded-2xl bg-white/95 dark:bg-[#18222d]/95 border border-slate-200/80 dark:border-white/[0.08] shadow-soft space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">

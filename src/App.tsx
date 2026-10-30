@@ -21,6 +21,15 @@ import { FeedBottomNav } from './components/FeedBottomNav';
 import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
 import { useFeedAuthSync } from './hooks/useFeedAuthSync';
+import {
+  FeedHorizon,
+  PeriodFilterMode,
+  extractPeriodItems,
+  filterNotesByHorizon,
+  filterNotesByPeriod,
+} from './utils/periods';
+import { FeedPeriodActiveBanner } from './components/toolbar/FeedPeriodActiveBanner';
+import { FeedActivitiesMobileCarousel } from './components/activities/FeedActivitiesMobileCarousel';
 
 const FeedDetailModal = lazy(() => import('./components/FeedDetailModal').then((m) => ({ default: m.FeedDetailModal })));
 const FeedEditNoteModal = lazy(() => import('./components/FeedEditNoteModal').then((m) => ({ default: m.FeedEditNoteModal })));
@@ -117,6 +126,46 @@ export const App: React.FC = () => {
   });
   const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(false);
+
+  // Horizon State ('recent' = ⚡ Свежее, 'upcoming' = 🔔 Скоро)
+  const [feedHorizon, setFeedHorizon] = useState<FeedHorizon>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlH = sp.get('horizon');
+      if (urlH === 'upcoming' || urlH === 'recent') return urlH;
+      const saved = localStorage.getItem('lenta_feed_horizon');
+      if (saved === 'upcoming' || saved === 'recent') return saved as FeedHorizon;
+    }
+    return 'recent';
+  });
+
+  const handleSetHorizon = useCallback((newHorizon: FeedHorizon) => {
+    setFeedHorizon(newHorizon);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lenta_feed_horizon', newHorizon);
+        const url = new URL(window.location.href);
+        if (newHorizon === 'upcoming') {
+          url.searchParams.set('horizon', 'upcoming');
+        } else {
+          url.searchParams.delete('horizon');
+        }
+        window.history.replaceState({}, '', url.toString());
+      } catch (err) {
+        console.warn('Failed to update URL horizon:', err);
+      }
+    }
+  }, []);
+
+  // Selected Period state & filter mode ('bound' vs 'all')
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string | undefined>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('period') || undefined;
+    }
+    return undefined;
+  });
+  const [periodFilterMode, setPeriodFilterMode] = useState<PeriodFilterMode>('bound');
 
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
   const [selectedDetailItem, setSelectedDetailItem] = useState<UnifiedFeedItem | null>(null);
@@ -338,34 +387,115 @@ export const App: React.FC = () => {
     setIsFeedEntityModalOpen(true);
   }, []);
 
+  // Periods extraction & mapping
+  const allPeriods = useMemo(() => extractPeriodItems(rawNotes), [rawNotes]);
+
+  const selectedPeriod = useMemo(
+    () => allPeriods.find((p) => p.id === selectedPeriodId),
+    [allPeriods, selectedPeriodId]
+  );
+
+  const handleSelectPeriod = useCallback(
+    (periodId?: string) => {
+      setSelectedPeriodId(periodId);
+      setPeriodFilterMode('bound'); // Auto-reset to bound notes as per spec
+
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          if (periodId) {
+            url.searchParams.set('period', periodId);
+          } else {
+            url.searchParams.delete('period');
+          }
+          window.history.replaceState({}, '', url.toString());
+        } catch {
+          // ignore
+        }
+      }
+
+      if (periodId) {
+        const targetPeriod = allPeriods.find((p) => p.id === periodId);
+        if (targetPeriod?.feedSlug) {
+          setSelectedFeedSlug(targetPeriod.feedSlug);
+        }
+      }
+    },
+    [allPeriods, setSelectedFeedSlug]
+  );
+
+  // Active channel periods for rail & mobile carousel
+  const activeChannelPeriods = useMemo(() => {
+    if (selectedFeedSlug) {
+      return allPeriods.filter(
+        (p) =>
+          p.feedSlug === selectedFeedSlug ||
+          (p.rawNote.folderPath && p.rawNote.folderPath.toLowerCase().includes(selectedFeedSlug.toLowerCase()))
+      );
+    }
+    return allPeriods.filter((p) => p.status === 'active' || p.status === 'upcoming');
+  }, [allPeriods, selectedFeedSlug]);
+
   // All items for current streamSource (shared for totalCount and unfiltered view)
   const allSourceItems = useMemo(() => {
     return activeAdapter.adaptNotes(notes, undefined, '');
   }, [activeAdapter, notes]);
 
+  // Upcoming items count for Horizon switcher badge
+  const upcomingCount = useMemo(() => {
+    const today = dayjs().startOf('day');
+    return allSourceItems.filter((item) => {
+      const d = dayjs(item.publishedAt);
+      return d.isValid() && d.isSameOrAfter(today);
+    }).length;
+  }, [allSourceItems]);
+
   // Mode total count
   const totalCount = allSourceItems.length;
 
-  // Filtered feed items (search query + optional month filter)
+  // Filtered feed items (search query + optional month filter + period + horizon)
   const feedItems: UnifiedFeedItem[] = useMemo(() => {
     let items =
       !selectedFeedSlug && !deferredSearchQuery.trim()
         ? allSourceItems
         : activeAdapter.adaptNotes(notes, selectedFeedSlug, deferredSearchQuery);
+
     if (isMonthFilterActive) {
       items = items.filter((item) => {
         const itemDate = dayjs(item.publishedAt);
         return itemDate.isValid() && itemDate.isSame(selectedMonth, 'month');
       });
     }
+
     if (filterUnassignedOnly) {
       items = items.filter((item) => {
         const slug = item.feedSlug?.toLowerCase() || '';
         return !slug || slug === 'spark-general' || slug === 'general' || slug === 'unassigned' || slug === 'news' || slug === 'default';
       });
     }
+
+    // Apply chosen period filter if active
+    if (selectedPeriod) {
+      items = filterNotesByPeriod(items, selectedPeriod, periodFilterMode);
+    }
+
+    // Apply Horizon filter & sorting ('recent' vs 'upcoming')
+    items = filterNotesByHorizon(items, feedHorizon);
+
     return items;
-  }, [activeAdapter, notes, allSourceItems, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth, filterUnassignedOnly]);
+  }, [
+    activeAdapter,
+    notes,
+    allSourceItems,
+    selectedFeedSlug,
+    deferredSearchQuery,
+    isMonthFilterActive,
+    selectedMonth,
+    filterUnassignedOnly,
+    selectedPeriod,
+    periodFilterMode,
+    feedHorizon,
+  ]);
 
   // Progressive infinite loading
   const BATCH_SIZE = 24;
@@ -373,7 +503,17 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-  }, [streamSource, selectedFeedSlug, deferredSearchQuery, isMonthFilterActive, selectedMonth, filterUnassignedOnly]);
+  }, [
+    streamSource,
+    selectedFeedSlug,
+    deferredSearchQuery,
+    isMonthFilterActive,
+    selectedMonth,
+    filterUnassignedOnly,
+    selectedPeriodId,
+    periodFilterMode,
+    feedHorizon,
+  ]);
 
   const visibleFeedItems = useMemo(() => {
     return feedItems.slice(0, visibleCount);
@@ -607,6 +747,9 @@ export const App: React.FC = () => {
           onSelectMonth={handleSelectMonth}
           onResetMonthFilter={handleResetMonthFilter}
           onToday={handleToday}
+          horizon={feedHorizon}
+          onChangeHorizon={handleSetHorizon}
+          upcomingCount={upcomingCount}
           isDarkMode={isDarkMode}
           onToggleTheme={toggleTheme}
           onRefresh={() => refetch()}
@@ -629,6 +772,26 @@ export const App: React.FC = () => {
           onEditFeed={handleOpenEditFeed}
           onAddFeed={handleOpenAddFeed}
         />
+
+        {/* Active Period Banner if selected */}
+        {selectedPeriod && (
+          <FeedPeriodActiveBanner
+            period={selectedPeriod}
+            mode={periodFilterMode}
+            onChangeMode={setPeriodFilterMode}
+            onClearPeriod={() => handleSelectPeriod(undefined)}
+            totalPeriodNotesCount={feedItems.length}
+          />
+        )}
+
+        {/* Mobile Horizontal Activities Carousel */}
+        {activeChannelPeriods.length > 0 && (
+          <FeedActivitiesMobileCarousel
+            periods={activeChannelPeriods}
+            selectedPeriodId={selectedPeriodId}
+            onSelectPeriod={handleSelectPeriod}
+          />
+        )}
 
         {/* Responsive Body: Stream-only or Split layout with desktop rail */}
         <div
@@ -661,6 +824,9 @@ export const App: React.FC = () => {
             onUnpublishToStaging={!isPublicMode && appMode !== 'public' ? handleUnpublishToStaging : undefined}
             onReturnToPrivate={!isPublicMode && appMode !== 'public' ? handleReturnToPrivate : undefined}
             isMutating={updateNoteMutation.isPending}
+            allPeriods={allPeriods}
+            selectedPeriodId={selectedPeriodId}
+            onSelectPeriod={handleSelectPeriod}
           />
 
           {/* Right Desktop Rail: Folders, Metrics, Calendar, Tags (Only shown in split mode) */}
@@ -680,6 +846,9 @@ export const App: React.FC = () => {
               onNavigateToCalendar={handleOpenCalendar}
               currentMonthName={selectedMonth.format('MMMM YYYY')}
               isPublicMode={isPublicMode}
+              periods={activeChannelPeriods}
+              selectedPeriodId={selectedPeriodId}
+              onSelectPeriod={handleSelectPeriod}
             />
           )}
         </div>

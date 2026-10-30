@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
+import { FeedHorizon } from '../../utils/periods';
 
 export interface FeedModeOption {
   id: FeedSourceMode | string;
@@ -39,6 +40,10 @@ export interface FeedToolbarProps {
   onSelectMonth: (year: number, monthIndex: number) => void;
   onResetMonthFilter: () => void;
   onToday: () => void;
+
+  horizon?: FeedHorizon;
+  onChangeHorizon?: (horizon: FeedHorizon) => void;
+  upcomingCount?: number;
 
   isDarkMode: boolean;
   onToggleTheme: () => void;

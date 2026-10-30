@@ -6,6 +6,8 @@ import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { PeriodItem, extractPeriodMicroBadges } from '../utils/periods';
+import { PeriodMicroBadgesBar } from './PeriodMicroBadgesBar';
 import {
   Clock,
   Flame,
@@ -42,6 +44,9 @@ export interface FeedPostCardProps {
   onUnpublishToStaging?: (item: UnifiedFeedItem) => void;
   onReturnToPrivate?: (item: UnifiedFeedItem) => void;
   isMutating?: boolean;
+  allPeriods?: PeriodItem[];
+  selectedPeriodId?: string;
+  onSelectPeriod?: (periodId: string) => void;
 }
 
 export const FeedPostCard = React.memo<FeedPostCardProps>(({
@@ -55,11 +60,15 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   onUnpublishToStaging,
   onReturnToPrivate,
   isMutating,
+  allPeriods,
+  selectedPeriodId,
+  onSelectPeriod,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isBadgePopoverOpen, setIsBadgePopoverOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleToggleAudio = (e: React.MouseEvent) => {
@@ -91,6 +100,11 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const periodBadges = useMemo(() => {
+    if (!allPeriods || allPeriods.length === 0) return { visible: [], overflow: [] };
+    return extractPeriodMicroBadges(item, allPeriods, selectedPeriodId);
+  }, [item, allPeriods, selectedPeriodId]);
 
   const coverUrl =
     item.coverUrl ||
@@ -151,7 +165,9 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   return (
     <article
       onClick={() => onOpenDetail?.(item)}
-      className="rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full overflow-hidden"
+      className={`relative rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full ${
+        isBadgePopoverOpen ? 'z-40' : 'z-0'
+      }`}
     >
       {/* 1. Card Header */}
       {appMode === 'staging' && (
@@ -220,6 +236,18 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
           )}
         </div>
       </div>
+
+      {/* 1.5 Period Micro-Badges Bar */}
+      {periodBadges.visible.length > 0 && (
+        <div className="mb-2">
+          <PeriodMicroBadgesBar
+            badges={periodBadges.visible}
+            overflowBadges={periodBadges.overflow}
+            onSelectPeriod={onSelectPeriod}
+            onOpenChange={setIsBadgePopoverOpen}
+          />
+        </div>
+      )}
 
       {/* 2. Title */}
       <h3 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white leading-snug tracking-[-0.01em] mb-2 group-hover:text-[#2481cc] dark:group-hover:text-[#64b5f6] transition-colors break-words">
