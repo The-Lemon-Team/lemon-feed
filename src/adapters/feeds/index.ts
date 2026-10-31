@@ -9,6 +9,8 @@ import { GeneralFeedAdapter } from './generalFeedAdapter';
 import { SparkFeedAdapter } from './sparkFeedAdapter';
 import { DevFeedAdapter } from './devFeedAdapter';
 import { ClassicFeedAdapter } from './classicFeedAdapter';
+import { PrivateFeedsAdapter } from './privateFeedsAdapter';
+import { createConfiguredFeedAdapter } from './configuredFeedAdapter';
 
 export * from './types';
 export * from './allStreamsFeedAdapter';
@@ -21,14 +23,17 @@ export * from './generalFeedAdapter';
 export * from './sparkFeedAdapter';
 export * from './devFeedAdapter';
 export * from './classicFeedAdapter';
+export * from './privateFeedsAdapter';
+export * from './configuredFeedAdapter';
 
-export const FEED_ADAPTERS: Record<FeedSourceMode, FeedAdapter> = {
+export const FEED_ADAPTERS: Record<string, FeedAdapter> = {
   all: AllStreamsFeedAdapter,
   it_dev: ItDevFeedAdapter,
   seasons: SeasonsFeedAdapter,
   entertainment: EntertainmentFeedAdapter,
   holidays: HolidaysFeedAdapter,
   telegram: TelegramFeedAdapter,
+  private_feeds: PrivateFeedsAdapter,
 
   // Backward-compatibility legacy aliases
   spark: ItDevFeedAdapter,
@@ -44,4 +49,5 @@ export const ALL_FEED_SOURCES: FeedSourceMode[] = [
   'entertainment',
   'holidays',
   'telegram',
+  'private_feeds',
 ];

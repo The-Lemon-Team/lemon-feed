@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
+import { FeedSourceMode, UnifiedFeedTab, FeedTabFilterConfig } from '../../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import { FeedHorizon } from '../../utils/periods';
 
@@ -9,15 +9,25 @@ export interface FeedModeOption {
   emoji: string;
   badge?: string;
   description?: string;
+  filterConfig?: FeedTabFilterConfig;
+  isBuiltin?: boolean;
 }
 
 export const DEFAULT_FEED_MODES: FeedModeOption[] = [
-  { id: 'all', label: 'Все ленты', emoji: '🌐' },
-  { id: 'it_dev', label: 'IT & Dev', emoji: '💻' },
-  { id: 'seasons', label: 'Seasons', emoji: '🍋' },
-  { id: 'entertainment', label: 'Развлечения', emoji: '🍿' },
-  { id: 'holidays', label: 'Праздники', emoji: '🎉' },
-  { id: 'telegram', label: 'TG Live', emoji: '✈️', badge: 'live' },
+  { id: 'all', label: 'Все ленты', emoji: '🌐', isBuiltin: true },
+  { id: 'it_dev', label: 'IT & Dev', emoji: '💻', isBuiltin: true },
+  { id: 'seasons', label: 'Seasons', emoji: '🍋', isBuiltin: true },
+  { id: 'entertainment', label: 'Развлечения', emoji: '🍿', isBuiltin: true },
+  { id: 'holidays', label: 'Праздники', emoji: '🎉', isBuiltin: true },
+  { id: 'telegram', label: 'TG Live', emoji: '✈️', badge: 'live', isBuiltin: true },
+  {
+    id: 'private_feeds',
+    label: 'Private feeds',
+    emoji: '🔮',
+    description: 'Только приватные ленты и защищенный контур',
+    filterConfig: { privacy: 'private' },
+    isBuiltin: true,
+  },
 ];
 
 export interface FeedToolbarProps {

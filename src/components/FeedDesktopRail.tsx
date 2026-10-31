@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Calendar,
   Layers,
@@ -49,16 +49,30 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   onSelectPeriod,
 }) => {
   const isAll = sourceType === 'all';
+  const isPrivateFeeds = sourceType === 'private_feeds';
   const isItDev = sourceType === 'it_dev' || sourceType === 'spark' || sourceType === 'dev';
   const isSeasons = sourceType === 'seasons';
   const isEntertainment = sourceType === 'entertainment';
   const isHolidays = sourceType === 'holidays' || sourceType === 'classic';
   const isTelegram = sourceType === 'telegram';
 
+  const activeRailTabRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (selectedFeedSlug && activeRailTabRef.current) {
+      activeRailTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedFeedSlug, tabs]);
+
   const headerCategory = activeFeed
     ? activeFeed.category
     : isAll
     ? 'Все потоки'
+    : isPrivateFeeds
+    ? 'Private Feeds'
     : isItDev
     ? 'IT & Dev'
     : isSeasons
@@ -75,6 +89,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.emoji
     : isAll
     ? '🌐'
+    : isPrivateFeeds
+    ? '🔮'
     : isItDev
     ? '💻'
     : isSeasons
@@ -91,6 +107,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.title
     : isAll
     ? 'Все ленты и события'
+    : isPrivateFeeds
+    ? 'Private Feeds — Защищенный контур'
     : isItDev
     ? 'IT & Dev — Центр технологий'
     : isSeasons
@@ -107,6 +125,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.description
     : isAll
     ? 'Сквозной хронологический поток всех публикаций, новостей, дневников и дат'
+    : isPrivateFeeds
+    ? 'Приватные ленты, защищенные потоки и внутренние заметки рабочей станции'
     : isItDev
     ? 'Реактивные потоки: релизы моделей, changelog вендоров, кибербезопасность и статьи'
     : isSeasons
@@ -315,6 +335,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
             return (
               <button
                 key={tab.id}
+                ref={isSelected ? activeRailTabRef : undefined}
                 type="button"
                 onClick={() => onSelectFeed(tab.slug)}
                 className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors duration-150 text-left font-medium ${

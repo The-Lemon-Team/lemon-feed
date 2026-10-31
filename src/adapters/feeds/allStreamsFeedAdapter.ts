@@ -14,7 +14,7 @@ import {
 } from '../../utils/sparkFeeds';
 import { isItDevNote } from './itDevFeedAdapter';
 import { isEntertainmentNote } from './entertainmentFeedAdapter';
-import { isHolidayNote } from './holidaysFeedAdapter';
+import { isHolidayNote, isTodayHoliday } from './holidaysFeedAdapter';
 import {
   KNOWN_NOTEBOOKLM_SUBTOPICS,
   buildChangelogSubtopics,
@@ -238,8 +238,14 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
       if (isHol) countsByPreset['holidays-hub'] = (countsByPreset['holidays-hub'] || 0) + 1;
       if (isSeas) countsByPreset['seasons-hub'] = (countsByPreset['seasons-hub'] || 0) + 1;
 
-      // Hot count (daily sync items)
-      if (isDailyFolderNote(n) || isIt || n.feed?.slug?.startsWith('spark-') || n.feed?.slug?.startsWith('reactive-')) {
+      // Hot count (daily sync items + today's holidays)
+      if (
+        isDailyFolderNote(n) ||
+        isIt ||
+        n.feed?.slug?.startsWith('spark-') ||
+        n.feed?.slug?.startsWith('reactive-') ||
+        isTodayHoliday(n)
+      ) {
         countsByPreset['hot-daily'] = (countsByPreset['hot-daily'] || 0) + 1;
       }
     }
@@ -280,7 +286,12 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
     if (activeFeedSlug) {
       if (activeFeedSlug === 'hot-daily') {
         matched = matched.filter(
-          (n) => isDailyFolderNote(n) || isItDevNote(n) || (n.feed?.slug || '').startsWith('spark-') || (n.feed?.slug || '').startsWith('reactive-')
+          (n) =>
+            isDailyFolderNote(n) ||
+            isItDevNote(n) ||
+            (n.feed?.slug || '').startsWith('spark-') ||
+            (n.feed?.slug || '').startsWith('reactive-') ||
+            isTodayHoliday(n)
         );
       } else if (activeFeedSlug === 'it-tech') {
         matched = matched.filter(isItDevNote);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Plus, Pencil, X } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
 
@@ -28,6 +28,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   onAddFeed,
 }) => {
   const isAll = streamSource === 'all';
+  const isPrivateFeeds = streamSource === 'private_feeds';
   const isItDev = streamSource === 'it_dev' || streamSource === 'spark' || streamSource === 'dev';
   const isSeasons = streamSource === 'seasons';
   const isEntertainment = streamSource === 'entertainment';
@@ -35,6 +36,8 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
 
   const allLabel = isAll
     ? 'Все публикации'
+    : isPrivateFeeds
+    ? 'Все приватные'
     : isItDev
     ? 'Все IT потоки'
     : isSeasons
@@ -47,6 +50,8 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
 
   const allEmoji = isAll
     ? '🌐'
+    : isPrivateFeeds
+    ? '🔮'
     : isItDev
     ? '💻'
     : isSeasons
@@ -63,6 +68,31 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
       t.subtopics.length > 0 &&
       (activeFeedSlug === t.slug || t.subtopics.some((s) => s.slug === activeFeedSlug))
   );
+
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+  const activeSubtopicRef = useRef<HTMLButtonElement | null>(null);
+
+  // Auto-scroll horizontal row smoothly to the selected feed tab
+  useEffect(() => {
+    if (activeFeedSlug && activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [activeFeedSlug, tabs]);
+
+  // Auto-scroll horizontal subtopics row smoothly to the selected subtopic
+  useEffect(() => {
+    if (activeFeedSlug && activeSubtopicRef.current) {
+      activeSubtopicRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [activeFeedSlug]);
 
   return (
     <div className="space-y-1.5 w-full">
@@ -108,6 +138,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
           return (
             <button
               key={tab.id}
+              ref={isSelected ? activeTabRef : undefined}
               type="button"
               onClick={handleClick}
               title={
@@ -215,6 +246,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
             return (
               <button
                 key={sub.id}
+                ref={isSubSelected ? activeSubtopicRef : undefined}
                 type="button"
                 onClick={() => onSelectFeed(sub.slug)}
                 className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors select-none ${

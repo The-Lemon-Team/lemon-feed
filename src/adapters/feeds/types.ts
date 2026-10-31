@@ -1,5 +1,15 @@
 import { Note } from '@lenta/shared';
 
+export type FeedPrivacyFilter = 'all' | 'public' | 'private';
+
+export interface FeedTabFilterConfig {
+  privacy?: FeedPrivacyFilter;
+  feedSlugs?: string[];
+  folderPaths?: string[];
+  categories?: string[];
+  tags?: string[];
+}
+
 export type FeedSourceMode =
   | 'all'
   | 'it_dev'
@@ -7,10 +17,12 @@ export type FeedSourceMode =
   | 'entertainment'
   | 'holidays'
   | 'telegram'
+  | 'private_feeds'
   | 'spark'
   | 'dev'
   | 'classic'
-  | 'general';
+  | 'general'
+  | (string & {});
 
 export interface ThematicCategoryBadge {
   label: string;
@@ -85,7 +97,16 @@ export interface UnifiedFeedTab {
 }
 
 export interface FeedAdapterContext {
-  allFeeds: Array<{ id: string; slug: string; title: string; description?: string | null; _count?: { notes: number } }>;
+  allFeeds: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    description?: string | null;
+    privacy?: 'public' | 'private' | string;
+    icon?: string | null;
+    color?: string | null;
+    _count?: { notes: number };
+  }>;
   notes: Note[];
 }
 

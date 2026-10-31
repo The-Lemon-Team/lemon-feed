@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FeedModeOption } from './toolbar/types';
-import { X, Save, Trash2, Sparkles, Tag, Info } from 'lucide-react';
+import { FeedTabFilterConfig, FeedPrivacyFilter } from '../adapters/feeds/types';
+import { X, Save, Trash2, Sparkles, Tag, Info, Filter, Lock, Globe } from 'lucide-react';
 
 export interface FeedSourceTabModalProps {
   tab?: FeedModeOption | null;
@@ -9,9 +10,10 @@ export interface FeedSourceTabModalProps {
   onClose: () => void;
   onSave: (tab: FeedModeOption) => void;
   onDelete?: (tabId: string) => void;
+  allFeeds?: Array<{ id: string; slug: string; title: string; privacy?: string; icon?: string | null }>;
 }
 
-const PRESET_EMOJIS = ['🌐', '💻', '🍋', '🍿', '🎉', '✈️', '📈', '🔬', '🎮', '⚡', '🧠', '🎧'];
+const PRESET_EMOJIS = ['🌐', '💻', '🍋', '🍿', '🎉', '✈️', '🔮', '🔒', '📈', '🔬', '🎮', '⚡', '🧠', '🎧'];
 
 export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   tab,
@@ -19,6 +21,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   onClose,
   onSave,
   onDelete,
+  allFeeds = [],
 }) => {
   const isEditing = Boolean(tab);
 
@@ -27,6 +30,9 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   const [id, setId] = useState('');
   const [badge, setBadge] = useState('');
   const [description, setDescription] = useState('');
+  const [privacyContour, setPrivacyContour] = useState<FeedPrivacyFilter>('all');
+  const [selectedFeedSlugs, setSelectedFeedSlugs] = useState<string[]>([]);
+  const [folderPrefixes, setFolderPrefixes] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,12 +43,20 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
         setId(tab.id || '');
         setBadge(tab.badge || '');
         setDescription(tab.description || '');
+        setPrivacyContour(
+          tab.filterConfig?.privacy || (tab.id === 'private_feeds' ? 'private' : 'all')
+        );
+        setSelectedFeedSlugs(tab.filterConfig?.feedSlugs || []);
+        setFolderPrefixes((tab.filterConfig?.folderPaths || []).join(', '));
       } else {
         setLabel('');
         setEmoji('✨');
         setId('');
         setBadge('');
         setDescription('');
+        setPrivacyContour('all');
+        setSelectedFeedSlugs([]);
+        setFolderPrefixes('');
       }
       setErrorMsg(null);
     }
@@ -84,12 +98,24 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
     }
     const finalId = id.trim() || label.toLowerCase().replace(/\s+/g, '_');
 
+    const folderPathsArray = folderPrefixes
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const filterConfig: FeedTabFilterConfig = {
+      privacy: privacyContour,
+      feedSlugs: selectedFeedSlugs.length > 0 ? selectedFeedSlugs : undefined,
+      folderPaths: folderPathsArray.length > 0 ? folderPathsArray : undefined,
+    };
+
     onSave({
       id: finalId,
       label: label.trim(),
       emoji: emoji || '📁',
       badge: badge.trim() || undefined,
       description: description.trim() || undefined,
+      filterConfig,
     });
     onClose();
   };
@@ -103,11 +129,11 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white dark:bg-[#18222d] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-[#18222d] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-white/[0.08] bg-slate-50/50 dark:bg-white/[0.02]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-white/[0.08] bg-slate-50/50 dark:bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-lg">
               <span>{emoji}</span>
@@ -117,7 +143,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                 {isEditing ? 'Настройка раздела (таба)' : 'Новый раздел (таб)'}
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                Верхняя панель переключения потоков
+                Верхняя панель переключения потоков & правила фильтрации
               </p>
             </div>
           </div>
@@ -131,8 +157,8 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
-        <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs">
+        {/* Body Form */}
+        <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs overflow-y-auto custom-scrollbar flex-1">
           {errorMsg && (
             <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 flex items-center gap-2">
               <Info className="w-4 h-4 shrink-0" />
@@ -151,7 +177,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                 required
                 value={label}
                 onChange={(e) => handleLabelChange(e.target.value)}
-                placeholder="IT & Dev"
+                placeholder="Private feeds"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#121921] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-[#2481cc]"
               />
             </div>
@@ -164,7 +190,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                 type="text"
                 value={id}
                 onChange={(e) => setId(e.target.value)}
-                placeholder="it_dev"
+                placeholder="private_feeds"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#121921] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-mono placeholder-slate-400 outline-none focus:border-[#2481cc]"
               />
             </div>
@@ -190,7 +216,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                       key={e}
                       type="button"
                       onClick={() => setEmoji(e)}
-                      className={`w-6 h-6 rounded-lg text-xs flex items-center justify-center transition-all ${
+                      className={`w-6 h-6 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
                         emoji === e
                           ? 'bg-[#2481cc]/20 border border-[#2481cc]'
                           : 'hover:bg-slate-100 dark:hover:bg-white/10'
@@ -212,7 +238,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                 type="text"
                 value={badge}
                 onChange={(e) => setBadge(e.target.value)}
-                placeholder="live, hot, new"
+                placeholder="private, live, new"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#121921] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-[#2481cc]"
               />
             </div>
@@ -232,8 +258,136 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
             />
           </div>
 
+          {/* Filter Rules & Content Configuration Card */}
+          <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-[#121921]/90 border border-slate-200/80 dark:border-white/10 space-y-3 mt-2">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200/50 dark:border-white/5">
+              <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 text-xs">
+                <Filter className="w-3.5 h-3.5 text-[#2481cc]" />
+                <span>Правила фильтрации контента</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">Фильтр таба</span>
+            </div>
+
+            {/* Privacy Contour Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <span>Контур приватности:</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-200/60 dark:bg-black/20 text-[11px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setPrivacyContour('all')}
+                  className={`py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                    privacyContour === 'all'
+                      ? 'bg-white dark:bg-[#243343] text-[#2481cc] dark:text-white shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Все ленты</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrivacyContour('private')}
+                  className={`py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                    privacyContour === 'private'
+                      ? 'bg-purple-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400'
+                  }`}
+                >
+                  <Lock className="w-3.5 h-3.5 text-purple-300" />
+                  <span>Только Private</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrivacyContour('public')}
+                  className={`py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                    privacyContour === 'public'
+                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Только Public</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Specific Feed Selection */}
+            {allFeeds && allFeeds.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Привязка к конкретным лентам ({selectedFeedSlugs.length > 0 ? selectedFeedSlugs.length : 'Все ленты контура'}):
+                  </span>
+                  {selectedFeedSlugs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFeedSlugs([])}
+                      className="text-[10px] text-[#2481cc] hover:underline cursor-pointer"
+                    >
+                      Выбрать все
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-32 overflow-y-auto pr-1 flex flex-wrap gap-1.5 custom-scrollbar p-1 rounded-lg bg-white/50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
+                  {allFeeds
+                    .filter((f) => {
+                      if (privacyContour === 'private') return f.privacy === 'private';
+                      if (privacyContour === 'public') return f.privacy !== 'private';
+                      return true;
+                    })
+                    .map((feed) => {
+                      const isSelected = selectedFeedSlugs.includes(feed.slug);
+                      return (
+                        <button
+                          key={feed.slug}
+                          type="button"
+                          onClick={() => {
+                            setSelectedFeedSlugs((prev) =>
+                              isSelected ? prev.filter((s) => s !== feed.slug) : [...prev, feed.slug]
+                            );
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#2481cc]/15 border-[#2481cc] text-[#2481cc] dark:text-[#64b5f6] font-semibold shadow-2xs'
+                              : 'bg-white dark:bg-[#18222d] border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                          }`}
+                        >
+                          <span>{feed.icon || (feed.privacy === 'private' ? '🔒' : '📁')}</span>
+                          <span className="truncate max-w-[140px]">{feed.title}</span>
+                          {feed.privacy === 'private' && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-400 font-mono">
+                              private
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Folder Paths */}
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                Префиксы папок (через запятую, опционально):
+              </label>
+              <input
+                type="text"
+                value={folderPrefixes}
+                onChange={(e) => setFolderPrefixes(e.target.value)}
+                placeholder="private/, 01_daily_logs/, vault/"
+                className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-[#121921] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-[#2481cc] font-mono text-[11px]"
+              />
+            </div>
+          </div>
+
           {/* Footer Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/[0.08]">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/[0.08] shrink-0">
             {isEditing && onDelete && tab && tab.id !== 'all' ? (
               <button
                 type="button"

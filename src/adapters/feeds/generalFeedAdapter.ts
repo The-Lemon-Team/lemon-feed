@@ -7,7 +7,7 @@ import {
   extractNoteCoverUrl,
 } from './types';
 import { getThematicCategoryBadge } from '../../utils/sparkFeeds';
-import { isHolidayNote } from './holidaysFeedAdapter';
+import { isHolidayNote, isTodayHoliday } from './holidaysFeedAdapter';
 
 export const GENERAL_FEED_PRESETS: Array<{
   slug: string;
@@ -68,7 +68,9 @@ export const GENERAL_FEED_PRESETS: Array<{
 ];
 
 export function isGeneralNote(note: Note): boolean {
-  if (isHolidayNote(note)) return false;
+  if (isHolidayNote(note)) {
+    return isTodayHoliday(note);
+  }
   const slug = note.feed?.slug?.toLowerCase() || '';
   if (slug === 'wiki' || slug === 'wiki-history' || slug === 'wikipedia') return true;
   if (slug === 'spark-general' || slug === 'general' || slug === 'news' || slug === 'default') return true;

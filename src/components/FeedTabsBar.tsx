@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { UnifiedFeedTab, FeedSourceMode } from '../adapters/feeds/types';
 import { X } from 'lucide-react';
 
@@ -20,6 +20,28 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
   totalCount,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+  const activeSubtopicRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (activeFeedSlug && activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [activeFeedSlug, tabs]);
+
+  useEffect(() => {
+    if (activeFeedSlug && activeSubtopicRef.current) {
+      activeSubtopicRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [activeFeedSlug]);
   const isAll = streamSource === 'all';
   const isItDev = streamSource === 'it_dev' || streamSource === 'spark' || streamSource === 'dev';
   const isSeasons = streamSource === 'seasons';
@@ -101,6 +123,7 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
           return (
             <button
               key={tab.id}
+              ref={isSelected ? activeTabRef : undefined}
               type="button"
               onClick={() => onSelectFeed(tab.slug)}
               title={tab.description || tab.title}
@@ -184,6 +207,7 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
             return (
               <button
                 key={sub.id}
+                ref={isSubSelected ? activeSubtopicRef : undefined}
                 type="button"
                 onClick={() => onSelectFeed(sub.slug)}
                 className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors select-none ${

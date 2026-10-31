@@ -1,4 +1,5 @@
 import { Note } from '@lenta/shared';
+import dayjs from 'dayjs';
 import {
   FeedAdapter,
   FeedAdapterContext,
@@ -79,6 +80,12 @@ export function isHolidayNote(note: Note): boolean {
   if (getHolidayPresetForSlug(note.feed?.slug)) return true;
   if (note.folderPath && note.folderPath.toLowerCase().includes('holiday')) return true;
   return false;
+}
+
+export function isTodayHoliday(note: Note, targetDate = dayjs()): boolean {
+  if (!isHolidayNote(note)) return false;
+  const d = dayjs(note.startDate);
+  return d.isValid() && d.isSame(targetDate, 'day');
 }
 
 export const HolidaysFeedAdapter: FeedAdapter = {

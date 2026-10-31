@@ -31,13 +31,14 @@ export interface MicrofrontendFeedNavigatePayload {
 }
 
 // 1. Declarative Route Mappings (High-order tabs & Clean aliases)
-export const SOURCE_TO_PATH: Record<FeedSourceMode, string> = {
+export const SOURCE_TO_PATH: Record<string, string> = {
   all: '/all',
   it_dev: '/it-dev',
   seasons: '/seasons',
   entertainment: '/entertainment',
   holidays: '/holidays',
   telegram: '/tg',
+  private_feeds: '/private',
   spark: '/all',
   dev: '/it-dev',
   classic: '/holidays',
@@ -61,6 +62,9 @@ export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
   general: 'all',
   tg: 'telegram',
   telegram: 'telegram',
+  private: 'private_feeds',
+  'private-feeds': 'private_feeds',
+  private_feeds: 'private_feeds',
 };
 
 export const FEED_SLUG_TO_ALIAS: Record<string, string> = {
