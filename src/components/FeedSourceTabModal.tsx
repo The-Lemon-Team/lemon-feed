@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FeedModeOption } from './toolbar/types';
 import { X, Save, Trash2, Sparkles, Tag, Info } from 'lucide-react';
 
@@ -53,6 +54,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose();
       }
@@ -94,9 +96,10 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      style={{ zIndex: 9999 }}
       onClick={onClose}
     >
       <div
@@ -268,6 +271,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

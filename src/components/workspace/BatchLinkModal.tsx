@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Link2, Check, ArrowRight } from 'lucide-react';
 import { WorkspacePin } from '@lenta/shared';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -35,6 +36,7 @@ export const BatchLinkModal: React.FC<BatchLinkModalProps> = ({
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         onClose();
       }
     };
@@ -74,9 +76,10 @@ export const BatchLinkModal: React.FC<BatchLinkModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+      style={{ zIndex: 9999 }}
       onClick={onClose}
     >
       <div
@@ -188,6 +191,7 @@ export const BatchLinkModal: React.FC<BatchLinkModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

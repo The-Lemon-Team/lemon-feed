@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { useUpdateNote } from '../api/queries';
 import { resolveMediaUrl } from '../api/client';
@@ -79,6 +80,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
     if (!item || disableEscClose) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose();
       }
@@ -146,9 +148,10 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
+      style={{ zIndex: 10000 }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -508,6 +511,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

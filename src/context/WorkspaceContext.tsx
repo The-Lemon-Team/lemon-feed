@@ -52,7 +52,12 @@ export interface WorkspaceContextType {
   ) => Promise<WorkspacePin>;
   unpinNote: (pinIdOrNoteId: string) => Promise<void>;
   updatePin: (pinId: string, updates: UpdatePinInput) => Promise<WorkspacePin>;
-  createTrack: (title: string, color?: string, icon?: string) => Promise<WorkspaceTrack>;
+  createTrack: (
+    title: string,
+    color?: string,
+    icon?: string,
+    targetWorkspaceId?: string
+  ) => Promise<WorkspaceTrack>;
   createWorkspace: (data: CreateWorkspaceInput) => Promise<Workspace>;
   batchLinkNotes: (
     parentNoteId: string,
@@ -311,11 +316,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   const createTrack = useCallback(
-    async (title: string, color?: string, icon?: string) => {
-      if (!activeWorkspaceId) {
+    async (title: string, color?: string, icon?: string, targetWorkspaceId?: string) => {
+      const wsId = targetWorkspaceId || activeWorkspaceId;
+      if (!wsId) {
         throw new Error('No active workspace selected');
       }
-      const track = await workspacesApi.createTrack(activeWorkspaceId, {
+      const track = await workspacesApi.createTrack(wsId, {
         title,
         color,
         icon,

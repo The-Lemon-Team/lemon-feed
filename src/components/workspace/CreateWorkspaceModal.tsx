@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Check } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
@@ -47,6 +48,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOp
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         onClose();
       }
     };
@@ -76,7 +78,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOp
       // Optionally create initial track if specified
       if (initialTrackTitle.trim() && created?.id) {
         try {
-          await createTrack(initialTrackTitle.trim(), color);
+          await createTrack(initialTrackTitle.trim(), color, undefined, created.id);
         } catch (tErr) {
           console.warn('Initial track creation skipped:', tErr);
         }
@@ -90,9 +92,10 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOp
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+      style={{ zIndex: 9999 }}
       onClick={onClose}
     >
       <div
@@ -241,6 +244,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOp
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

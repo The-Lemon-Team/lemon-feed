@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { resolveMediaUrl } from '../api/client';
 import ReactMarkdown from 'react-markdown';
@@ -44,6 +45,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !disableEscClose) {
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose();
       }
@@ -90,9 +92,10 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     minute: '2-digit',
   });
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in"
+      style={{ zIndex: 9999 }}
       onMouseDown={handleOverlayMouseDown}
       onTouchStart={handleOverlayTouchStart}
       onClick={handleOverlayClick}
@@ -242,6 +245,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

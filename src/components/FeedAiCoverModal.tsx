@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import {
   useGenerateNoteCover,
@@ -89,6 +90,19 @@ export const FeedAiCoverModal: React.FC<FeedAiCoverModalProps> = ({
       }
     }
   }, [item, initialTemplateId, recommendation]);
+
+  // Escape key handling per AGENTS.md
+  useEffect(() => {
+    if (!item) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [item, onClose]);
 
   if (!item) return null;
 
@@ -189,9 +203,10 @@ export const FeedAiCoverModal: React.FC<FeedAiCoverModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
+      style={{ zIndex: 10000 }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -410,6 +425,7 @@ export const FeedAiCoverModal: React.FC<FeedAiCoverModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Feed } from '@lenta/shared';
 import { UnifiedFeedTab } from '../adapters/feeds/types';
 import { useCreateFeed, useUpdateFeed, useDeleteFeed } from '../api/queries';
@@ -110,6 +111,7 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose();
       }
@@ -213,9 +215,10 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
 
   const isSaving = createFeedMutation.isPending || updateFeedMutation.isPending;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      style={{ zIndex: 9999 }}
       onClick={onClose}
     >
       <div
@@ -544,6 +547,7 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

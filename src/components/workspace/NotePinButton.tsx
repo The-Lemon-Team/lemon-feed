@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pin, Plus, Check, X, Layers, Trash2 } from 'lucide-react';
+import { Pin, Check, X, Layers, Loader2 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
 interface NotePinButtonProps {
@@ -64,7 +64,12 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
     e.stopPropagation();
     setLoadingWorkspaceId(workspaceId);
     try {
-      await addToWorkspace(workspaceId, noteId, { isPinned: !currentPinned });
+      const current = memberships.find((m) => m.workspaceId === workspaceId && m.noteId === noteId);
+      await addToWorkspace(workspaceId, noteId, {
+        isPinned: !currentPinned,
+        trackId: current?.trackId,
+        status: (current?.status as any) || 'ACTIVE',
+      });
     } catch (err) {
       console.error('Failed to toggle focus:', err);
     } finally {
@@ -73,17 +78,18 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
   };
 
   return (
-    <div className="relative inline-block" ref={popoverRef}>
+    <div className="relative inline-flex items-center justify-center shrink-0" ref={popoverRef}>
+      {/* Trigger Button: Strict 28x28px bounding box with 1px border in all states */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`relative p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+        className={`relative w-7 h-7 flex items-center justify-center rounded-lg border transition-colors cursor-pointer shrink-0 ${
           isInAnyWorkspace
-            ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/25'
-            : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
+            ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/25'
+            : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
         }`}
         title={
           isInAnyWorkspace
@@ -91,23 +97,30 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
             : 'Добавить в воркспейс'
         }
       >
-        <Layers className={`w-3.5 h-3.5 ${isInAnyWorkspace ? 'fill-current opacity-80' : ''}`} />
+        <Layers className="w-3.5 h-3.5 shrink-0" />
         {isAnyPinned && (
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-[#17212b]" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-[#17212b]" />
         )}
       </button>
 
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-1.5 z-50 w-72 p-3 rounded-2xl bg-white dark:bg-[#17212b] border border-slate-200 dark:border-white/15 shadow-2xl shadow-slate-900/30 dark:shadow-black/70 space-y-2.5 text-left animate-fadeIn"
+          className="absolute right-0 top-full mt-1.5 z-50 w-64 p-2.5 rounded-2xl bg-white dark:bg-[#17212b] border border-slate-200 dark:border-white/15 shadow-2xl shadow-slate-900/30 dark:shadow-black/70 space-y-2 text-left animate-fadeIn"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-white/10">
             <div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-                Добавить в воркспейс
-              </h4>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                  Добавить в воркспейс
+                </h4>
+                {noteMemberships.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                    {noteMemberships.length}
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] text-slate-400">
                 Сборка заметки в рабочие пространства
               </p>
@@ -115,82 +128,91 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Workspaces List */}
-          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5">
-            {workspaces.map((w) => {
-              const inWs = isNoteInWorkspace(w.id, noteId);
-              const isPinned = isNotePinnedInWorkspace(w.id, noteId);
-              const isLoading = loadingWorkspaceId === w.id;
+          {/* Workspaces Multiselect List */}
+          <div className="space-y-1 max-h-56 overflow-y-auto pr-0.5">
+            {workspaces.length === 0 ? (
+              <div className="py-3 text-center text-xs text-slate-400">
+                Нет доступных воркспейсов
+              </div>
+            ) : (
+              workspaces.map((w) => {
+                const inWs = isNoteInWorkspace(w.id, noteId);
+                const isPinned = isNotePinnedInWorkspace(w.id, noteId);
+                const isLoading = loadingWorkspaceId === w.id;
 
-              return (
-                <div
-                  key={w.id}
-                  className={`flex items-center justify-between gap-2 p-2 rounded-xl border transition-all ${
-                    inWs
-                      ? 'bg-blue-50/70 dark:bg-blue-900/15 border-blue-500/30'
-                      : 'border-slate-200/80 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: w.color || '#3b82f6' }}
-                    />
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {w.title}
-                    </span>
-                  </div>
+                return (
+                  <div
+                    key={w.id}
+                    role="checkbox"
+                    aria-checked={inWs}
+                    tabIndex={0}
+                    onClick={() => !isLoading && handleToggleWorkspace(w.id, inWs)}
+                    onKeyDown={(e) => {
+                      if (!isLoading && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        handleToggleWorkspace(w.id, inWs);
+                      }
+                    }}
+                    className={`group flex items-center justify-between h-8 min-h-[32px] max-h-[32px] px-2 rounded-lg border transition-all cursor-pointer select-none ${
+                      inWs
+                        ? 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-500/30 text-blue-700 dark:text-blue-300'
+                        : 'border-transparent hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {/* Left: Checkbox + Color Dot + Title */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-colors border ${
+                          inWs
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : 'border-slate-300 dark:border-white/20 group-hover:border-slate-400 dark:group-hover:border-white/40 bg-white/50 dark:bg-white/5'
+                        }`}
+                      >
+                        {isLoading ? (
+                          <Loader2 className={`w-2.5 h-2.5 animate-spin ${inWs ? 'text-white' : 'text-blue-500'}`} />
+                        ) : inWs ? (
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        ) : null}
+                      </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    {inWs ? (
-                      <>
-                        {/* Toggle Focus Pin */}
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: w.color || '#3b82f6' }}
+                      />
+
+                      <span className="text-xs font-medium truncate">
+                        {w.title}
+                      </span>
+                    </div>
+
+                    {/* Right: Invariant fixed slot for Focus Pin action */}
+                    <div className="w-6 h-6 shrink-0 flex items-center justify-center">
+                      {inWs && (
                         <button
                           type="button"
                           onClick={(e) => handleToggleFocus(w.id, isPinned, e)}
                           disabled={isLoading}
-                          className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                          className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
                             isPinned
-                              ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold'
-                              : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-white/10'
+                              ? 'text-amber-500 hover:text-amber-600 bg-amber-500/15'
+                              : 'text-slate-400 hover:text-amber-500 hover:bg-slate-200/60 dark:hover:bg-white/10 opacity-60 hover:opacity-100'
                           }`}
                           title={isPinned ? 'Снять из фокусных слотов' : 'Закрепить в фокусные слоты'}
                         >
-                          <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-current' : ''}`} />
+                          <Pin className={`w-3 h-3 ${isPinned ? 'fill-current' : ''}`} />
                         </button>
-
-                        {/* Remove from workspace */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleWorkspace(w.id, true)}
-                          disabled={isLoading}
-                          className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                          title="Удалить из этого воркспейса"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleWorkspace(w.id, false)}
-                        disabled={isLoading}
-                        className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Добавить</span>
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}

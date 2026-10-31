@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { TelegramMediaItem } from '../api/telegramReaderApi';
 import {
   Image as ImageIcon,
@@ -59,8 +60,10 @@ export const TelegramMediaGallery: React.FC<TelegramMediaGalleryProps> = ({
     if (lightboxIndex === null) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeLightbox();
-      else if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        closeLightbox();
+      } else if (e.key === 'ArrowLeft') handlePrev();
       else if (e.key === 'ArrowRight') handleNext();
     };
 
@@ -273,9 +276,10 @@ export const TelegramMediaGallery: React.FC<TelegramMediaGalleryProps> = ({
       )}
 
       {/* 5. Lightbox Modal */}
-      {lightboxIndex !== null && photos[lightboxIndex] && (
+      {lightboxIndex !== null && photos[lightboxIndex] && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in select-none"
+          className="fixed inset-0 z-[10001] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in select-none"
+          style={{ zIndex: 10001 }}
           onClick={closeLightbox}
         >
           {/* Top Control Bar */}
@@ -349,7 +353,8 @@ export const TelegramMediaGallery: React.FC<TelegramMediaGalleryProps> = ({
               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

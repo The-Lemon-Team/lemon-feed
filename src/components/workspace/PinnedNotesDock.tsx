@@ -259,7 +259,7 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
               </div>
 
               {/* Workspace Switcher Bar */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-scroll py-1.5 px-1 -mx-1">
                 {workspaces.map((w) => {
                   const isActive = w.id === activeWorkspaceId;
                   return (
@@ -267,10 +267,10 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
                       key={w.id}
                       type="button"
                       onClick={() => setActiveWorkspaceId(w.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#151e27] ${
                         isActive
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-slate-100 dark:bg-white/5 border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <span
@@ -288,7 +288,7 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
                 <button
                   type="button"
                   onClick={() => setIsCreateWorkspaceOpen(true)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer border border-dashed border-slate-300 dark:border-white/10 shrink-0"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer border border-dashed border-slate-300 dark:border-white/15 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#151e27]"
                   title="Создать новое рабочее пространство"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -328,36 +328,36 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
 
             {/* Body: Focus Slots & Workbench */}
             <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
-              {filteredPins.length === 0 ? (
-                <div className="text-center py-12 px-4 text-slate-400 dark:text-slate-500">
-                  <Layers className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-xs font-medium">В этом воркспейсе пока нет заметок</p>
-                  <p className="text-[11px] mt-1 max-w-xs mx-auto">
-                    Нажимайте иконку воркспейса в карточках заметок ленты, чтобы добавлять их сюда для работы.
-                  </p>
+              {filteredPins.length === 0 && (searchQuery.trim() || filterAttentionOnly) ? (
+                <div className="text-center py-10 px-4 text-slate-400 dark:text-slate-500">
+                  <Search className="w-7 h-7 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs font-medium">Ничего не найдено</p>
+                  <p className="text-[11px] mt-1">Попробуйте изменить поисковый запрос или фильтры</p>
                 </div>
               ) : (
                 <>
                   {/* Select All row */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pb-1">
-                    <button
-                      type="button"
-                      onClick={selectAll}
-                      className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                    >
-                      {selectedPinIds.size === filteredPins.length ? (
-                        <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
-                      ) : (
-                        <Square className="w-3.5 h-3.5" />
+                  {filteredPins.length > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pb-1">
+                      <button
+                        type="button"
+                        onClick={selectAll}
+                        className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                      >
+                        {selectedPinIds.size === filteredPins.length ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5" />
+                        )}
+                        <span>Выбрать все ({filteredPins.length})</span>
+                      </button>
+                      {selectedPinIds.size > 0 && (
+                        <span className="font-mono font-bold text-blue-500">
+                          Выбрано: {selectedPinIds.size}
+                        </span>
                       )}
-                      <span>Выбрать все ({filteredPins.length})</span>
-                    </button>
-                    {selectedPinIds.size > 0 && (
-                      <span className="font-mono font-bold text-blue-500">
-                        Выбрано: {selectedPinIds.size}
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* 1. FOCUS SLOTS SECTION (📌) */}
                   <FocusSlotsSection
@@ -378,6 +378,19 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
                         <span className="text-[10px] text-slate-400">({filteredPins.length})</span>
                       </div>
                     </div>
+
+                    {/* Empty workspace callout banner if pins.length === 0 and not searching */}
+                    {pins.length === 0 && !searchQuery.trim() && !filterAttentionOnly && (
+                      <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-dashed border-slate-200 dark:border-white/10 text-center space-y-1">
+                        <Layers className="w-6 h-6 mx-auto text-slate-400 dark:text-slate-500 opacity-50 mb-1" />
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          В этом воркспейсе пока нет заметок
+                        </p>
+                        <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                          Нажимайте иконку воркспейса в карточках заметок ленты, чтобы добавлять их сюда для работы.
+                        </p>
+                      </div>
+                    )}
 
                     {/* General notes (without track) */}
                     {generalPins.length > 0 && (

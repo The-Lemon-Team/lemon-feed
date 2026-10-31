@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Sparkles, ExternalLink, Calendar, RefreshCw } from 'lucide-react';
 import { LemonLogo } from './LemonLogo';
 
@@ -13,6 +14,7 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({ isOpen, on
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         onClose();
       }
     };
@@ -23,9 +25,10 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({ isOpen, on
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      style={{ zIndex: 9999 }}
       onClick={onClose}
     >
       <div
@@ -104,6 +107,7 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({ isOpen, on
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
