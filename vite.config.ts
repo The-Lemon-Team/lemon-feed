@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => {
       '/stats': 'http://localhost:3001',
       '/api': 'http://localhost:3001',
       '/ingestion': 'http://localhost:3001',
+      '/workspaces': 'http://localhost:3001',
     },
   },
   build: {

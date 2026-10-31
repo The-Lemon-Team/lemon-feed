@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   Workspace,
   WorkspaceTrack,
@@ -6,8 +14,11 @@ import {
   PinStatus,
   CreateWorkspaceInput,
   UpdatePinInput,
+  ReorderPinItemInput,
 } from '@lenta/shared';
 import { workspacesApi } from '../api/workspaces';
+import { sortPinsDeterministically } from './workspaceContext.utils';
+import { useWorkspacePinActions } from './useWorkspacePinActions';
 
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'lemon_active_workspace_id';
 
@@ -44,6 +55,7 @@ export interface WorkspaceContextType {
   ) => Promise<WorkspacePin>;
   removeFromWorkspace: (workspaceId: string, noteId: string) => Promise<void>;
   togglePinFocus: (pinId: string, isPinned: boolean) => Promise<WorkspacePin>;
+  batchToggleFocus: (pinIds: string[], isPinned: boolean) => Promise<void>;
   pinNote: (
     noteId: string,
     trackId?: string | null,
@@ -52,13 +64,30 @@ export interface WorkspaceContextType {
   ) => Promise<WorkspacePin>;
   unpinNote: (pinIdOrNoteId: string) => Promise<void>;
   updatePin: (pinId: string, updates: UpdatePinInput) => Promise<WorkspacePin>;
+  commitPinsLayout: (updates: ReorderPinItemInput[]) => Promise<void>;
+  movePinToTrack: (
+    pinId: string,
+    targetTrackId: string | null,
+    targetOrder?: number
+  ) => Promise<void>;
+  movePinsToTrack: (
+    pinIds: string[],
+    targetTrackId: string | null,
+    baseOrder?: number
+  ) => Promise<void>;
+  reorderPinsInTrack: (
+    trackId: string | null,
+    orderedPinIds: string[]
+  ) => Promise<void>;
   createTrack: (
     title: string,
     color?: string,
     icon?: string,
     targetWorkspaceId?: string
   ) => Promise<WorkspaceTrack>;
+  deleteTrack: (trackId: string, targetWorkspaceId?: string) => Promise<void>;
   createWorkspace: (data: CreateWorkspaceInput) => Promise<Workspace>;
+  deleteWorkspace: (id: string) => Promise<void>;
   batchLinkNotes: (
     parentNoteId: string,
     childNoteIds: string[]
@@ -67,7 +96,18 @@ export interface WorkspaceContextType {
   refreshPins: () => Promise<void>;
 }
 
+export interface WorkspaceMembershipContextType {
+  workspaces: Workspace[];
+  memberships: NoteMembership[];
+  membershipsByNoteId: Map<string, NoteMembership[]>;
+  isNoteInWorkspace: (workspaceId: string, noteId: string) => boolean;
+  isNotePinnedInWorkspace: (workspaceId: string, noteId: string) => boolean;
+  addToWorkspace: WorkspaceContextType['addToWorkspace'];
+  removeFromWorkspace: WorkspaceContextType['removeFromWorkspace'];
+}
+
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null);
+const WorkspaceMembershipContext = createContext<WorkspaceMembershipContextType | null>(null);
 
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -78,6 +118,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [memberships, setMemberships] = useState<NoteMembership[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDockOpen, setIsDockOpen] = useState(false);
+
+  // Ref for reading latest pins inside stable action callbacks without triggering dependency churn
+  const pinsRef = useRef<WorkspacePin[]>(pins);
+  pinsRef.current = pins;
 
   const fetchWorkspaces = useCallback(async () => {
     try {
@@ -122,7 +166,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsLoading(true);
     try {
       const data = await workspacesApi.getPins(activeWorkspaceId);
-      setPins(data);
+      setPins(sortPinsDeterministically(data));
     } catch (err) {
       console.warn('[WorkspaceContext] Failed to load pins:', err);
     } finally {
@@ -139,9 +183,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     fetchPins();
   }, [fetchPins]);
 
-  const activeWorkspace = useMemo(() => {
-    return workspaces.find((w) => w.id === activeWorkspaceId) || null;
-  }, [workspaces, activeWorkspaceId]);
+  const activeWorkspace = useMemo(
+    () => workspaces.find((w) => w.id === activeWorkspaceId) || null,
+    [workspaces, activeWorkspaceId]
+  );
 
   const pinsByNoteId = useMemo(() => {
     const map = new Map<string, WorkspacePin>();
@@ -151,186 +196,43 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return map;
   }, [pins]);
 
+  // O(1) membership indexes for fast NotePinButton rendering across large feeds
+  const { membershipByKey, membershipsByNoteId } = useMemo(() => {
+    const byKey = new Map<string, NoteMembership>();
+    const byNote = new Map<string, NoteMembership[]>();
+    for (const m of memberships) {
+      byKey.set(`${m.workspaceId}:${m.noteId}`, m);
+      const list = byNote.get(m.noteId);
+      if (list) list.push(m);
+      else byNote.set(m.noteId, [m]);
+    }
+    return { membershipByKey: byKey, membershipsByNoteId: byNote };
+  }, [memberships]);
+
   const isNoteInWorkspace = useCallback(
     (workspaceId: string, noteId: string): boolean => {
-      return memberships.some(
-        (m) => m.workspaceId === workspaceId && m.noteId === noteId
-      );
+      return membershipByKey.has(`${workspaceId}:${noteId}`);
     },
-    [memberships]
+    [membershipByKey]
   );
 
   const isNotePinnedInWorkspace = useCallback(
     (workspaceId: string, noteId: string): boolean => {
-      return memberships.some(
-        (m) => m.workspaceId === workspaceId && m.noteId === noteId && m.isPinned
-      );
+      return Boolean(membershipByKey.get(`${workspaceId}:${noteId}`)?.isPinned);
     },
-    [memberships]
+    [membershipByKey]
   );
 
-  const addToWorkspace = useCallback(
-    async (
-      workspaceId: string,
-      noteId: string,
-      options?: {
-        isPinned?: boolean;
-        trackId?: string | null;
-        status?: PinStatus;
-        comment?: string;
-      }
-    ) => {
-      const res = await workspacesApi.pinNote(workspaceId, {
-        noteId,
-        isPinned: options?.isPinned ?? false,
-        trackId: options?.trackId || undefined,
-        status: options?.status || 'ACTIVE',
-        comment: options?.comment,
-      });
-
-      // Update memberships state
-      setMemberships((prev) => {
-        const filtered = prev.filter(
-          (m) => !(m.workspaceId === workspaceId && m.noteId === noteId)
-        );
-        return [
-          ...filtered,
-          {
-            workspaceId,
-            noteId,
-            isPinned: res.isPinned,
-            status: res.status,
-            trackId: res.trackId || null,
-          },
-        ];
-      });
-
-      // If active workspace, update pins list
-      if (workspaceId === activeWorkspaceId) {
-        setPins((prev) => {
-          const filtered = prev.filter((p) => p.noteId !== noteId);
-          return [...filtered, res];
-        });
-      }
-
-      // Update workspace pin count locally
-      setWorkspaces((prev) =>
-        prev.map((w) =>
-          w.id === workspaceId
-            ? { ...w, _count: { ...w._count!, pins: (w._count?.pins || 0) + 1 } }
-            : w
-        )
-      );
-
-      return res;
-    },
-    [activeWorkspaceId]
-  );
-
-  const removeFromWorkspace = useCallback(
-    async (workspaceId: string, noteId: string) => {
-      await workspacesApi.unpinNote(workspaceId, noteId);
-
-      // Update memberships state
-      setMemberships((prev) =>
-        prev.filter((m) => !(m.workspaceId === workspaceId && m.noteId === noteId))
-      );
-
-      // If active workspace, update pins list
-      if (workspaceId === activeWorkspaceId) {
-        setPins((prev) => prev.filter((p) => p.noteId !== noteId));
-      }
-
-      // Update workspace pin count locally
-      setWorkspaces((prev) =>
-        prev.map((w) =>
-          w.id === workspaceId
-            ? { ...w, _count: { ...w._count!, pins: Math.max(0, (w._count?.pins || 1) - 1) } }
-            : w
-        )
-      );
-    },
-    [activeWorkspaceId]
-  );
-
-  const togglePinFocus = useCallback(
-    async (pinId: string, isPinned: boolean) => {
-      if (!activeWorkspaceId) {
-        throw new Error('No active workspace selected');
-      }
-      const updated = await workspacesApi.updatePin(activeWorkspaceId, pinId, { isPinned });
-      setPins((prev) => prev.map((p) => (p.id === pinId ? updated : p)));
-
-      // Update memberships
-      setMemberships((prev) =>
-        prev.map((m) =>
-          m.workspaceId === activeWorkspaceId && m.noteId === updated.noteId
-            ? { ...m, isPinned }
-            : m
-        )
-      );
-
-      return updated;
-    },
-    [activeWorkspaceId]
-  );
-
-  const pinNote = useCallback(
-    async (
-      noteId: string,
-      trackId?: string | null,
-      status?: PinStatus,
-      comment?: string
-    ) => {
-      if (!activeWorkspaceId) {
-        throw new Error('No active workspace selected');
-      }
-      return addToWorkspace(activeWorkspaceId, noteId, {
-        isPinned: true,
-        trackId,
-        status,
-        comment,
-      });
-    },
-    [activeWorkspaceId, addToWorkspace]
-  );
-
-  const unpinNote = useCallback(
-    async (pinIdOrNoteId: string) => {
-      if (!activeWorkspaceId) return;
-      return removeFromWorkspace(activeWorkspaceId, pinIdOrNoteId);
-    },
-    [activeWorkspaceId, removeFromWorkspace]
-  );
-
-  const updatePin = useCallback(
-    async (pinId: string, updates: UpdatePinInput) => {
-      if (!activeWorkspaceId) {
-        throw new Error('No active workspace selected');
-      }
-      const updated = await workspacesApi.updatePin(activeWorkspaceId, pinId, updates);
-      setPins((prev) => prev.map((p) => (p.id === pinId ? updated : p)));
-      return updated;
-    },
-    [activeWorkspaceId]
-  );
-
-  const createTrack = useCallback(
-    async (title: string, color?: string, icon?: string, targetWorkspaceId?: string) => {
-      const wsId = targetWorkspaceId || activeWorkspaceId;
-      if (!wsId) {
-        throw new Error('No active workspace selected');
-      }
-      const track = await workspacesApi.createTrack(wsId, {
-        title,
-        color,
-        icon,
-      });
-      await fetchWorkspaces();
-      return track;
-    },
-    [activeWorkspaceId, fetchWorkspaces]
-  );
+  const pinActions = useWorkspacePinActions({
+    activeWorkspaceId,
+    pinsRef,
+    membershipByKey,
+    setPins,
+    setMemberships,
+    setWorkspaces,
+    fetchPins,
+    fetchWorkspaces,
+  });
 
   const createWorkspace = useCallback(
     async (data: CreateWorkspaceInput) => {
@@ -342,16 +244,46 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [fetchWorkspaces, setActiveWorkspaceId]
   );
 
-  const batchLinkNotes = useCallback(
-    async (parentNoteId: string, childNoteIds: string[]) => {
-      const res = await workspacesApi.batchLink({
-        parentNoteId,
-        childNoteIds,
-      });
-      await fetchPins();
-      return res;
+  const deleteWorkspace = useCallback(
+    async (id: string) => {
+      await workspacesApi.deleteWorkspace(id);
+      const remaining = workspaces.filter((w) => w.id !== id);
+      if (activeWorkspaceId === id) {
+        const nextWs = remaining.find((w) => w.isDefault) || remaining[0] || null;
+        if (nextWs) {
+          setActiveWorkspaceId(nextWs.id);
+        } else {
+          setActiveWorkspaceIdState(null);
+          localStorage.removeItem(ACTIVE_WORKSPACE_STORAGE_KEY);
+        }
+      }
+      await fetchWorkspaces();
+      await fetchMemberships();
     },
-    [fetchPins]
+    [workspaces, activeWorkspaceId, setActiveWorkspaceId, fetchWorkspaces, fetchMemberships]
+  );
+
+  // Isolated membership slice so reordering `pins` or toggling `isDockOpen`
+  // causes zero re-renders across NotePinButton instances on the main feed page.
+  const membershipValue = useMemo<WorkspaceMembershipContextType>(
+    () => ({
+      workspaces,
+      memberships,
+      membershipsByNoteId,
+      isNoteInWorkspace,
+      isNotePinnedInWorkspace,
+      addToWorkspace: pinActions.addToWorkspace,
+      removeFromWorkspace: pinActions.removeFromWorkspace,
+    }),
+    [
+      workspaces,
+      memberships,
+      membershipsByNoteId,
+      isNoteInWorkspace,
+      isNotePinnedInWorkspace,
+      pinActions.addToWorkspace,
+      pinActions.removeFromWorkspace,
+    ]
   );
 
   const value = useMemo(
@@ -368,15 +300,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsDockOpen,
       isNoteInWorkspace,
       isNotePinnedInWorkspace,
-      addToWorkspace,
-      removeFromWorkspace,
-      togglePinFocus,
-      pinNote,
-      unpinNote,
-      updatePin,
-      createTrack,
+      ...pinActions,
       createWorkspace,
-      batchLinkNotes,
+      deleteWorkspace,
       refreshWorkspaces: fetchWorkspaces,
       refreshPins: fetchPins,
     }),
@@ -392,27 +318,35 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isDockOpen,
       isNoteInWorkspace,
       isNotePinnedInWorkspace,
-      addToWorkspace,
-      removeFromWorkspace,
-      togglePinFocus,
-      pinNote,
-      unpinNote,
-      updatePin,
-      createTrack,
+      pinActions,
       createWorkspace,
-      batchLinkNotes,
+      deleteWorkspace,
       fetchWorkspaces,
       fetchPins,
     ]
   );
 
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  return (
+    <WorkspaceContext.Provider value={value}>
+      <WorkspaceMembershipContext.Provider value={membershipValue}>
+        {children}
+      </WorkspaceMembershipContext.Provider>
+    </WorkspaceContext.Provider>
+  );
 };
 
 export const useWorkspace = (): WorkspaceContextType => {
   const context = useContext(WorkspaceContext);
   if (!context) {
     throw new Error('useWorkspace must be used within a WorkspaceProvider');
+  }
+  return context;
+};
+
+export const useWorkspaceMembership = (): WorkspaceMembershipContextType => {
+  const context = useContext(WorkspaceMembershipContext);
+  if (!context) {
+    throw new Error('useWorkspaceMembership must be used within a WorkspaceProvider');
   }
   return context;
 };

@@ -1,27 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pin, Check, X, Layers, Loader2 } from 'lucide-react';
-import { useWorkspace } from '../../context/WorkspaceContext';
+import { useWorkspaceMembership, NoteMembership } from '../../context/WorkspaceContext';
 
 interface NotePinButtonProps {
   noteId: string;
 }
 
+const EMPTY_MEMBERSHIPS: NoteMembership[] = [];
+
 export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
   const {
     workspaces,
-    memberships,
+    membershipsByNoteId,
     addToWorkspace,
     removeFromWorkspace,
     isNoteInWorkspace,
     isNotePinnedInWorkspace,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [loadingWorkspaceId, setLoadingWorkspaceId] = useState<string | null>(null);
+  const [loadingWorkspaceIds, setLoadingWorkspaceIds] = useState<Record<string, boolean>>({});
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // All memberships for this note
-  const noteMemberships = memberships.filter((m) => m.noteId === noteId);
+  // O(1) lookup for this note's workspace memberships
+  const noteMemberships = membershipsByNoteId.get(noteId) ?? EMPTY_MEMBERSHIPS;
   const isInAnyWorkspace = noteMemberships.length > 0;
   const isAnyPinned = noteMemberships.some((m) => m.isPinned);
 
@@ -46,7 +48,7 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
   }, [isOpen]);
 
   const handleToggleWorkspace = async (workspaceId: string, inWorkspace: boolean) => {
-    setLoadingWorkspaceId(workspaceId);
+    setLoadingWorkspaceIds((prev) => ({ ...prev, [workspaceId]: true }));
     try {
       if (inWorkspace) {
         await removeFromWorkspace(workspaceId, noteId);
@@ -56,15 +58,19 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
     } catch (err) {
       console.error('Failed to toggle workspace:', err);
     } finally {
-      setLoadingWorkspaceId(null);
+      setLoadingWorkspaceIds((prev) => {
+        const next = { ...prev };
+        delete next[workspaceId];
+        return next;
+      });
     }
   };
 
   const handleToggleFocus = async (workspaceId: string, currentPinned: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
-    setLoadingWorkspaceId(workspaceId);
+    setLoadingWorkspaceIds((prev) => ({ ...prev, [workspaceId]: true }));
     try {
-      const current = memberships.find((m) => m.workspaceId === workspaceId && m.noteId === noteId);
+      const current = noteMemberships.find((m) => m.workspaceId === workspaceId);
       await addToWorkspace(workspaceId, noteId, {
         isPinned: !currentPinned,
         trackId: current?.trackId,
@@ -73,7 +79,11 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
     } catch (err) {
       console.error('Failed to toggle focus:', err);
     } finally {
-      setLoadingWorkspaceId(null);
+      setLoadingWorkspaceIds((prev) => {
+        const next = { ...prev };
+        delete next[workspaceId];
+        return next;
+      });
     }
   };
 
@@ -107,6 +117,7 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
         <div
           className="absolute right-0 top-full mt-1.5 z-50 w-64 p-2.5 rounded-2xl bg-white dark:bg-[#17212b] border border-slate-200 dark:border-white/15 shadow-2xl shadow-slate-900/30 dark:shadow-black/70 space-y-2 text-left animate-fadeIn"
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-white/10">
@@ -144,7 +155,7 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
               workspaces.map((w) => {
                 const inWs = isNoteInWorkspace(w.id, noteId);
                 const isPinned = isNotePinnedInWorkspace(w.id, noteId);
-                const isLoading = loadingWorkspaceId === w.id;
+                const isLoading = Boolean(loadingWorkspaceIds[w.id]);
 
                 return (
                   <div
@@ -152,9 +163,15 @@ export const NotePinButton: React.FC<NotePinButtonProps> = ({ noteId }) => {
                     role="checkbox"
                     aria-checked={inWs}
                     tabIndex={0}
-                    onClick={() => !isLoading && handleToggleWorkspace(w.id, inWs)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isLoading) {
+                        handleToggleWorkspace(w.id, inWs);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (!isLoading && (e.key === 'Enter' || e.key === ' ')) {
+                        e.stopPropagation();
                         e.preventDefault();
                         handleToggleWorkspace(w.id, inWs);
                       }

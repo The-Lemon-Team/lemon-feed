@@ -9,6 +9,7 @@ import {
   UpdateTrackInput,
   CreatePinInput,
   UpdatePinInput,
+  ReorderPinsInput,
   BatchLinkNotesInput,
 } from '@lenta/shared';
 
@@ -98,6 +99,36 @@ export const workspacesApi = {
       data
     );
     return res.data;
+  },
+
+  reorderPins: async (
+    workspaceId: string,
+    data: ReorderPinsInput
+  ): Promise<{ success: boolean; updatedCount: number }> => {
+    if (!data.items.length) {
+      return { success: true, updatedCount: 0 };
+    }
+    try {
+      const res = await apiClient.patch<{ success: boolean; updatedCount: number }>(
+        `/workspaces/${workspaceId}/pins/reorder`,
+        data
+      );
+      return res.data;
+    } catch (err: any) {
+      // Graceful fallback if connected to an older backend instance before restart
+      if (err?.response?.status === 404) {
+        await Promise.all(
+          data.items.map((item) =>
+            apiClient.patch(`/workspaces/${workspaceId}/pins/${item.id}`, {
+              ...(item.trackId !== undefined ? { trackId: item.trackId } : {}),
+              order: item.order,
+            })
+          )
+        );
+        return { success: true, updatedCount: data.items.length };
+      }
+      throw err;
+    }
   },
 
   unpinNote: async (workspaceId: string, pinIdOrNoteId: string): Promise<void> => {
