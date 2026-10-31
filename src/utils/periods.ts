@@ -76,7 +76,14 @@ export function getPeriodActivityStatus(note: Note, now = dayjs()): PeriodActivi
  */
 export function extractPeriodItems(notes: Note[]): PeriodItem[] {
   const now = dayjs();
-  const periodNotes = notes.filter((n) => n.type === 'PERIOD' && n.status !== 'ARCHIVED');
+  const periodNotes = notes.filter((n) => {
+    if (n.type !== 'PERIOD' || n.status === 'ARCHIVED') return false;
+    // Defensive check: Daily digests and news briefs are never periods
+    const lower = n.title.toLowerCase();
+    const isDigest = lower.includes('дайджест') || lower.includes('сводка') || lower.includes('digest');
+    if (isDigest) return false;
+    return true;
+  });
 
   return periodNotes.map((n) => {
     const meta = (n.metadata as any) || {};

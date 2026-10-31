@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { PeriodItem } from '../../utils/periods';
 
 export interface FeedActivitiesMobileCarouselProps {
@@ -12,6 +12,18 @@ export const FeedActivitiesMobileCarousel: React.FC<FeedActivitiesMobileCarousel
   selectedPeriodId,
   onSelectPeriod,
 }) => {
+  const activePeriodRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (selectedPeriodId && activePeriodRef.current) {
+      activePeriodRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [selectedPeriodId]);
+
   if (periods.length === 0) return null;
 
   return (
@@ -32,6 +44,7 @@ export const FeedActivitiesMobileCarousel: React.FC<FeedActivitiesMobileCarousel
           return (
             <button
               key={p.id}
+              ref={isSelected ? activePeriodRef : undefined}
               type="button"
               onClick={() => onSelectPeriod(isSelected ? undefined : p.id)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap border transition-all cursor-pointer shrink-0 ${

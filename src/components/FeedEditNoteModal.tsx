@@ -5,6 +5,7 @@ import { useUpdateNote } from '../api/queries';
 import { resolveMediaUrl } from '../api/client';
 import { extractCleanSnippet } from '@lenta/shared';
 import dayjs from 'dayjs';
+import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
 import {
   X,
   Edit3,
@@ -110,27 +111,23 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       return;
     }
 
-    const tagsArray = hashtagsStr
-      .split(/[\s,]+/)
-      .map((t) => t.replace(/^#/, '').trim())
-      .filter(Boolean);
-
     try {
+      const payload = buildSafeNoteUpdatePayload(item, {
+        title,
+        description,
+        summary,
+        author,
+        curator: author,
+        sourceLink,
+        hashtagsStr,
+        eventDate,
+        targetPrivacy,
+        targetStatus,
+      });
+
       await updateNoteMutation.mutateAsync({
         id: item.id,
-        data: {
-          title: title.trim(),
-          description: description.trim(),
-          summary: summary.trim() || undefined,
-          author: author.trim() || undefined,
-          curator: author.trim() || undefined,
-          sourceLink: sourceLink.trim() || undefined,
-          hashtags: tagsArray,
-          startDate: eventDate ? new Date(eventDate).toISOString() : undefined,
-          privacy: targetPrivacy,
-          status: targetStatus,
-          ...(targetStatus === 'PUBLISHED' ? { publishAt: new Date().toISOString() } : {}),
-        },
+        data: payload,
       });
 
       setFeedback({

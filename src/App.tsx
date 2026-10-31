@@ -13,6 +13,7 @@ import {
   FeedSourceMode,
   UnifiedFeedItem,
   UnifiedFeedTab,
+  createConfiguredFeedAdapter,
 } from './adapters/feeds';
 import { FeedToolbar, FeedModeOption, DEFAULT_FEED_MODES } from './components/FeedToolbar';
 import { FeedStreamView } from './components/FeedStreamView';
@@ -21,6 +22,7 @@ import { FeedBottomNav } from './components/FeedBottomNav';
 import { X } from 'lucide-react';
 import { useFeedRouter } from './utils/feedRouter';
 import { useFeedAuthSync } from './hooks/useFeedAuthSync';
+import { useLiveNoteSubscription } from './hooks/useLiveNoteSubscription';
 import {
   FeedHorizon,
   PeriodFilterMode,
@@ -212,7 +214,14 @@ export const App: React.FC = () => {
         const saved = localStorage.getItem('lenta_custom_stream_modes');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const hasPrivate = parsed.some((m: any) => m.id === 'private_feeds');
+            if (!hasPrivate) {
+              const priv = DEFAULT_FEED_MODES.find((m) => m.id === 'private_feeds');
+              if (priv) return [...parsed, priv];
+            }
+            return parsed;
+          }
         }
       } catch {
         // fallback
@@ -339,8 +348,15 @@ export const App: React.FC = () => {
 
   // Active adapter
   const activeAdapter = useMemo(() => {
-    return FEED_ADAPTERS[streamSource] || FEED_ADAPTERS.all;
-  }, [streamSource]);
+    if (FEED_ADAPTERS[streamSource]) {
+      return FEED_ADAPTERS[streamSource];
+    }
+    const customMode = sourceModes.find((m) => m.id === streamSource);
+    if (customMode) {
+      return createConfiguredFeedAdapter(customMode);
+    }
+    return FEED_ADAPTERS.all;
+  }, [streamSource, sourceModes]);
 
   // Thematic tabs (only tabs that actually have notes in the current staging/public view)
   const activeTabs: UnifiedFeedTab[] = useMemo(() => {
@@ -419,6 +435,9 @@ export const App: React.FC = () => {
         const targetPeriod = allPeriods.find((p) => p.id === periodId);
         if (targetPeriod?.feedSlug) {
           setSelectedFeedSlug(targetPeriod.feedSlug);
+        }
+        if (typeof window !== 'undefined') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }
     },
@@ -553,6 +572,18 @@ export const App: React.FC = () => {
     setSelectedDetailItem(null);
     closeNote();
   }, [closeNote]);
+
+  // Live subscription for open note (auto-refreshes when AI cover generated or updated by bus)
+  useLiveNoteSubscription(selectedDetailItem?.id, {
+    enabled: Boolean(selectedDetailItem),
+    intervalMs: 2500,
+    onUpdate: (updatedNote) => {
+      const [adapted] = activeAdapter.adaptNotes([updatedNote]);
+      if (adapted) {
+        setSelectedDetailItem((prev) => (prev && prev.id === adapted.id ? { ...prev, ...adapted } : prev));
+      }
+    },
+  });
 
   // Synchronize open note modal with route query param (?note=...)
   useEffect(() => {
@@ -959,8 +990,26 @@ export const App: React.FC = () => {
               setAiCoverItem(null);
               setAiCoverTemplateId(undefined);
             }}
-            onCoverApplied={() => {
+            onCoverApplied={(newCoverUrl) => {
               refetch();
+              if (selectedDetailItem && aiCoverItem && selectedDetailItem.id === aiCoverItem.id) {
+                const mainImg = {
+                  id: `img-ai-${Date.now()}`,
+                  url: newCoverUrl,
+                  isMain: true,
+                };
+                const otherImgs = (selectedDetailItem.rawPayload?.images || [])
+                  .map((img: any) => ({ ...img, isMain: false }));
+
+                setSelectedDetailItem({
+                  ...selectedDetailItem,
+                  coverUrl: newCoverUrl,
+                  rawPayload: {
+                    ...(selectedDetailItem.rawPayload || {}),
+                    images: [mainImg, ...otherImgs],
+                  },
+                });
+              }
             }}
           />
         )}
@@ -998,6 +1047,7 @@ export const App: React.FC = () => {
             }}
             onSave={handleSaveSourceTab}
             onDelete={handleDeleteSourceTab}
+            allFeeds={allFeeds}
           />
         )}
       </Suspense>
@@ -1017,7 +1067,10 @@ export const App: React.FC = () => {
       />
 
       {/* Floating Workspace Pinned Notes & Period Tracker Dock */}
-      <PinnedNotesDock onOpenNoteDetail={(id) => openNote(id)} />
+      <PinnedNotesDock
+        onOpenNoteDetail={(id) => openNote(id)}
+        onSelectPeriod={handleSelectPeriod}
+      />
     </div>
   );
 };
