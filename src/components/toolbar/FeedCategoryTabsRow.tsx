@@ -1,9 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { Plus, Pencil, X } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
+import { FeedModeOption } from './types';
+import { SymbolIcon } from '../common/SymbolIcon';
 
 export interface FeedCategoryTabsRowProps {
   streamSource: FeedSourceMode;
+  activeMode?: FeedModeOption;
   tabs: UnifiedFeedTab[];
   activeFeedSlug?: string;
   isAllSelected: boolean;
@@ -18,6 +21,7 @@ export interface FeedCategoryTabsRowProps {
 
 export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   streamSource,
+  activeMode,
   tabs,
   activeFeedSlug,
   isAllSelected,
@@ -34,10 +38,15 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   const isEntertainment = streamSource === 'entertainment';
   const isHolidays = streamSource === 'holidays' || streamSource === 'classic';
 
+  const tagsFilter = activeMode?.filterConfig?.tags;
+  const isTagSandbox = tagsFilter && tagsFilter.length > 0;
+
   const allLabel = isAll
     ? 'Все публикации'
     : isPrivateFeeds
     ? 'Все приватные'
+    : isTagSandbox
+    ? `Все (${tagsFilter.map((t) => `#${t}`).join(' ')})`
     : isItDev
     ? 'Все IT потоки'
     : isSeasons
@@ -46,9 +55,13 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
     ? 'Все релизы'
     : isHolidays
     ? 'Все праздники'
+    : activeMode?.label
+    ? `Все ${activeMode.label}`
     : 'Все каналы';
 
-  const allEmoji = isAll
+  const allEmoji = isTagSandbox
+    ? activeMode?.emoji || '📥'
+    : isAll
     ? '🌐'
     : isPrivateFeeds
     ? '🔮'
@@ -60,7 +73,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
     ? '🍿'
     : isHolidays
     ? '🎉'
-    : '📡';
+    : activeMode?.emoji || '📡';
 
   const activeTabWithSubtopics = tabs.find(
     (t) =>
@@ -108,7 +121,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
               : 'bg-white/90 dark:bg-[#18222d]/90 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:border-[#2481cc]/40 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-[#1f2b38]'
           }`}
         >
-          <span>{allEmoji}</span>
+          <SymbolIcon icon={allEmoji} fallback="📡" className="text-xs" />
           <span>{allLabel}</span>
           <span
             className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full leading-tight font-medium ${
@@ -152,7 +165,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
                   : 'bg-white/90 dark:bg-[#18222d]/90 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:border-[#2481cc]/40 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-[#1f2b38]'
               }`}
             >
-              <span>{tab.emoji}</span>
+              <SymbolIcon icon={tab.emoji} fallback="📁" className="text-xs" />
               <span>{tab.shortTitle}</span>
 
               {tab.isHot && (
@@ -255,7 +268,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
                     : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
                 }`}
               >
-                <span>{sub.emoji}</span>
+                <SymbolIcon icon={sub.emoji} fallback="📁" className="text-xs" />
                 <span>{sub.title}</span>
                 <span className="font-mono text-[9px] opacity-80">
                   {sub.count}

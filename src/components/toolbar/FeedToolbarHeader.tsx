@@ -10,6 +10,7 @@ import {
   Calendar as CalendarIcon,
   Pencil,
   Check,
+  Plus,
 } from 'lucide-react';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import { LemonLogo } from '../LemonLogo';
@@ -24,6 +25,7 @@ export interface FeedToolbarHeaderProps {
   onToggleEditMode?: () => void;
 
   // Actions
+  onCreateNote?: () => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
   isDarkMode: boolean;
@@ -41,6 +43,7 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
   isPublicMode = false,
   isEditMode = false,
   onToggleEditMode,
+  onCreateNote,
   onRefresh,
   isRefreshing,
   isDarkMode,
@@ -199,6 +202,20 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
             aria-label="Режим редактирования"
           >
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Create Note Action */}
+        {!isPublicMode && onCreateNote && (
+          <button
+            type="button"
+            onClick={onCreateNote}
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-[11px] sm:text-xs font-semibold shadow-xs shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Создать новую запись в ленту"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline">Заметка</span>
+            <span className="xs:hidden">Запись</span>
           </button>
         )}
 

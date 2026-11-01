@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
 import dayjs from 'dayjs';
-import { Radio, Inbox } from 'lucide-react';
+import { Radio, Inbox, Plus } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedPostCard } from './FeedPostCard';
 import { FeedAppRuntimeMode } from '../utils/appMode';
@@ -27,6 +27,7 @@ export interface FeedStreamViewProps {
   loadMoreRef?: RefObject<HTMLDivElement>;
   layoutMode?: 'split' | 'stream';
   appMode?: FeedAppRuntimeMode;
+  onCreateNote?: () => void;
   onApprovePublish?: (item: UnifiedFeedItem) => void;
   onUnpublishToStaging?: (item: UnifiedFeedItem) => void;
   onReturnToPrivate?: (item: UnifiedFeedItem) => void;
@@ -60,6 +61,7 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   loadMoreRef,
   layoutMode = 'split',
   appMode = 'staging',
+  onCreateNote,
   onApprovePublish,
   onUnpublishToStaging,
   onReturnToPrivate,
@@ -124,6 +126,18 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                 >
                   Показать все даты
                 </button>
+              )}
+              {onCreateNote && appMode !== 'public' && !searchQuery && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={onCreateNote}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Создать первую запись</span>
+                  </button>
+                </div>
               )}
             </div>
           ) : (

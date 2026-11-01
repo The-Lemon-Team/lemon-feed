@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { PeriodItem } from '../../utils/periods';
+import { SymbolIcon } from '../common/SymbolIcon';
 
 export interface FeedActivitiesMobileCarouselProps {
   periods: PeriodItem[];
@@ -53,7 +54,7 @@ export const FeedActivitiesMobileCarousel: React.FC<FeedActivitiesMobileCarousel
                   : 'bg-white/90 dark:bg-[#18222d] border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5'
               }`}
             >
-              <span>{p.emoji}</span>
+              <SymbolIcon icon={p.emoji} fallback="⏱️" className="text-xs shrink-0" />
               <span className={`text-[9px] ${isSelected ? 'text-white' : statusDot}`}>●</span>
               <span className="max-w-[140px] truncate">{p.title}</span>
             </button>

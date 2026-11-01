@@ -20,11 +20,16 @@ import {
 } from './workspaceDnd.utils';
 
 export interface PinnedNotesDockProps {
-  onOpenNoteDetail?: (noteId: string) => void;
+  onOpenNoteDetail?: (noteId: string, note?: any) => void;
   onSelectPeriod?: (periodId?: string) => void;
+  disableEscClose?: boolean;
 }
 
-export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDetail }) => {
+export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({
+  onOpenNoteDetail,
+  onSelectPeriod,
+  disableEscClose = false,
+}) => {
   const {
     workspaces,
     activeWorkspaceId,
@@ -121,12 +126,13 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
     onAutoExpandTrack: handleAutoExpandTrack,
   });
 
-  // Escape key handling per AGENTS.md (defers to @dnd-kit cancel while actively dragging)
+  // Escape key handling per AGENTS.md (defers to @dnd-kit cancel while actively dragging or when nested modal is open)
   useEffect(() => {
-    if (!isDockOpen) return;
+    if (!isDockOpen || disableEscClose) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === 'Escape' &&
+        !disableEscClose &&
         !isDragging &&
         !isLinkModalOpen &&
         !isCreateWorkspaceOpen &&
@@ -140,6 +146,7 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({ onOpenNoteDeta
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     isDockOpen,
+    disableEscClose,
     isDragging,
     isLinkModalOpen,
     isCreateWorkspaceOpen,

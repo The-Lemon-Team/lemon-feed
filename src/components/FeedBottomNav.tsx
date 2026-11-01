@@ -4,6 +4,7 @@ import {
   Layers,
   Search,
   Calendar,
+  Plus,
 } from 'lucide-react';
 import { LemonLogo } from './LemonLogo';
 
@@ -12,6 +13,8 @@ export interface FeedBottomNavProps {
   onSelectTab: (tab: 'stream' | 'categories' | 'search') => void;
   onOpenCalendar?: () => void;
   onOpenLemonSeasons?: () => void;
+  onCreateNote?: () => void;
+  isPublicMode?: boolean;
 }
 
 export const FeedBottomNav: React.FC<FeedBottomNavProps> = ({
@@ -19,6 +22,8 @@ export const FeedBottomNav: React.FC<FeedBottomNavProps> = ({
   onSelectTab,
   onOpenCalendar,
   onOpenLemonSeasons,
+  onCreateNote,
+  isPublicMode = false,
 }) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 sm:hidden bg-white/95 dark:bg-[#18222d]/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-white/[0.08] transition-colors pb-[max(0.5rem,var(--sab))]">
@@ -51,7 +56,22 @@ export const FeedBottomNav: React.FC<FeedBottomNavProps> = ({
           <span className="text-[10px] font-medium leading-none">Категории</span>
         </button>
 
-        {/* 3. Search */}
+        {/* 3. Create Note (Mobile Quick Add) */}
+        {!isPublicMode && onCreateNote && (
+          <button
+            type="button"
+            onClick={onCreateNote}
+            className="flex flex-col items-center gap-0.5 py-0.5 px-2.5 rounded-xl text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+            title="Создать новую заметку"
+          >
+            <div className="w-6 h-6 rounded-lg bg-emerald-500/15 dark:bg-emerald-400/20 flex items-center justify-center">
+              <Plus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <span className="text-[10px] font-semibold leading-none">Заметка</span>
+          </button>
+        )}
+
+        {/* 4. Search */}
         <button
           type="button"
           onClick={() => onSelectTab('search')}

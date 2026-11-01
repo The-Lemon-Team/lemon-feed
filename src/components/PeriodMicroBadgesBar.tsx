@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PeriodMicroBadge } from '../utils/periods';
 import { X } from 'lucide-react';
+import { SymbolIcon } from './common/SymbolIcon';
 
 export interface PeriodMicroBadgesBarProps {
   badges: PeriodMicroBadge[];
@@ -60,7 +61,7 @@ export const PeriodMicroBadgesBar: React.FC<PeriodMicroBadgesBarProps> = ({
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/30 text-violet-700 dark:text-violet-300 font-mono hover:bg-violet-500/20 transition-colors cursor-pointer"
           title={`Период: ${b.title}${b.isBound ? ' (связанная публикация)' : ''}`}
         >
-          <span>{b.emoji}</span>
+          <SymbolIcon icon={b.emoji} fallback="⏱️" className="text-xs" />
           <span className="max-w-[110px] truncate">{b.title}</span>
         </button>
       ))}
@@ -114,7 +115,7 @@ export const PeriodMicroBadgesBar: React.FC<PeriodMicroBadgesBarProps> = ({
                     className="w-full flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-violet-500/10 dark:hover:bg-violet-500/20 text-left transition-colors cursor-pointer border border-transparent hover:border-violet-500/20"
                   >
                     <span className="flex items-center gap-1.5 truncate text-slate-800 dark:text-slate-200 font-medium text-[11px] min-w-0 flex-1">
-                      <span className="text-sm shrink-0">{b.emoji}</span>
+                      <SymbolIcon icon={b.emoji} fallback="⏱️" className="text-sm shrink-0" />
                       <span className="truncate">{b.title}</span>
                     </span>
                     <div className="flex items-center gap-1 shrink-0 ml-1.5">

@@ -12,6 +12,7 @@ import {
   Sparkles,
   Edit3,
 } from 'lucide-react';
+import { SymbolIcon } from './common/SymbolIcon';
 
 export interface FeedDetailModalProps {
   item: UnifiedFeedItem | null;
@@ -111,15 +112,15 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-white/[0.08]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc]">
-              {item.avatarIcon}
+            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc] overflow-hidden">
+              <SymbolIcon icon={item.avatarIcon} fallback="✨" className="text-base" />
             </div>
             <div className="min-w-0">
               <h4 className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
                 {item.channelTitle}
               </h4>
               <span className="text-[11px] font-mono text-slate-400">
-                @{item.channelHandle}
+                @{item.channelHandle.replace(/^@+/, '')}
               </span>
             </div>
           </div>

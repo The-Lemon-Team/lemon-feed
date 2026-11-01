@@ -22,7 +22,7 @@ export interface WorkspaceTrackItemProps {
   onToggleFocus: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onToggleAttention: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onUnpin: (id: string) => void;
-  onOpenDetail?: (noteId: string) => void;
+  onOpenDetail?: (noteId: string, note?: any) => void;
   onDeleteTrack?: (track: WorkspaceTrack) => void;
 }
 

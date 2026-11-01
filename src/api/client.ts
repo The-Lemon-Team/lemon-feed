@@ -86,6 +86,25 @@ export interface CreateFeedPayload {
 
 export type UpdateFeedPayload = Partial<CreateFeedPayload>;
 
+export interface CreateNotePayload {
+  title: string;
+  description?: string;
+  summary?: string;
+  type?: 'SINGLE' | 'PERIOD' | 'EVENT' | 'FILM_RELEASE' | 'MENTION' | 'DONE';
+  startDate?: string;
+  endDate?: string | null;
+  feedId?: string | null;
+  publicFeedId?: string | null;
+  folderPath?: string;
+  author?: string;
+  curator?: string;
+  sourceLink?: string;
+  hashtags?: string[];
+  status?: 'DRAFT' | 'PUBLISHED' | 'SCHEDULED' | 'ARCHIVED';
+  privacy?: 'private' | 'public';
+  publishAt?: string | null;
+}
+
 export interface UpdateNotePayload {
   title?: string;
   description?: string;
@@ -168,6 +187,11 @@ export const feedApi = {
 
   getNoteById: async (id: string): Promise<Note> => {
     const res = await apiClient.get<Note>(`/notes/${id}`);
+    return res.data;
+  },
+
+  createNote: async (data: CreateNotePayload): Promise<Note> => {
+    const res = await apiClient.post<Note>('/notes', data);
     return res.data;
   },
 

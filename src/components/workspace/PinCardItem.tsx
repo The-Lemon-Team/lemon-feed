@@ -15,7 +15,7 @@ export interface PinCardItemProps {
   onToggleFocus?: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onToggleAttention: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onUnpin: (pinId: string) => void;
-  onOpenDetail?: (noteId: string) => void;
+  onOpenDetail?: (noteId: string, note?: any) => void;
 
   // DnD / Visual state
   showDragHandle?: boolean;
@@ -149,7 +149,18 @@ export const PinCardItem: React.FC<PinCardItemProps> = memo(
                 </span>
               )}
 
-              <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+              <span
+                onClick={(e) => {
+                  if (onOpenDetail && !isOverlay) {
+                    e.stopPropagation();
+                    onOpenDetail(pin.noteId, pin.note);
+                  }
+                }}
+                className={`text-xs font-semibold text-slate-900 dark:text-white truncate ${
+                  onOpenDetail ? 'cursor-pointer hover:underline hover:text-blue-500 transition-colors' : ''
+                }`}
+                title={pin.note?.title || 'Заметка'}
+              >
                 {pin.note?.title || 'Заметка'}
               </span>
 
@@ -197,10 +208,15 @@ export const PinCardItem: React.FC<PinCardItemProps> = memo(
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onOpenDetail(pin.noteId);
+                    if (e.ctrlKey || e.metaKey || e.button === 1) {
+                      const noteUrl = `/notes/${pin.noteId}`;
+                      window.open(noteUrl, '_blank');
+                      return;
+                    }
+                    onOpenDetail(pin.noteId, pin.note);
                   }}
                   className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
-                  title="Открыть заметку"
+                  title="Открыть заметку (Ctrl+клик — в новой вкладке)"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
@@ -252,7 +268,7 @@ export interface SortablePinCardItemProps {
   onToggleFocus?: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onToggleAttention: (pin: WorkspacePin, e: React.MouseEvent) => void;
   onUnpin: (pinId: string) => void;
-  onOpenDetail?: (noteId: string) => void;
+  onOpenDetail?: (noteId: string, note?: any) => void;
 }
 
 const SORTABLE_TRANSITION = {

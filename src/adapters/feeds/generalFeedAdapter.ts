@@ -155,7 +155,7 @@ export const GeneralFeedAdapter: FeedAdapter = {
         sourceType: 'general',
         feedSlug: n.feed?.slug || preset.slug,
         channelTitle: preset.title,
-        channelHandle: `@${preset.slug}`,
+        channelHandle: preset.slug,
         avatarIcon: preset.emoji,
         category: badge,
         title: n.title,

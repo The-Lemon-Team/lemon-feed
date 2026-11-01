@@ -107,7 +107,7 @@ export const PrivateFeedsAdapter: FeedAdapter = {
       .map((n) => {
         const cover = extractNoteCoverUrl(n);
         const channelTitle = n.feed?.title || 'Приватный контур';
-        const channelHandle = `@private/${n.feed?.slug || 'vault'}`;
+        const channelHandle = `private/${n.feed?.slug || 'vault'}`;
         const avatarIcon = n.feed?.icon || '🔒';
 
         return {

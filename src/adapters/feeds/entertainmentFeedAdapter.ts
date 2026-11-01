@@ -180,7 +180,7 @@ export const EntertainmentFeedAdapter: FeedAdapter = {
         sourceType: 'entertainment',
         feedSlug: n.feed?.slug || preset.slug,
         channelTitle: preset.title,
-        channelHandle: `@${preset.slug}`,
+        channelHandle: preset.slug,
         avatarIcon: preset.emoji,
         category: badge,
         title: n.title,

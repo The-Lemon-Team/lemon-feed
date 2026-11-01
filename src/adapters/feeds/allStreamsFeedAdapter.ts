@@ -388,8 +388,8 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
         feedSlug: n.feed?.slug || 'general',
         channelTitle,
         channelHandle: isDaily
-          ? `@daily/${(n.feed?.slug || 'feed').replace(/^spark-/, '')}`
-          : `@${n.feed?.slug || 'lenta'}`,
+          ? `daily/${(n.feed?.slug || 'feed').replace(/^spark-/, '')}`
+          : `${n.feed?.slug || 'lenta'}`,
         avatarIcon: isDaily ? resolveAvatarIcon(n) : isHol ? '🎉' : isEnt ? '🍿' : isIt ? '💻' : '🍋',
         category: categoryBadge,
         title: n.title,

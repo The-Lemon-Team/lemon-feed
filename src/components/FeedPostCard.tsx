@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import { PeriodItem, extractPeriodMicroBadges } from '../utils/periods';
 import { PeriodMicroBadgesBar } from './PeriodMicroBadgesBar';
 import { NotePinButton } from './workspace/NotePinButton';
+import { SymbolIcon } from './common/SymbolIcon';
 import {
   Clock,
   Flame,
@@ -182,8 +183,8 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
       )}
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/20 border border-slate-200 dark:border-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc] dark:text-[#64b5f6]">
-            {item.avatarIcon}
+          <div className="w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/20 border border-slate-200 dark:border-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc] dark:text-[#64b5f6] overflow-hidden">
+            <SymbolIcon icon={item.avatarIcon} fallback="✨" className="text-base" />
           </div>
 
           <div className="min-w-0 leading-tight">
@@ -192,7 +193,7 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
                 {item.channelTitle}
               </span>
               <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                @{item.channelHandle}
+                @{item.channelHandle.replace(/^@+/, '')}
               </span>
             </div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 import { Calendar, ChevronRight, Sparkles } from 'lucide-react';
 import { PeriodItem } from '../../utils/periods';
+import { SymbolIcon } from '../common/SymbolIcon';
 
 export interface FeedActivitiesRailSectionProps {
   periods: PeriodItem[];
@@ -52,7 +53,7 @@ export const FeedActivitiesRailSection: React.FC<FeedActivitiesRailSectionProps>
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-sm">{p.emoji}</span>
+                  <SymbolIcon icon={p.emoji} fallback="⏱️" className="text-base shrink-0" />
                   <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${statusBadge.class}`}>
                     {statusBadge.text}
                   </span>

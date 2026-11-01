@@ -33,6 +33,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   upcomingCount,
   isDarkMode,
   onToggleTheme,
+  onCreateNote,
   onRefresh,
   isRefreshing,
   onOpenLemonSeasons,
@@ -64,6 +65,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         isPublicMode={isPublicMode}
         isEditMode={isEditMode}
         onToggleEditMode={onToggleEditMode}
+        onCreateNote={onCreateNote}
         onRefresh={onRefresh}
         isRefreshing={isRefreshing}
         isDarkMode={isDarkMode}
@@ -89,6 +91,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
       {streamSource !== 'telegram' && (
         <FeedCategoryTabsRow
           streamSource={streamSource}
+          activeMode={sourceModes?.find((m) => m.id === streamSource)}
           tabs={tabs}
           activeFeedSlug={activeFeedSlug}
           isAllSelected={isAllSelected}

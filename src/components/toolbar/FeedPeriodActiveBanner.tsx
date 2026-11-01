@@ -2,6 +2,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 import { X, Target, Globe, Calendar } from 'lucide-react';
 import { PeriodItem, PeriodFilterMode } from '../../utils/periods';
+import { SymbolIcon } from '../common/SymbolIcon';
 
 export interface FeedPeriodActiveBannerProps {
   period: PeriodItem;
@@ -31,8 +32,8 @@ export const FeedPeriodActiveBanner: React.FC<FeedPeriodActiveBannerProps> = ({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-transparent dark:from-violet-500/15 dark:via-indigo-500/15 border border-violet-500/25 text-xs select-none">
       <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center text-lg shrink-0">
-          {period.emoji}
+        <div className="w-8 h-8 rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center text-lg shrink-0 overflow-hidden">
+          <SymbolIcon icon={period.emoji} fallback="⏱️" className="text-xl" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

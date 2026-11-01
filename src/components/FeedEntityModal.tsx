@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Feed } from '@lenta/shared';
 import { UnifiedFeedTab } from '../adapters/feeds/types';
 import { useCreateFeed, useUpdateFeed, useDeleteFeed } from '../api/queries';
+import { SymbolIcon } from './common/SymbolIcon';
 import {
   X,
   Save,
@@ -232,7 +233,7 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
               className="w-8 h-8 rounded-xl flex items-center justify-center text-lg border shadow-2xs"
               style={{ backgroundColor: `${color}20`, borderColor: `${color}40` }}
             >
-              <span>{emoji}</span>
+              <SymbolIcon icon={emoji} fallback="📁" className="text-lg" style={{ color }} />
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">

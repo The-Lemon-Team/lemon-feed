@@ -3,6 +3,7 @@ import {
   feedApi,
   CreateFeedPayload,
   UpdateFeedPayload,
+  CreateNotePayload,
   UpdateNotePayload,
   GenerateAiCoverPayload,
   GenerateAiBatchPayload,
@@ -79,6 +80,19 @@ export function useDeleteFeed() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+    },
+  });
+}
+
+export function useCreateNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateNotePayload) => {
+      return await feedApi.createNote(data);
+    },
+    onSuccess: (newNote) => {
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
     },
   });
 }

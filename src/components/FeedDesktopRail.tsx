@@ -6,14 +6,17 @@ import {
   TrendingUp,
   Sparkles,
   Tag,
+  Plus,
 } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../adapters/feeds/types';
+import { FeedModeOption } from './toolbar/types';
 import { LemonLogo } from './LemonLogo';
 import { PeriodItem } from '../utils/periods';
 import { FeedActivitiesRailSection } from './activities/FeedActivitiesRailSection';
 
 export interface FeedDesktopRailProps {
   sourceType: FeedSourceMode;
+  activeMode?: FeedModeOption;
   activeFeed: UnifiedFeedTab | null;
   tabs: UnifiedFeedTab[];
   selectedFeedSlug?: string;
@@ -25,6 +28,7 @@ export interface FeedDesktopRailProps {
   onNavigateToCalendar?: () => void;
   currentMonthName?: string;
   isPublicMode?: boolean;
+  onCreateNote?: () => void;
 
   periods?: PeriodItem[];
   selectedPeriodId?: string;
@@ -33,6 +37,7 @@ export interface FeedDesktopRailProps {
 
 export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   sourceType,
+  activeMode,
   activeFeed,
   tabs,
   selectedFeedSlug,
@@ -44,17 +49,18 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   onNavigateToCalendar,
   currentMonthName = 'октябрь 2026',
   isPublicMode = false,
+  onCreateNote,
   periods = [],
   selectedPeriodId,
   onSelectPeriod,
 }) => {
   const isAll = sourceType === 'all';
+  const isTelegram = sourceType === 'telegram';
   const isPrivateFeeds = sourceType === 'private_feeds';
   const isItDev = sourceType === 'it_dev' || sourceType === 'spark' || sourceType === 'dev';
   const isSeasons = sourceType === 'seasons';
   const isEntertainment = sourceType === 'entertainment';
   const isHolidays = sourceType === 'holidays' || sourceType === 'classic';
-  const isTelegram = sourceType === 'telegram';
 
   const activeRailTabRef = useRef<HTMLButtonElement | null>(null);
 
@@ -71,6 +77,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.category
     : isAll
     ? 'Все потоки'
+    : activeMode?.label
+    ? activeMode.label
     : isPrivateFeeds
     ? 'Private Feeds'
     : isItDev
@@ -89,6 +97,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.emoji
     : isAll
     ? '🌐'
+    : activeMode?.emoji
+    ? activeMode.emoji
     : isPrivateFeeds
     ? '🔮'
     : isItDev
@@ -107,6 +117,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.title
     : isAll
     ? 'Все ленты и события'
+    : activeMode?.label
+    ? `${activeMode.label} — Лента`
     : isPrivateFeeds
     ? 'Private Feeds — Защищенный контур'
     : isItDev
@@ -125,6 +137,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? activeFeed.description
     : isAll
     ? 'Сквозной хронологический поток всех публикаций, новостей, дневников и дат'
+    : activeMode?.description
+    ? activeMode.description
     : isPrivateFeeds
     ? 'Приватные ленты, защищенные потоки и внутренние заметки рабочей станции'
     : isItDev
@@ -286,6 +300,33 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
           </div>
         )}
       </div>
+
+      {/* Quick Add Note to Feed Button (Hidden in Public Mode) */}
+      {!isPublicMode && onCreateNote && (
+        <button
+          type="button"
+          onClick={onCreateNote}
+          className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/95 dark:bg-[#18222d]/95 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border border-slate-200/80 dark:border-white/[0.08] hover:border-emerald-500/40 dark:hover:border-emerald-500/30 shadow-soft group transition-all cursor-pointer text-left"
+          title="Добавить новую заметку"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
+              <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <span>Новая запись</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                {activeFeed ? `в ${activeFeed.title}` : 'в общий поток'}
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+            + Note
+          </span>
+        </button>
+      )}
 
       {/* 2. Channel Activities / Periods Section */}
       {onSelectPeriod && periods.length > 0 && (

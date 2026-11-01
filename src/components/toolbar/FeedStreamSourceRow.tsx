@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Pencil } from 'lucide-react';
 import { FeedSourceMode } from '../../adapters/feeds/types';
 import { FeedModeOption, DEFAULT_FEED_MODES } from './types';
+import { SymbolIcon } from '../common/SymbolIcon';
 
 export interface FeedStreamSourceRowProps {
   streamSource: FeedSourceMode;
@@ -52,7 +53,7 @@ export const FeedStreamSourceRow: React.FC<FeedStreamSourceRowProps> = ({
                   : `Переключить на: ${mode.label}`
               }
             >
-              <span>{mode.emoji}</span>
+              <SymbolIcon icon={mode.emoji} fallback="📁" className="text-xs" />
               <span>{mode.label}</span>
 
               {mode.badge && (

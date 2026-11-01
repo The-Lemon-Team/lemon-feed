@@ -372,7 +372,7 @@ export const ItDevFeedAdapter: FeedAdapter = {
         sourceType: 'it_dev',
         feedSlug: n.feed?.slug || 'it-dev',
         channelTitle: n.feed?.title || 'IT & Dev',
-        channelHandle: `@${n.feed?.slug || 'it-dev'}`,
+        channelHandle: n.feed?.slug || 'it-dev',
         avatarIcon: changelogSub
           ? '🚀'
           : nbSub
