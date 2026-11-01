@@ -1,5 +1,4 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import { buildSafeNoteUpdatePayload, type NoteFormValues } from '../noteFormPayload';
 import type { UnifiedFeedItem } from '../../adapters/feeds/types';
 
@@ -40,10 +39,10 @@ describe('buildSafeNoteUpdatePayload', () => {
     const payload = buildSafeNoteUpdatePayload(mockBaseItem, formValues);
 
     // CRITICAL: startDate must retain the full ISO time (18:00:00.000Z), not truncated to 00:00:00.000Z!
-    assert.strictEqual(payload.startDate, '2026-10-31T18:00:00.000Z');
+    expect(payload.startDate).toBe('2026-10-31T18:00:00.000Z');
     // CRITICAL: publishAt must NOT be overwritten with new Date() if already published historically!
-    assert.strictEqual(payload.publishAt, undefined);
-    assert.strictEqual(payload.status, 'PUBLISHED');
+    expect(payload.publishAt).toBe(undefined);
+    expect(payload.status).toBe('PUBLISHED');
   });
 
   it('preserves existing publishAt timestamp if note was already published with a timestamp', () => {
@@ -69,8 +68,8 @@ describe('buildSafeNoteUpdatePayload', () => {
     const payload = buildSafeNoteUpdatePayload(itemWithPublishAt, formValues, () => fixedNow);
 
     // Existing publishAt MUST NOT be reset to fixedNow
-    assert.strictEqual(payload.publishAt, '2026-10-25T10:00:00.000Z');
-    assert.strictEqual(payload.startDate, '2026-10-31T18:00:00.000Z');
+    expect(payload.publishAt).toBe('2026-10-25T10:00:00.000Z');
+    expect(payload.startDate).toBe('2026-10-31T18:00:00.000Z');
   });
 
   it('sets publishAt to current time when transitioning from DRAFT to PUBLISHED for the first time', () => {
@@ -95,8 +94,8 @@ describe('buildSafeNoteUpdatePayload', () => {
     const fixedNow = new Date('2026-10-31T07:23:50.000Z');
     const payload = buildSafeNoteUpdatePayload(draftItem, formValues, () => fixedNow);
 
-    assert.strictEqual(payload.publishAt, '2026-10-31T07:23:50.000Z');
-    assert.strictEqual(payload.status, 'PUBLISHED');
+    expect(payload.publishAt).toBe('2026-10-31T07:23:50.000Z');
+    expect(payload.status).toBe('PUBLISHED');
   });
 
   it('clears publishAt when unpublishing to DRAFT', () => {
@@ -119,8 +118,8 @@ describe('buildSafeNoteUpdatePayload', () => {
     };
 
     const payload = buildSafeNoteUpdatePayload(publishedItem, formValues);
-    assert.strictEqual(payload.publishAt, null);
-    assert.strictEqual(payload.status, 'DRAFT');
+    expect(payload.publishAt).toBe(null);
+    expect(payload.status).toBe('DRAFT');
   });
 
   it('updates startDate while preserving time if user explicitly changes eventDate', () => {
@@ -135,6 +134,6 @@ describe('buildSafeNoteUpdatePayload', () => {
 
     const payload = buildSafeNoteUpdatePayload(mockBaseItem, formValues);
     // Should apply new date (2026-11-01) with original hours/minutes (18:00:00.000Z)
-    assert.strictEqual(payload.startDate, '2026-11-01T18:00:00.000Z');
+    expect(payload.startDate).toBe('2026-11-01T18:00:00.000Z');
   });
 });
