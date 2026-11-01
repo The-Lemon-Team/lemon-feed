@@ -80,13 +80,21 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch((err) => {
-          console.warn('Audio play notice:', err);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined && typeof playPromise.then === 'function') {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+            })
+            .catch((err) => {
+              console.warn('Audio play notice:', err);
+              setIsPlaying(true);
+              setTimeout(() => setIsPlaying(false), 5000);
+            });
+        } else {
           setIsPlaying(true);
           setTimeout(() => setIsPlaying(false), 5000);
-        });
+        }
       }
     } else {
       setIsPlaying((prev) => !prev);
