@@ -140,7 +140,7 @@ describe('FeedEditNoteModal', () => {
       ['dev', { privacy: 'private', status: 'DRAFT' }],
       ['staging', { privacy: 'public', status: 'DRAFT' }],
       ['public', { privacy: 'public', status: 'PUBLISHED' }],
-    ] as const)('publication stage "%s" maps to privacy/status', async (key, expected) => {
+    ] as const)('[BUG-007] publication stage "%s" maps to privacy/status', async (key, expected) => {
       const api = mockPatch();
       renderWithProviders(<FeedEditNoteModal item={makeFeedItem()} onClose={vi.fn()} />);
       await userEvent.click(stage(key));

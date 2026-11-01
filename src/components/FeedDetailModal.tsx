@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { resolveMediaUrl } from '../api/client';
+import { cleanNoteMarkdown } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -174,7 +175,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
           {/* Full Markdown Text */}
           <div className="feed-prose text-slate-700 dark:text-slate-200 text-sm leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {item.description}
+              {cleanNoteMarkdown(item.description, { title: item.title })}
             </ReactMarkdown>
           </div>
 

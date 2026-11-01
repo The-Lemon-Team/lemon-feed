@@ -124,7 +124,7 @@ export const PrivateFeedsAdapter: FeedAdapter = {
           },
           title: n.title,
           description: n.description || '',
-          summary: n.description || null,
+          summary: (n as any).summary || null,
           publishedAt: n.startDate ? new Date(n.startDate).toISOString() : new Date().toISOString(),
           updatedAt: n.updatedAt ? new Date(n.updatedAt).toISOString() : null,
           sourceLink: n.sourceLink,
