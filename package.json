@@ -6,8 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "dev": "vite --port 5175",
-    "dev:public": "vite --port 5176 --mode public",
+    "dev": "vite --port 5180",
+    "dev:public": "vite --port 5181 --mode public",
     "build": "tsc -b && vite build",
     "build:public": "tsc -b && vite build --mode public",
     "preview": "vite preview --port 5175",

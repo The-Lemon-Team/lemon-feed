@@ -271,7 +271,10 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
                 type="button"
                 onClick={() => onSelectFeed(activeFeed.slug)}
                 className={`px-2 py-0.5 rounded-full font-mono text-[10px] transition-colors cursor-pointer ${
-                  !selectedFeedSlug || selectedFeedSlug === activeFeed.slug
+                  !selectedFeedSlug ||
+                  selectedFeedSlug === activeFeed.slug ||
+                  (activeFeed.slug === 'spark-changelogsfeed' && (selectedFeedSlug === 'changelogs' || selectedFeedSlug === 'changelog')) ||
+                  (activeFeed.slug === 'spark-notebooklmai' && (selectedFeedSlug === 'notebooklm' || selectedFeedSlug === 'notebooklmai'))
                     ? 'bg-[#2481cc]/20 text-[#2481cc] dark:text-[#64b5f6] font-semibold border border-[#2481cc]/30 shadow-2xs'
                     : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 border border-transparent'
                 }`}
@@ -280,7 +283,9 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
               </button>
 
               {activeFeed.subtopics.map((sub) => {
-                const isSubActive = selectedFeedSlug === sub.slug;
+                const isSubActive =
+                  selectedFeedSlug === sub.slug ||
+                  (sub.subfolder && selectedFeedSlug?.endsWith(`-${sub.subfolder}`));
                 return (
                   <button
                     key={sub.id}
@@ -372,7 +377,17 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
           {tabs.map((tab) => {
             const isSelected =
               selectedFeedSlug === tab.slug ||
-              Boolean(tab.subtopics && tab.subtopics.some((s) => s.slug === selectedFeedSlug));
+              (tab.slug === 'spark-changelogsfeed' && (selectedFeedSlug === 'changelogs' || selectedFeedSlug === 'changelog')) ||
+              (tab.slug === 'spark-notebooklmai' && (selectedFeedSlug === 'notebooklm' || selectedFeedSlug === 'notebooklmai')) ||
+              Boolean(
+                tab.subtopics &&
+                  tab.subtopics.some(
+                    (s) =>
+                      s.slug === selectedFeedSlug ||
+                      s.subfolder === selectedFeedSlug ||
+                      (s.subfolder && selectedFeedSlug?.endsWith(`-${s.subfolder}`))
+                  )
+              );
             return (
               <button
                 key={tab.id}

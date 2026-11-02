@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import type { Note } from '@lenta/shared';
 import type { UnifiedFeedItem } from '../../adapters/feeds/types';
 import {
+  calculatePeriodMetrics,
   extractPeriodItems,
   extractPeriodMicroBadges,
   filterNotesByHorizon,
@@ -52,6 +53,44 @@ const period = (over: Partial<PeriodItem> = {}): PeriodItem => ({
   hashtags: [],
   rawNote: note(),
   ...over,
+});
+
+describe('calculatePeriodMetrics', () => {
+  it('detects ending soon when 95% elapsed and hours remain', () => {
+    // 20-day period: 2026-10-12 to 2026-11-01T12:00:00. Now is 2026-10-31T12:00:00 (19/20 = 95%)
+    const metrics = calculatePeriodMetrics(
+      '2026-10-12T12:00:00',
+      '2026-11-01T12:00:00',
+      NOW
+    );
+    expect(metrics.status).toBe('active');
+    expect(metrics.progressPercent).toBe(95);
+    expect(metrics.isEndingSoon).toBe(true);
+    expect(metrics.timeRemainingText).toBe('1 дн.');
+  });
+
+  it('detects ending soon when remaining time <= 72h even with lower percent', () => {
+    // 100-day period, 3 days left
+    const metrics = calculatePeriodMetrics(
+      '2026-07-26T12:00:00',
+      '2026-11-02T12:00:00',
+      NOW // 2026-10-31T12:00:00 => 48h left
+    );
+    expect(metrics.status).toBe('active');
+    expect(metrics.isEndingSoon).toBe(true);
+    expect(metrics.timeRemainingText).toBe('2 дн.');
+  });
+
+  it('not ending soon for early period', () => {
+    const metrics = calculatePeriodMetrics(
+      '2026-10-30T12:00:00',
+      '2026-11-30T12:00:00',
+      NOW
+    );
+    expect(metrics.status).toBe('active');
+    expect(metrics.isEndingSoon).toBe(false);
+    expect(metrics.progressPercent).toBeLessThan(10);
+  });
 });
 
 describe('getPeriodActivityStatus', () => {
@@ -105,6 +144,21 @@ describe('extractPeriodItems', () => {
       note({ id: 'd', title: 'Real period' }),
     ]);
     expect(result.map((p) => p.id)).toEqual(['d']);
+  });
+
+  it('preserves multi-day summary digests when endDate is specified', () => {
+    const result = extractPeriodItems([
+      note({
+        id: 'wow-beta',
+        title: 'Сводный дайджест World of Warcraft за октябрь 2026',
+        startDate: '2026-10-15T00:00:00',
+        endDate: '2026-11-02T12:00:00',
+      }),
+    ]);
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('wow-beta');
+    expect(result[0].isEndingSoon).toBe(true);
+    expect(result[0].progressPercent).toBeGreaterThan(80);
   });
 
   it('normalises hashtags (strings and objects, strips #, lowercases)', () => {

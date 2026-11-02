@@ -4,7 +4,8 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const isPublicMode = mode === 'public' || process.env.VITE_FEED_APP_MODE === 'public';
-  const port = isPublicMode ? 5176 : 5175;
+  const defaultPort = isPublicMode ? 5181 : 5180;
+  const port = Number(process.env.VITE_PORT || process.env.PORT || defaultPort);
   return {
   envDir: path.resolve(__dirname, '../../'),
   plugins: [react()],
@@ -34,30 +35,26 @@ export default defineConfig(({ mode }) => {
     port,
     host: true,
     allowedHosts: true,
-    hmr: {
-      clientPort: port,
-      port,
-    },
     proxy: {
       '/api/external': {
         target: 'http://localhost:4000',
         changeOrigin: true,
       },
-      '/notes': 'http://localhost:3001',
-      '/feeds': 'http://localhost:3001',
-      '/taxonomy': 'http://localhost:3001',
-      '/hashtags': 'http://localhost:3001',
-      '/folders': 'http://localhost:3001',
-      '/sync': 'http://localhost:3001',
-      '/storage': 'http://localhost:3001',
-      '/uploads': 'http://localhost:3001',
-      '/keys': 'http://localhost:3001',
-      '/containers': 'http://localhost:3001',
-      '/health': 'http://localhost:3001',
-      '/stats': 'http://localhost:3001',
-      '/api': 'http://localhost:3001',
-      '/ingestion': 'http://localhost:3001',
-      '/workspaces': 'http://localhost:3001',
+      '/notes': 'http://localhost:3002',
+      '/feeds': 'http://localhost:3002',
+      '/taxonomy': 'http://localhost:3002',
+      '/hashtags': 'http://localhost:3002',
+      '/folders': 'http://localhost:3002',
+      '/sync': 'http://localhost:3002',
+      '/storage': 'http://localhost:3002',
+      '/uploads': 'http://localhost:3002',
+      '/keys': 'http://localhost:3002',
+      '/containers': 'http://localhost:3002',
+      '/health': 'http://localhost:3002',
+      '/stats': 'http://localhost:3002',
+      '/api': 'http://localhost:3002',
+      '/ingestion': 'http://localhost:3002',
+      '/workspaces': 'http://localhost:3002',
     },
   },
   build: {

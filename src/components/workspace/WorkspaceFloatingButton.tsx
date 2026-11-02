@@ -8,6 +8,7 @@ export interface WorkspaceFloatingButtonProps {
   pinsCount: number;
   focusCount: number;
   attentionCount: number;
+  className?: string;
 }
 
 export const WorkspaceFloatingButton: React.FC<WorkspaceFloatingButtonProps> = memo(
@@ -18,16 +19,17 @@ export const WorkspaceFloatingButton: React.FC<WorkspaceFloatingButtonProps> = m
     pinsCount,
     focusCount,
     attentionCount,
+    className = '',
   }) => {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={`fixed bottom-5 right-5 z-40 flex items-center gap-2 px-3.5 py-2.5 rounded-full shadow-lg border transition-all duration-200 cursor-pointer select-none ${
+        className={`fixed bottom-[calc(4.25rem+max(0.5rem,var(--sab)))] sm:bottom-5 right-3.5 sm:right-5 z-40 flex items-center gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-full shadow-lg border transition-all duration-200 cursor-pointer select-none ${
           pinsCount > 0
             ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-700/50 hover:scale-105 shadow-xl'
             : 'bg-white dark:bg-[#18222d] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-300'
-        }`}
+        } ${className}`}
         title="Открыть рабочее пространство & Фокусные слоты"
       >
         <span

@@ -18,6 +18,7 @@ export interface PeriodMicroBadge {
   color: string;
   status: PeriodActivityStatus;
   isBound: boolean;
+  isEndingSoon?: boolean;
 }
 
 export interface PeriodItem {
@@ -32,12 +33,101 @@ export interface PeriodItem {
   startDate: string;
   endDate?: string | null;
   status: PeriodActivityStatus;
+  isEndingSoon?: boolean;
+  progressPercent?: number | null;
+  timeRemainingText?: string | null;
   hashtags: string[];
   rawNote: Note;
 }
 
+export interface PeriodMetrics {
+  status: PeriodActivityStatus;
+  isEndingSoon: boolean;
+  progressPercent: number | null;
+  timeRemainingText: string | null;
+}
+
 const DEFAULT_EMOJI = '⏱️';
 const DEFAULT_COLOR = '#8b5cf6';
+
+/**
+ * Calculates quantitative progress metrics for a period:
+ * - isEndingSoon: active and nearing end date (remaining time <= 72h or progress >= 80%)
+ * - progressPercent: percentage of elapsed duration (0..99% while active, 100% when finished)
+ * - timeRemainingText: readable remaining time e.g. '12 ч.', '2 дн.'
+ */
+export function calculatePeriodMetrics(
+  startDateStr: string,
+  endDateStr?: string | null,
+  now = dayjs()
+): PeriodMetrics {
+  const start = dayjs(startDateStr);
+  const end = endDateStr ? dayjs(endDateStr) : null;
+
+  if (start.isValid() && start.isAfter(now, 'day')) {
+    return {
+      status: 'upcoming',
+      isEndingSoon: false,
+      progressPercent: 0,
+      timeRemainingText: null,
+    };
+  }
+
+  if (end && end.isValid()) {
+    if (end.isBefore(now, 'day')) {
+      return {
+        status: 'finished',
+        isEndingSoon: false,
+        progressPercent: 100,
+        timeRemainingText: 'Завершён',
+      };
+    }
+
+    const totalDurationMs = end.diff(start);
+    const elapsedMs = Math.max(0, now.diff(start));
+    const remainingMs = Math.max(0, end.diff(now));
+
+    let progressPercent = 0;
+    if (totalDurationMs > 0) {
+      const rawPct = Math.round((elapsedMs / totalDurationMs) * 100);
+      progressPercent = Math.min(99, Math.max(0, rawPct));
+    }
+
+    // Ending soon threshold: remaining <= 72 hours (3 days) OR progress >= 80%
+    const isEndingSoon =
+      remainingMs > 0 &&
+      (remainingMs <= 72 * 60 * 60 * 1000 || (totalDurationMs > 0 && progressPercent >= 80));
+
+    let timeRemainingText: string | null = null;
+    if (remainingMs > 0) {
+      const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+      const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
+      const remainingMinutes = Math.floor(remainingMs / (60 * 1000));
+
+      if (remainingDays >= 1) {
+        timeRemainingText = `${remainingDays} дн.`;
+      } else if (remainingHours >= 1) {
+        timeRemainingText = `${remainingHours} ч.`;
+      } else {
+        timeRemainingText = `${Math.max(1, remainingMinutes)} мин.`;
+      }
+    }
+
+    return {
+      status: 'active',
+      isEndingSoon,
+      progressPercent,
+      timeRemainingText,
+    };
+  }
+
+  return {
+    status: 'active',
+    isEndingSoon: false,
+    progressPercent: null,
+    timeRemainingText: null,
+  };
+}
 
 /**
  * Resolves the activity status of a period Note:
@@ -78,10 +168,10 @@ export function extractPeriodItems(notes: Note[]): PeriodItem[] {
   const now = dayjs();
   const periodNotes = notes.filter((n) => {
     if (n.type !== 'PERIOD' || n.status === 'ARCHIVED') return false;
-    // Defensive check: Daily digests and news briefs are never periods
+    // Defensive check: Point-in-time daily digests without an explicit end date are never periods
     const lower = n.title.toLowerCase();
     const isDigest = lower.includes('дайджест') || lower.includes('сводка') || lower.includes('digest');
-    if (isDigest) return false;
+    if (isDigest && !n.endDate) return false;
     return true;
   });
 
@@ -90,6 +180,9 @@ export function extractPeriodItems(notes: Note[]): PeriodItem[] {
     const hashtags = Array.isArray(n.hashtags)
       ? n.hashtags.map((h: any) => (typeof h === 'string' ? h : h.name).replace(/^#/, '').toLowerCase())
       : [];
+
+    const status = getPeriodActivityStatus(n, now);
+    const metrics = calculatePeriodMetrics(n.startDate, n.endDate, now);
 
     return {
       id: n.id,
@@ -102,7 +195,10 @@ export function extractPeriodItems(notes: Note[]): PeriodItem[] {
       color: meta.color || n.feed?.color || DEFAULT_COLOR,
       startDate: n.startDate,
       endDate: n.endDate || null,
-      status: getPeriodActivityStatus(n, now),
+      status,
+      isEndingSoon: status === 'active' && metrics.isEndingSoon,
+      progressPercent: metrics.progressPercent,
+      timeRemainingText: metrics.timeRemainingText,
       hashtags,
       rawNote: n,
     };
@@ -226,6 +322,7 @@ export function extractPeriodMicroBadges(
           color: period.color,
           status: period.status,
           isBound,
+          isEndingSoon: period.isEndingSoon,
         });
       }
     } else if (isBound || (inTimeWindow && period.status === 'active')) {
@@ -236,6 +333,7 @@ export function extractPeriodMicroBadges(
         color: period.color,
         status: period.status,
         isBound,
+        isEndingSoon: period.isEndingSoon,
       });
     }
   }

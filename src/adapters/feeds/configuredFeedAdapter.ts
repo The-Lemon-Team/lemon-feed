@@ -8,6 +8,7 @@ import {
 } from './types';
 import { FeedModeOption } from '../../components/toolbar/types';
 import {
+  KNOWN_CHANGELOG_SUBTOPICS,
   KNOWN_NOTEBOOKLM_SUBTOPICS,
   buildChangelogSubtopics,
   extractChangelogSubfolder,
@@ -34,6 +35,10 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
 
   const matchesPrivacy = (note: Note): boolean => {
     if (targetPrivacy === 'private') {
+      // Notes attached to public feeds are NEVER part of the private contour
+      if (note.feed && note.feed.privacy === 'public') {
+        return false;
+      }
       const p = (note.folderPath || '').toLowerCase();
       const isPriv =
         note.privacy === 'private' ||
@@ -57,37 +62,75 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     const hasTags = Boolean(targetTags && targetTags.length > 0);
     const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
 
-    // If no source criteria configured, match all notes that passed privacy
-    if (!hasSlugs && !hasTags && !hasFolders) {
+    // If explicit criteria are configured, match by them:
+    if (hasSlugs || hasTags || hasFolders) {
+      // 1. Attached candidate feed slug match
+      if (hasSlugs) {
+        const slug = (note.feed?.slug || '').toLowerCase();
+        if (slug && (targetSlugs!.has(slug) || Array.from(targetSlugs!).some((s) => slug.includes(s)))) {
+          return true;
+        }
+        if (
+          isChangelogsNote(note) &&
+          (targetSlugs!.has('spark-changelogsfeed') ||
+            targetSlugs!.has('changelogs') ||
+            targetSlugs!.has('changelog'))
+        ) {
+          return true;
+        }
+      }
+
+      // 2. Folder prefix match
+      if (hasFolders) {
+        const noteFolder = (note.folderPath || '').toLowerCase();
+        if (targetFolders!.some((f) => noteFolder.includes(f))) {
+          return true;
+        }
+      }
+
+      // 3. Hashtag match
+      if (hasTags) {
+        const noteTags = (note.hashtags || []).map((h: any) =>
+          (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
+        );
+        if (targetTags!.some((t) => noteTags.includes(t))) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    // Clean Slate by Default:
+    // If NO criteria are configured, the tab is a clean workspace!
+    // It only matches notes that were explicitly authored for or tagged with this tab:
+    const normTabId = modeOption.id.toLowerCase().trim();
+    const normLabel = modeOption.label.toLowerCase().trim();
+
+    const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
+    if (noteFeedSlug && (noteFeedSlug === normTabId || noteFeedSlug.endsWith(`/${normTabId}`))) {
       return true;
     }
 
-    // 1. Attached candidate feed slug match
-    if (hasSlugs) {
-      const slug = (note.feed?.slug || '').toLowerCase();
-      if (slug && (targetSlugs!.has(slug) || Array.from(targetSlugs!).some((s) => slug.includes(s)))) {
-        return true;
-      }
+    const noteFolder = (note.folderPath || '').toLowerCase();
+    if (
+      noteFolder &&
+      (noteFolder.includes(`/${normTabId}/`) ||
+        noteFolder.startsWith(`${normTabId}/`) ||
+        noteFolder.includes(`/${normLabel}/`) ||
+        noteFolder.startsWith(`${normLabel}/`))
+    ) {
+      return true;
     }
 
-    // 2. Folder prefix match
-    if (hasFolders) {
-      const noteFolder = (note.folderPath || '').toLowerCase();
-      if (targetFolders!.some((f) => noteFolder.includes(f))) {
-        return true;
-      }
+    const noteTags = (note.hashtags || []).map((h: any) =>
+      (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
+    );
+    if (noteTags.includes(normTabId) || noteTags.includes(normLabel)) {
+      return true;
     }
 
-    // 3. Hashtag match
-    if (hasTags) {
-      const noteTags = (note.hashtags || []).map((h: any) =>
-        (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
-      );
-      if (targetTags!.some((t) => noteTags.includes(t))) {
-        return true;
-      }
-    }
-
+    // Default: Clean empty tab (0 notes)
     return false;
   };
 
@@ -142,23 +185,77 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
         { title: string; emoji: string; color: string; description?: string }
       > = {};
 
-      for (const f of context.allFeeds) {
-        if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
-        if (targetPrivacy === 'public' && f.privacy === 'private') continue;
-        if (targetSlugs && !targetSlugs.has(f.slug.toLowerCase())) continue;
+      const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
 
-        countsBySlug[f.slug] = 0;
-        feedMetaBySlug[f.slug] = {
-          title: f.title,
-          emoji: f.icon || modeOption.emoji || '📁',
-          color: f.color || '#2481cc',
-          description: f.description || undefined,
+      if (hasSlugs) {
+        for (const f of context.allFeeds) {
+          if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
+          if (targetPrivacy === 'public' && f.privacy === 'private') continue;
+
+          // Child subtopics of changelogs/notebooklm roll up into their parent tabs
+          if (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')) continue;
+          if (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-')) continue;
+
+          if (!targetSlugs!.has(f.slug.toLowerCase())) continue;
+
+          countsBySlug[f.slug] = 0;
+          feedMetaBySlug[f.slug] = {
+            title: f.title,
+            emoji: f.icon || modeOption.emoji || '📁',
+            color: f.color || '#2481cc',
+            description: f.description || undefined,
+          };
+        }
+      }
+
+      const allowsChangelogs =
+        targetPrivacy !== 'private' &&
+        Boolean(
+          targetSlugs?.has('spark-changelogsfeed') ||
+            targetSlugs?.has('changelogs') ||
+            targetSlugs?.has('changelog')
+        );
+
+      if (allowsChangelogs && !feedMetaBySlug['spark-changelogsfeed']) {
+        feedMetaBySlug['spark-changelogsfeed'] = {
+          title: 'Changelogs & Релизы',
+          emoji: '🚀',
+          color: '#f97316',
+          description: 'Официальные обновления и релизы вендоров: Google, OpenAI, Anthropic, DeepSeek',
         };
+        countsBySlug['spark-changelogsfeed'] = 0;
+      }
+
+      const allowsNotebooklm =
+        targetPrivacy !== 'private' &&
+        Boolean(
+          targetSlugs?.has('spark-notebooklmai') ||
+            targetSlugs?.has('notebooklm')
+        );
+
+      if (allowsNotebooklm && !feedMetaBySlug['spark-notebooklmai']) {
+        feedMetaBySlug['spark-notebooklmai'] = {
+          title: 'NotebookLM AI',
+          emoji: '🎙️',
+          color: '#a855f7',
+          description: 'Структурированные аудио-обзоры и аналитические синтезы от NotebookLM',
+        };
+        countsBySlug['spark-notebooklmai'] = 0;
       }
 
       // Count notes for each feed
       for (const n of context.notes) {
         if (matchesPrivacy(n) && matchesSourceCriteria(n)) {
+          if (allowsChangelogs && isChangelogsNote(n)) {
+            countsBySlug['spark-changelogsfeed'] = (countsBySlug['spark-changelogsfeed'] || 0) + 1;
+            continue;
+          }
+
+          if (allowsNotebooklm && isNotebooklmNote(n)) {
+            countsBySlug['spark-notebooklmai'] = (countsBySlug['spark-notebooklmai'] || 0) + 1;
+            continue;
+          }
+
           const slug = n.feed?.slug || (targetPrivacy === 'private' ? 'private-notes' : 'general-notes');
           if (targetSlugs && !targetSlugs.has(slug.toLowerCase())) {
             continue;
@@ -198,7 +295,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
           if (slug.includes('changelog')) {
             const changelogCounts: Record<string, number> = {};
             for (const n of context.notes) {
-              if (isChangelogsNote(n)) {
+              if (matchesPrivacy(n) && matchesSourceCriteria(n) && isChangelogsNote(n)) {
                 const sub = extractChangelogSubfolder(n);
                 if (sub) changelogCounts[sub] = (changelogCounts[sub] || 0) + 1;
               }
@@ -207,7 +304,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
           } else if (slug.includes('notebooklm')) {
             const nbCounts: Record<'regular' | 'telegram', number> = { regular: 0, telegram: 0 };
             for (const n of context.notes) {
-              if (isNotebooklmNote(n)) {
+              if (matchesPrivacy(n) && matchesSourceCriteria(n) && isNotebooklmNote(n)) {
                 const sub = extractNotebooklmSubtopic(n) || 'regular';
                 nbCounts[sub] = (nbCounts[sub] || 0) + 1;
               }
@@ -243,26 +340,58 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
                 (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
               );
               if (!noteTags.includes(activeTag)) return false;
-            } else if (activeFeedSlug.includes('changelog') || activeFeedSlug.startsWith('spark-changelogsfeed-')) {
+            } else if (
+              activeFeedSlug === 'spark-changelogsfeed' ||
+              activeFeedSlug === 'changelogs' ||
+              activeFeedSlug === 'changelog' ||
+              activeFeedSlug.startsWith('spark-changelogsfeed-') ||
+              activeFeedSlug.startsWith('changelogs-')
+            ) {
               if (!isChangelogsNote(note)) return false;
-              const sub = activeFeedSlug.replace('spark-changelogsfeed-', '');
-              if (sub && sub !== 'spark-changelogsfeed') {
-                const noteSub = extractChangelogSubfolder(note);
-                if (noteSub !== sub) return false;
+
+              let sub: string | null = null;
+              if (activeFeedSlug.startsWith('spark-changelogsfeed-')) {
+                sub = activeFeedSlug.replace(/^spark-changelogsfeed-/, '').trim().toLowerCase();
+              } else if (activeFeedSlug.startsWith('changelogs-')) {
+                sub = activeFeedSlug.replace(/^changelogs-/, '').trim().toLowerCase();
               }
-            } else if (activeFeedSlug === 'regular' || activeFeedSlug === 'telegram') {
+
+              if (sub && sub !== 'spark-changelogsfeed' && sub !== 'changelogs' && sub !== 'changelog') {
+                const noteSub = extractChangelogSubfolder(note);
+                const hasTag = (note.hashtags || []).some((h: any) => {
+                  const name = (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim();
+                  return name === sub;
+                });
+                if (noteSub !== sub && !hasTag) return false;
+              }
+            } else if (
+              activeFeedSlug === 'spark-notebooklmai' ||
+              activeFeedSlug === 'notebooklm' ||
+              activeFeedSlug.startsWith('spark-notebooklmai-') ||
+              activeFeedSlug.startsWith('notebooklm-') ||
+              activeFeedSlug === 'regular' ||
+              activeFeedSlug === 'telegram'
+            ) {
               if (!isNotebooklmNote(note)) return false;
-              const noteSub = extractNotebooklmSubtopic(note) || 'regular';
-              if (noteSub !== activeFeedSlug) return false;
+              let nbSub: string | null = null;
+              if (activeFeedSlug.startsWith('spark-notebooklmai-')) {
+                nbSub = activeFeedSlug.replace(/^spark-notebooklmai-/, '');
+              } else if (activeFeedSlug.startsWith('notebooklm-')) {
+                nbSub = activeFeedSlug.replace(/^notebooklm-/, '');
+              } else if (activeFeedSlug === 'regular' || activeFeedSlug === 'telegram') {
+                nbSub = activeFeedSlug;
+              }
+              if (nbSub && nbSub !== 'spark-notebooklmai' && nbSub !== 'notebooklm') {
+                const noteSub = extractNotebooklmSubtopic(note) || 'regular';
+                if (noteSub !== nbSub) return false;
+              }
             } else {
               const slug = (note.feed?.slug || '').toLowerCase();
               const folder = (note.folderPath || '').toLowerCase();
               const target = activeFeedSlug.toLowerCase();
               const matchesCurrentFeed =
-                slug === target ||
-                slug.includes(target) ||
-                target.includes(slug) ||
-                folder.includes(target);
+                Boolean(slug && (slug === target || slug.includes(target) || target.includes(slug))) ||
+                Boolean(folder && folder.includes(target));
               if (!matchesCurrentFeed) return false;
             }
           } else {
@@ -277,25 +406,63 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
             const matchTag = note.hashtags?.some((h: any) =>
               (typeof h === 'string' ? h : h.name)?.toLowerCase().includes(query)
             );
-            if (!matchTitle && !matchDesc && !matchAuthor && !matchTag) return false;
+            const subfolder = extractChangelogSubfolder(note);
+            const matchSubfolder = Boolean(subfolder && subfolder.includes(query));
+            if (!matchTitle && !matchDesc && !matchAuthor && !matchTag && !matchSubfolder) return false;
           }
 
           return true;
         })
         .map((n) => {
           const cover = extractNoteCoverUrl(n);
+          const changelogSub = extractChangelogSubfolder(n);
+          const nbSub = extractNotebooklmSubtopic(n);
+
+          let channelTitle = n.feed?.title || modeOption.label;
+          let avatarIcon = n.feed?.icon || modeOption.emoji || '📁';
+          let categoryBadge = {
+            label: modeOption.label,
+            emoji: modeOption.emoji || '📁',
+            colorClass: 'border-blue-500/30 text-blue-500',
+          };
+
+          if (changelogSub) {
+            const known = KNOWN_CHANGELOG_SUBTOPICS.find((k) => k.subfolder === changelogSub);
+            const vendorName = known?.title || (changelogSub.charAt(0).toUpperCase() + changelogSub.slice(1));
+            channelTitle = `${vendorName} Changelog`;
+            avatarIcon = known?.emoji || '🚀';
+
+            categoryBadge = {
+              label: `Changelog / ${vendorName.toUpperCase()}`,
+              emoji: known?.emoji || '🚀',
+              colorClass: 'border-orange-500/30 text-orange-500',
+            };
+          } else if (isChangelogsNote(n)) {
+            channelTitle = 'Changelogs & Релизы';
+            avatarIcon = '🚀';
+            categoryBadge = {
+              label: 'Changelogs',
+              emoji: '🚀',
+              colorClass: 'border-orange-500/30 text-orange-500',
+            };
+          } else if (nbSub) {
+            channelTitle = `NotebookLM (${nbSub === 'telegram' ? 'Telegram' : 'Аудио'})`;
+            avatarIcon = nbSub === 'telegram' ? '✈️' : '🎙️';
+            categoryBadge = {
+              label: 'NotebookLM AI',
+              emoji: '🎙️',
+              colorClass: 'border-purple-500/30 text-purple-500',
+            };
+          }
+
           return {
             id: n.id,
             sourceType: modeOption.id,
-            feedSlug: n.feed?.slug || 'general-notes',
-            channelTitle: n.feed?.title || modeOption.label,
-            channelHandle: `@${modeOption.id}/${n.feed?.slug || 'feed'}`,
-            avatarIcon: n.feed?.icon || modeOption.emoji || '📁',
-            category: {
-              label: modeOption.label,
-              emoji: modeOption.emoji || '📁',
-              colorClass: 'border-blue-500/30 text-blue-500',
-            },
+            feedSlug: n.feed?.slug || (changelogSub ? `spark-changelogsfeed-${changelogSub}` : 'general-notes'),
+            channelTitle,
+            channelHandle: `@${modeOption.id}/${n.feed?.slug || (changelogSub ? `changelogs/${changelogSub}` : 'feed')}`,
+            avatarIcon,
+            category: categoryBadge,
             title: n.title,
             description: n.description || '',
             summary: (n as any).summary || null,

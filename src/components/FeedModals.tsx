@@ -16,6 +16,7 @@ export interface FeedModalsProps {
   selectedDetailItem: UnifiedFeedItem | null;
   onCloseDetail: () => void;
   onSelectTag: (tag: string) => void;
+  onOpenNoteById?: (noteId: string) => void;
   // Edit Note Modal
   editingItem: UnifiedFeedItem | null;
   onOpenEdit: (item: UnifiedFeedItem) => void;
@@ -57,6 +58,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
   selectedDetailItem,
   onCloseDetail,
   onSelectTag,
+  onOpenNoteById,
   editingItem,
   onOpenEdit,
   onCloseEdit,
@@ -96,6 +98,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           onClose={onCloseDetail}
           disableEscClose={Boolean(aiCoverItem || editingItem)}
           onSelectTag={onSelectTag}
+          onOpenNoteById={onOpenNoteById}
           onEditNote={
             !isPublicOnly
               ? (item) => {

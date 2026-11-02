@@ -321,6 +321,23 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
+                  onClick={() => {
+                    setLabel('Working Space');
+                    setEmoji('✨');
+                    setId('working_space');
+                    setBadge('space');
+                    setDescription('Личное рабочее пространство');
+                    setSelectedFeedSlugs([]);
+                    setSelectedTags([]);
+                    setFolderPrefixes('');
+                    setPrivacyContour('all');
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/15 dark:bg-amber-500/25 border border-amber-500/40 text-amber-800 dark:text-amber-200 hover:border-amber-500 transition-colors cursor-pointer"
+                >
+                  ✨ Чистый Working Space
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleApplyTemplate('ai')}
                   className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white dark:bg-[#1e2a38] border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:border-[#2481cc] transition-colors cursor-pointer"
                 >
@@ -439,7 +456,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
                   Навыбор лент (Feeds Source)
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/40 text-[#2481cc] dark:text-blue-300 font-semibold">
-                  {selectedFeedSlugs.length > 0 ? `${selectedFeedSlugs.length} выбрано` : 'Все ленты контура'}
+                  {selectedFeedSlugs.length > 0 ? `${selectedFeedSlugs.length} выбрано` : 'Без внешних лент (чистый таб)'}
                 </span>
               </div>
 
@@ -739,6 +756,23 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
               />
             </div>
           </div>
+
+          {/* Mode Indicator Callout */}
+          {selectedFeedSlugs.length === 0 && selectedTags.length === 0 && !folderPrefixes.trim() ? (
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-[11px] flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>
+                <strong>Чистое пространство:</strong> таб будет создан пустым (без записей из общей ленты). Вы сможете писать сюда заметки, прикреплять материалы или добавить фильтры позже.
+              </span>
+            </div>
+          ) : (
+            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-200 text-[11px] flex items-center gap-2">
+              <Filter className="w-4 h-4 text-[#2481cc] shrink-0" />
+              <span>
+                <strong>Смарт-лента:</strong> в этот таб будут попадать публикации по выбранным источникам ({selectedFeedSlugs.length ? `${selectedFeedSlugs.length} лент` : ''}{selectedTags.length ? `${selectedFeedSlugs.length ? ', ' : ''}${selectedTags.length} тегов` : ''}{folderPrefixes.trim() ? ', папки' : ''}).
+              </span>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1">

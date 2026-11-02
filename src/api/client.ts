@@ -2,16 +2,26 @@ import axios from 'axios';
 import { Note, Feed, NotesResponse, QueryNotesParams } from '@lenta/shared';
 import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL !== undefined
-    ? import.meta.env.VITE_API_URL
-    : typeof window !== 'undefined' &&
-      window.location.hostname !== 'localhost' &&
-      window.location.hostname !== '127.0.0.1'
-    ? ''
-    : import.meta.env.PROD
-    ? ''
-    : 'http://localhost:3001';
+function resolveApiBaseUrl(): string {
+  // When running in a browser accessed remotely (Tailscale LAN, Funnel, Magic URL),
+  // always use relative URL ('') so Vite's proxy forwards requests to backend seamlessly,
+  // preventing mobile "localhost" resolution errors and HTTPS mixed-content blocks.
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    return '';
+  }
+
+  if (import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== '') {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  return import.meta.env.PROD ? '' : 'http://localhost:3002';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const DEFAULT_ADMIN_TOKEN =
   import.meta.env.VITE_ADMIN_TOKEN || 'lenta_adm_master_permanent_7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c';
@@ -44,10 +54,22 @@ export const getFeedUserKey = () => currentFeedUserKey;
 
 export const resolveMediaUrl = (url?: string | null): string => {
   if (!url) return '';
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    if (url.includes('localhost:') || url.includes('127.0.0.1:')) {
+      const uploadIdx = url.indexOf('/uploads/');
+      if (uploadIdx !== -1) {
+        return url.slice(uploadIdx);
+      }
+    }
+  }
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
+  const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002');
   return `${base.replace(/\/$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
 };
 

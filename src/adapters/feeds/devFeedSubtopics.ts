@@ -9,6 +9,7 @@ export const KNOWN_CHANGELOG_SUBTOPICS: Array<{
   { subfolder: 'google', title: 'Google', emoji: '🌐', accentColor: '#4285f4' },
   { subfolder: 'openai', title: 'OpenAI', emoji: '🧠', accentColor: '#10a37f' },
   { subfolder: 'anthropic', title: 'Anthropic', emoji: '⚡', accentColor: '#d97706' },
+  { subfolder: 'deepseek', title: 'DeepSeek', emoji: '🐋', accentColor: '#0ea5e9' },
 ];
 
 export function buildChangelogSubtopics(
@@ -82,13 +83,14 @@ export const KNOWN_NOTEBOOKLM_SUBTOPICS: Array<{
 ];
 
 /**
- * Extracts the changelog subfolder from a note (e.g. 'google', 'openai', 'anthropic').
+ * Extracts the changelog subfolder/vendor from a note (e.g. 'google', 'openai', 'anthropic', 'deepseek').
+ * Inspects folder path, folder relations, slug, metadata, and hashtags.
  */
 export function extractChangelogSubfolder(note: Note): string | null {
   const checkString = (str?: string | null): string | null => {
     if (!str) return null;
     const normalized = str.replace(/\\/g, '/').toLowerCase();
-    const match = normalized.match(/changelogsfeed\/([^/]+)/);
+    const match = normalized.match(/changelogs?(?:feed)?\/([^/]+)/);
     if (match && match[1]) {
       const clean = match[1].trim().toLowerCase();
       return clean === 'antropic' ? 'anthropic' : clean;
@@ -112,6 +114,33 @@ export function extractChangelogSubfolder(note: Note): string | null {
     const sub = slug.replace(/^spark-changelogsfeed-/, '').trim();
     return sub === 'antropic' ? 'anthropic' : sub;
   }
+  if (slug.startsWith('changelogs-')) {
+    const sub = slug.replace(/^changelogs-/, '').trim();
+    return sub === 'antropic' ? 'anthropic' : sub;
+  }
+
+  // Check metadata vendor/subtopic
+  const meta = (note.metadata || {}) as Record<string, any>;
+  if (meta.vendor && typeof meta.vendor === 'string') {
+    const v = meta.vendor.trim().toLowerCase();
+    return v === 'antropic' ? 'anthropic' : v;
+  }
+  if (meta.subtopic && typeof meta.subtopic === 'string') {
+    const s = meta.subtopic.trim().toLowerCase();
+    return s === 'antropic' ? 'anthropic' : s;
+  }
+
+  // Check hashtags for known vendors or custom tags
+  if (note.hashtags && Array.isArray(note.hashtags)) {
+    const tagNames = note.hashtags.map((h: any) =>
+      (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
+    );
+    for (const known of KNOWN_CHANGELOG_SUBTOPICS) {
+      if (tagNames.includes(known.subfolder)) {
+        return known.subfolder;
+      }
+    }
+  }
 
   return null;
 }
@@ -119,13 +148,27 @@ export function extractChangelogSubfolder(note: Note): string | null {
 export function isChangelogsNote(note: Note): boolean {
   if (extractChangelogSubfolder(note)) return true;
   const slug = (note.feed?.slug || '').toLowerCase();
-  if (slug.startsWith('spark-changelogsfeed') || slug === 'changelogsfeed') return true;
+  if (
+    slug.startsWith('spark-changelogsfeed') ||
+    slug === 'changelogsfeed' ||
+    slug === 'changelogs' ||
+    slug.startsWith('changelogs-')
+  ) {
+    return true;
+  }
   const fp = (note.folderPath || '').replace(/\\/g, '/').toLowerCase();
-  if (fp.includes('changelogsfeed')) return true;
+  if (fp.includes('changelogsfeed') || fp.includes('changelogs')) return true;
   if (note.folders && Array.isArray(note.folders)) {
-    return note.folders.some((f) => {
+    const inFolder = note.folders.some((f) => {
       const p = (f.folder?.path || f.folder?.name || '').replace(/\\/g, '/').toLowerCase();
-      return p.includes('changelogsfeed');
+      return p.includes('changelogsfeed') || p.includes('changelogs');
+    });
+    if (inFolder) return true;
+  }
+  if (note.hashtags && Array.isArray(note.hashtags)) {
+    return note.hashtags.some((h) => {
+      const name = (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim();
+      return name === 'changelog' || name === 'changelogs' || name === 'релиз' || name === 'релизы';
     });
   }
   return false;

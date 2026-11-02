@@ -33,9 +33,16 @@ export const FeedActivitiesRailSection: React.FC<FeedActivitiesRailSectionProps>
           const startDateStr = dayjs(p.startDate).format('D MMM');
           const endDateStr = p.endDate ? dayjs(p.endDate).format('D MMM') : 'открытый';
 
+          const isEnding = Boolean(p.isEndingSoon);
+
           const statusBadge =
             p.status === 'active'
-              ? { text: '🟢 Идёт сейчас', class: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' }
+              ? isEnding
+                ? {
+                    text: `⚠️ Завершается (${p.timeRemainingText || `${p.progressPercent}%`})`,
+                    class: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse',
+                  }
+                : { text: '🟢 Идёт сейчас', class: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' }
               : p.status === 'upcoming'
               ? { text: '⏳ Скоро', class: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' }
               : { text: '⚪ Завершён', class: 'bg-slate-500/15 text-slate-500 dark:text-slate-400' };
@@ -67,6 +74,22 @@ export const FeedActivitiesRailSection: React.FC<FeedActivitiesRailSectionProps>
                     {startDateStr} — {endDateStr}
                   </span>
                 </div>
+
+                {typeof p.progressPercent === 'number' && (
+                  <div className="w-full mt-1.5 flex items-center gap-1.5">
+                    <div className="flex-1 h-1 bg-slate-200/80 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          isEnding ? 'bg-amber-500' : 'bg-violet-500'
+                        }`}
+                        style={{ width: `${p.progressPercent}%` }}
+                      />
+                    </div>
+                    <span className={`text-[9px] font-mono font-bold ${isEnding ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                      {p.progressPercent}%
+                    </span>
+                  </div>
+                )}
               </div>
 
               <ChevronRight

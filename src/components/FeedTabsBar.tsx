@@ -76,7 +76,15 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
     (t) =>
       t.subtopics &&
       t.subtopics.length > 0 &&
-      (activeFeedSlug === t.slug || t.subtopics.some((s) => s.slug === activeFeedSlug))
+      (activeFeedSlug === t.slug ||
+        (t.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
+        (t.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
+        t.subtopics.some(
+          (s) =>
+            s.slug === activeFeedSlug ||
+            s.subfolder === activeFeedSlug ||
+            (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
+        ))
   );
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -119,7 +127,17 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
         {tabs.map((tab) => {
           const isSelected =
             activeFeedSlug === tab.slug ||
-            Boolean(tab.subtopics && tab.subtopics.some((s) => s.slug === activeFeedSlug));
+            (tab.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
+            (tab.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
+            Boolean(
+              tab.subtopics &&
+                tab.subtopics.some(
+                  (s) =>
+                    s.slug === activeFeedSlug ||
+                    s.subfolder === activeFeedSlug ||
+                    (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
+                )
+            );
           return (
             <button
               key={tab.id}
@@ -194,7 +212,9 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
             type="button"
             onClick={() => onSelectFeed(activeTabWithSubtopics.slug)}
             className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors select-none ${
-              activeFeedSlug === activeTabWithSubtopics.slug
+              activeFeedSlug === activeTabWithSubtopics.slug ||
+              (activeTabWithSubtopics.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
+              (activeTabWithSubtopics.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai'))
                 ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
                 : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
             }`}
@@ -203,7 +223,9 @@ export const FeedTabsBar: React.FC<FeedTabsBarProps> = ({
             <span className="font-mono text-[9px] opacity-80">{activeTabWithSubtopics.count}</span>
           </button>
           {activeTabWithSubtopics.subtopics.map((sub) => {
-            const isSubSelected = activeFeedSlug === sub.slug;
+            const isSubSelected =
+              activeFeedSlug === sub.slug ||
+              (sub.subfolder && activeFeedSlug?.endsWith(`-${sub.subfolder}`));
             return (
               <button
                 key={sub.id}

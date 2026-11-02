@@ -16,6 +16,7 @@ import { FeedDesktopRail } from './components/FeedDesktopRail';
 import { FeedCategoriesSheet } from './components/navigation/FeedCategoriesSheet';
 import { FeedModals } from './components/FeedModals';
 import { FeedBottomNav } from './components/FeedBottomNav';
+import { FeedPeriodEndingSoonToast } from './components/notifications/FeedPeriodEndingSoonToast';
 import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 import { navigateToHostCalendar, navigateToHostTimeline } from './utils/hostNavigation';
 
@@ -204,7 +205,7 @@ export const App: React.FC = () => {
   return (
     <div
       className={`min-h-screen bg-[#f8fafc] dark:bg-[#0e1621] text-slate-800 dark:text-[#e2e2e2] flex flex-col transition-colors w-full max-w-full overflow-x-hidden ${
-        isEmbed ? 'pb-4' : 'pb-16 sm:pb-8'
+        isEmbed ? 'pb-4' : 'pb-28 sm:pb-8'
       }`}
     >
       <main className="flex-1 max-w-5xl xl:max-w-6xl mx-auto w-full min-w-0 px-3 py-4 sm:px-5 sm:py-5 space-y-4">
@@ -261,6 +262,7 @@ export const App: React.FC = () => {
             onChangeMode={setPeriodFilterMode}
             onClearPeriod={() => handleSelectPeriod(undefined)}
             totalPeriodNotesCount={feedItems.length}
+            onOpenNoteDetail={handleOpenNoteById}
           />
         )}
 
@@ -283,6 +285,8 @@ export const App: React.FC = () => {
           <FeedStreamView
             streamSource={streamSource}
             onSetStreamSource={handleSelectSource}
+            activeMode={visibleSourceModes.find((m) => m.id === streamSource)}
+            onEditSourceTab={handleOpenEditSourceTab}
             feedItems={feedItems}
             visibleFeedItems={visibleFeedItems}
             selectedFeedSlug={selectedFeedSlug}
@@ -350,6 +354,7 @@ export const App: React.FC = () => {
         selectedDetailItem={selectedDetailItem}
         onCloseDetail={handleCloseDetail}
         onSelectTag={handleSelectTag}
+        onOpenNoteById={handleOpenNoteById}
         editingItem={editingItem}
         onOpenEdit={handleOpenEdit}
         onCloseEdit={handleCloseEdit}
@@ -394,6 +399,13 @@ export const App: React.FC = () => {
         onOpenLemonSeasons={handleOpenLemonSeasons}
         onCreateNote={!isPublicOnly ? handleOpenCreateNote : undefined}
         isPublicMode={isPublicMode}
+      />
+
+      {/* Floating Period Ending Soon Notification */}
+      <FeedPeriodEndingSoonToast
+        periods={allPeriods}
+        selectedPeriodId={selectedPeriodId}
+        onSelectPeriod={handleSelectPeriod}
       />
 
       {/* Floating Workspace Pinned Notes & Period Tracker Dock */}

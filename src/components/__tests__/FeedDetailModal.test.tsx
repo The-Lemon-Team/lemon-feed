@@ -175,6 +175,155 @@ describe('FeedDetailModal', () => {
     );
   });
 
+  describe('Detail › related notes', () => {
+    it('renders related notes when present in rawPayload metadata and navigates on click', () => {
+      const onOpenNote = vi.fn();
+      const itemWithRelated = makeFeedItem({
+        rawPayload: {
+          metadata: {
+            relatedNotes: [
+              {
+                cleanTitle: '04.11.26 - Релиз World of Warcraft: Forever',
+                resolved: true,
+                targetNoteId: 'note-wow-release',
+                targetTitle: 'Релиз World of Warcraft: Forever',
+                targetType: 'EVENT',
+                targetIcon: '🚀',
+                targetDate: '2026-11-04T12:00:00.000Z',
+              },
+            ],
+          },
+        },
+      });
+
+      render(<FeedDetailModal item={itemWithRelated} onClose={vi.fn()} onOpenNoteById={onOpenNote} />);
+
+      expect(screen.getByText('Связанные записи (1)')).toBeInTheDocument();
+      expect(screen.getByText('Релиз World of Warcraft: Forever')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Релиз World of Warcraft: Forever'));
+      expect(onOpenNote).toHaveBeenCalledWith('note-wow-release');
+    });
+
+    it('displays back button when navigating forward and navigates back on click', () => {
+      const onOpenNote = vi.fn();
+      const firstItem = makeFeedItem({ id: 'item-1', title: 'First Note' });
+      const secondItem = makeFeedItem({ id: 'item-2', title: 'Second Note' });
+
+      const { rerender } = render(
+        <FeedDetailModal item={firstItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />
+      );
+
+      expect(screen.queryByLabelText('Назад к предыдущей новости')).toBeNull();
+
+      // Navigate to second note
+      rerender(
+        <FeedDetailModal item={secondItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />
+      );
+
+      const backBtn = screen.getByLabelText('Назад к предыдущей новости');
+      expect(backBtn).toBeInTheDocument();
+
+      fireEvent.click(backBtn);
+      expect(onOpenNote).toHaveBeenCalledWith('item-1');
+    });
+
+    it('shows parent breadcrumb banner on direct link entry', () => {
+      const onOpenNote = vi.fn();
+      const directChildItem = makeFeedItem({
+        id: 'child-1',
+        title: 'Child Event',
+        rawPayload: {
+          metadata: {
+            relatedNotes: [
+              {
+                cleanTitle: 'WoW Beta Period',
+                resolved: true,
+                targetNoteId: 'parent-period-id',
+                targetTitle: 'WoW Forever Beta Period',
+                isParent: true,
+              },
+            ],
+          },
+        },
+      });
+
+      render(<FeedDetailModal item={directChildItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />);
+
+      expect(screen.getByText('Входит в сюжет:')).toBeInTheDocument();
+      const parentLink = screen.getByTitle('Перейти к родительской заметке');
+      expect(parentLink).toHaveTextContent('WoW Forever Beta Period');
+
+      fireEvent.click(parentLink);
+      expect(onOpenNote).toHaveBeenCalledWith('parent-period-id');
+    });
+
+    it('applies Telegram-style slide animation classes on forward and backward navigation', () => {
+      const onOpenNote = vi.fn();
+      const parentItem = makeFeedItem({
+        id: 'parent-1',
+        title: 'Parent Note',
+        rawPayload: {
+          metadata: {
+            relatedNotes: [
+              {
+                cleanTitle: 'Child Note',
+                resolved: true,
+                targetNoteId: 'child-1',
+                targetTitle: 'Child Note Title',
+              },
+            ],
+          },
+        },
+      });
+      const childItem = makeFeedItem({
+        id: 'child-1',
+        title: 'Child Note Title',
+        rawPayload: {
+          metadata: {
+            relatedNotes: [
+              {
+                cleanTitle: 'Parent Note',
+                resolved: true,
+                targetNoteId: 'parent-1',
+                targetTitle: 'Parent Note',
+                isParent: true,
+              },
+            ],
+          },
+        },
+      });
+
+      const { rerender } = render(
+        <FeedDetailModal item={parentItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />
+      );
+
+      // Initially no direction slide animation
+      const scrollable = document.querySelector('.touch-scroll');
+      expect(scrollable).not.toHaveClass('animate-telegram-forward');
+      expect(scrollable).not.toHaveClass('animate-telegram-backward');
+
+      // Click related note (forward)
+      fireEvent.click(screen.getByText('Child Note Title'));
+      expect(onOpenNote).toHaveBeenCalledWith('child-1');
+
+      // Rerender with childItem
+      rerender(<FeedDetailModal item={childItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />);
+      const scrollableAfterForward = document.querySelector('.touch-scroll');
+      expect(scrollableAfterForward).toHaveClass('animate-telegram-forward');
+
+      // Click back button (backward)
+      const backBtn = screen.getByLabelText('Назад к предыдущей новости');
+      fireEvent.click(backBtn);
+      expect(onOpenNote).toHaveBeenCalledWith('parent-1');
+
+      // Rerender with parentItem
+      rerender(<FeedDetailModal item={parentItem} onClose={vi.fn()} onOpenNoteById={onOpenNote} />);
+      const scrollableAfterBack = document.querySelector('.touch-scroll');
+      expect(scrollableAfterBack).toHaveClass('animate-telegram-backward');
+    });
+  });
+
   describe('Detail › body scroll lock', () => {
     it('locks page scroll while open and restores the previous value on close', () => {
       document.body.style.overflow = 'auto';

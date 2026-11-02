@@ -142,22 +142,29 @@ export function useFeedItemsPipeline({
     [allPeriods, selectedPeriodId]
   );
 
+  // All items for current streamSource
+  const allSourceItems = useMemo(() => {
+    return activeAdapter.adaptNotes(notes, undefined, '');
+  }, [activeAdapter, notes]);
+
   // Active channel periods for rail & mobile carousel
   const activeChannelPeriods = useMemo(() => {
+    // If viewing a scoped or custom source tab (not global 'all'), scope periods to the notes in this tab
+    const isGlobal = streamSource === 'all' || streamSource === 'classic';
+    const sourceNoteIds = isGlobal ? null : new Set(allSourceItems.map((item) => item.id));
+    const basePeriods = sourceNoteIds
+      ? allPeriods.filter((p) => sourceNoteIds.has(p.rawNote?.id || p.id))
+      : allPeriods;
+
     if (selectedFeedSlug) {
-      return allPeriods.filter(
+      return basePeriods.filter(
         (p) =>
           p.feedSlug === selectedFeedSlug ||
           (p.rawNote.folderPath && p.rawNote.folderPath.toLowerCase().includes(selectedFeedSlug.toLowerCase()))
       );
     }
-    return allPeriods.filter((p) => p.status === 'active' || p.status === 'upcoming');
-  }, [allPeriods, selectedFeedSlug]);
-
-  // All items for current streamSource
-  const allSourceItems = useMemo(() => {
-    return activeAdapter.adaptNotes(notes, undefined, '');
-  }, [activeAdapter, notes]);
+    return basePeriods.filter((p) => p.status === 'active' || p.status === 'upcoming');
+  }, [allPeriods, selectedFeedSlug, streamSource, allSourceItems]);
 
   // Upcoming items count for Horizon switcher badge
   const upcomingCount = useMemo(() => {

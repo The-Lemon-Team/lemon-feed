@@ -211,14 +211,26 @@ export function useFeedSourceTabs({
     return activeAdapter.getTabs({ allFeeds, notes }).filter((t) => t.count > 0);
   }, [activeAdapter, allFeeds, notes]);
 
+  // Helper to match selected feed slug or alias/subtopic against tabs
+  const matchesTabOrSubtopic = (tab: UnifiedFeedTab, targetSlug: string): boolean => {
+    if (tab.slug === targetSlug) return true;
+    if (tab.slug === 'spark-changelogsfeed' && (targetSlug === 'changelogs' || targetSlug === 'changelog')) return true;
+    if (tab.slug === 'spark-notebooklmai' && (targetSlug === 'notebooklm' || targetSlug === 'notebooklmai')) return true;
+    if (tab.subtopics && tab.subtopics.length > 0) {
+      return tab.subtopics.some(
+        (s) =>
+          s.slug === targetSlug ||
+          s.subfolder === targetSlug ||
+          (s.subfolder && targetSlug.endsWith(`-${s.subfolder}`))
+      );
+    }
+    return false;
+  };
+
   // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
   useEffect(() => {
     if (!selectedFeedSlug || isLoading) return;
-    const stillExists = activeTabs.some(
-      (t) =>
-        t.slug === selectedFeedSlug ||
-        Boolean(t.subtopics && t.subtopics.some((s) => s.slug === selectedFeedSlug))
-    );
+    const stillExists = activeTabs.some((t) => matchesTabOrSubtopic(t, selectedFeedSlug));
     if (!stillExists) {
       setSelectedFeedSlug(undefined);
     }
@@ -227,13 +239,7 @@ export function useFeedSourceTabs({
   // Active tab object for sidebar detail
   const activeTabObj: UnifiedFeedTab | null = useMemo(() => {
     if (!selectedFeedSlug) return null;
-    return (
-      activeTabs.find(
-        (t) =>
-          t.slug === selectedFeedSlug ||
-          Boolean(t.subtopics && t.subtopics.some((s) => s.slug === selectedFeedSlug))
-      ) || null
-    );
+    return activeTabs.find((t) => matchesTabOrSubtopic(t, selectedFeedSlug)) || null;
   }, [activeTabs, selectedFeedSlug]);
 
   return {
