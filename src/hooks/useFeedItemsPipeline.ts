@@ -26,6 +26,10 @@ interface UseFeedItemsPipelineOptions {
   periodFilterMode: PeriodFilterMode;
   feedHorizon: FeedHorizon;
   activeAdapter: FeedAdapter;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  fetchNextPage?: () => void;
+  totalNotesCount?: number;
 }
 
 export function useFeedItemsPipeline({
@@ -44,6 +48,10 @@ export function useFeedItemsPipeline({
   periodFilterMode,
   feedHorizon,
   activeAdapter,
+  hasNextPage = false,
+  isFetchingNextPage = false,
+  fetchNextPage,
+  totalNotesCount,
 }: UseFeedItemsPipelineOptions) {
   // Enriched feeds list (combines DB feeds and feeds detected in notes with actual count)
   const allAvailableFeeds = useMemo(() => {
@@ -251,11 +259,16 @@ export function useFeedItemsPipeline({
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (visibleCount >= feedItems.length) return;
+    if (visibleCount >= feedItems.length && !hasNextPage) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, feedItems.length));
+          if (visibleCount < feedItems.length) {
+            setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, feedItems.length));
+          } else if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
+            fetchNextPage();
+            setVisibleCount((prev) => prev + BATCH_SIZE);
+          }
         }
       },
       { rootMargin: '350px' }
@@ -267,7 +280,7 @@ export function useFeedItemsPipeline({
       if (el) observer.unobserve(el);
       observer.disconnect();
     };
-  }, [visibleCount, feedItems.length]);
+  }, [visibleCount, feedItems.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Available hashtags extracted from current filtered items
   const availableTags = useMemo(() => {

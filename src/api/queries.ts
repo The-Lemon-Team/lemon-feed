@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import {
   feedApi,
   CreateFeedPayload,
@@ -8,13 +8,59 @@ import {
   GenerateAiCoverPayload,
   GenerateAiBatchPayload,
 } from './client';
-import { QueryNotesParams } from '@lenta/shared';
+import { QueryNotesParams, NotesResponse } from '@lenta/shared';
+import { extractPeriodItems, PeriodItem } from '../utils/periods';
+import { FeedAppRuntimeMode } from '../utils/appMode';
 
 export const queryKeys = {
   allNotes: (params?: QueryNotesParams) => ['feed', 'notes', params] as const,
+  feedStream: (params?: QueryNotesParams & { streamSource?: string; selectedFeedSlug?: string }) =>
+    ['feed', 'stream', params] as const,
+  periods: (appMode?: string) => ['feed', 'periods', appMode] as const,
   feeds: ['feed', 'sources'] as const,
   noteDetail: (id: string) => ['feed', 'note', id] as const,
 };
+
+export function useFeedPeriods(appMode: FeedAppRuntimeMode = 'dev') {
+  return useQuery<PeriodItem[]>({
+    queryKey: queryKeys.periods(appMode),
+    staleTime: 1000 * 60 * 5, // 5 minutes cache ensures periods rail stays full and fast
+    queryFn: async () => {
+      const data = await feedApi.getNotes({
+        limit: 100,
+        type: 'PERIOD',
+        appMode,
+        privacy: appMode === 'dev' ? 'all' : 'public',
+        status: appMode === 'public' ? 'PUBLISHED' : undefined,
+      });
+      return extractPeriodItems(data.items || []);
+    },
+  });
+}
+
+export function useInfiniteFeedNotes(
+  params: QueryNotesParams & { streamSource?: string; selectedFeedSlug?: string }
+) {
+  return useInfiniteQuery<NotesResponse>({
+    queryKey: queryKeys.feedStream(params),
+    staleTime: 1000 * 60 * 3, // 3 minutes cache keeps client navigation instant
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const nextOffset = (lastPage.offset || 0) + (lastPage.limit || 30);
+      if (nextOffset < lastPage.total) {
+        return nextOffset;
+      }
+      return undefined;
+    },
+    queryFn: async ({ pageParam = 0 }) => {
+      return await feedApi.getNotes({
+        limit: 30,
+        offset: pageParam as number,
+        ...params,
+      });
+    },
+  });
+}
 
 export function useFeedNotes(params?: QueryNotesParams) {
   return useQuery({
@@ -110,6 +156,7 @@ export function useCreateNote() {
       return await feedApi.createNote(data);
     },
     onSuccess: (newNote) => {
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
     },
@@ -123,6 +170,19 @@ export function useUpdateNote() {
       return await feedApi.updateNote(id, data);
     },
     onSuccess: (updatedNote) => {
+      // Pinpoint in-place update in active stream cache
+      queryClient.setQueriesData<any>({ queryKey: ['feed', 'stream'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.pages)) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: any) => ({
+            ...page,
+            items: (page.items || []).map((item: any) =>
+              item.id === updatedNote.id ? { ...item, ...updatedNote } : item
+            ),
+          })),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(updatedNote.id) });
     },

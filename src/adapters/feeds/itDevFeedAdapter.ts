@@ -228,10 +228,9 @@ export const ItDevFeedAdapter: FeedAdapter = {
     }
 
     return IT_DEV_PRESETS
-      .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
-        const count = countsByPreset[preset.slug] || 0;
+        const count = countsByPreset[preset.slug] || (dbFeed?._count?.notes ?? 0);
         let subtopics: UnifiedSubtopic[] | undefined;
 
         if (preset.isChangelogs) {

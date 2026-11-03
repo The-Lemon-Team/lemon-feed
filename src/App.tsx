@@ -62,7 +62,15 @@ export const App: React.FC = () => {
     refetch,
     isRefetching,
     allPeriods,
-  } = useFeedData(appMode);
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    totalNotesCount,
+  } = useFeedData({
+    appMode,
+    streamSource,
+    selectedFeedSlug,
+  });
 
   // Source Modes & Tabs Management
   const {
@@ -156,6 +164,10 @@ export const App: React.FC = () => {
     periodFilterMode,
     feedHorizon,
     activeAdapter,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    totalNotesCount,
   });
 
   // Modals & Moderation State
@@ -338,6 +350,8 @@ export const App: React.FC = () => {
             onAiCover={!isPublicOnly ? handleOpenAiCover : undefined}
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
             layoutMode={layoutMode}
             appMode={appMode}
             onApprovePublish={!isPublicOnly ? handleApprovePublish : undefined}

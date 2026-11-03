@@ -127,10 +127,9 @@ export const ClassicFeedAdapter: FeedAdapter = {
     }
 
     return CLASSIC_FEED_PRESETS
-      .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
-        const count = countsByPreset[preset.slug] || 0;
+        const count = countsByPreset[preset.slug] || (dbFeed?._count?.notes ?? 0);
 
         return {
           id: dbFeed?.id || preset.slug,

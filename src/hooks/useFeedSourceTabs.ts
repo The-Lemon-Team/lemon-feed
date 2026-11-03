@@ -230,7 +230,8 @@ export function useFeedSourceTabs({
       const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug);
       if (isDbFeed) return true;
       if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug)) return true;
-      return false;
+      // Preset tabs defined by adapters stay visible
+      return true;
     });
 
     // If selectedFeedSlug matches a known DB feed that is not yet in rawTabs for this adapter,

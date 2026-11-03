@@ -29,6 +29,8 @@ export interface FeedStreamViewProps {
   onAiCover?: (item: UnifiedFeedItem) => void;
   visibleCount: number;
   loadMoreRef?: RefObject<HTMLDivElement>;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
   layoutMode?: 'split' | 'stream';
   appMode?: FeedAppRuntimeMode;
   onCreateNote?: () => void;
@@ -65,6 +67,8 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   onAiCover,
   visibleCount,
   loadMoreRef,
+  hasNextPage = false,
+  isFetchingNextPage = false,
   layoutMode = 'split',
   appMode = 'staging',
   onCreateNote,
@@ -218,14 +222,16 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                 />
               ))}
 
-              {visibleCount < feedItems.length && (
+              {(visibleCount < feedItems.length || hasNextPage) && (
                 <div
                   ref={loadMoreRef}
                   className="py-4 text-center text-xs font-mono text-slate-400 dark:text-slate-500 animate-pulse flex items-center justify-center gap-1.5"
                 >
                   <Radio className="w-3.5 h-3.5 text-[#2481cc]" />
                   <span>
-                    Показано {visibleFeedItems.length} из {feedItems.length} публикаций...
+                    {isFetchingNextPage
+                      ? 'Загрузка следующей страницы...'
+                      : `Показано ${visibleFeedItems.length} из ${feedItems.length} публикаций...`}
                   </span>
                 </div>
               )}
