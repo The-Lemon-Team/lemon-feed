@@ -111,4 +111,26 @@ describe('FeedCategoriesSheet', () => {
     fireEvent.click(screen.getByText('Все каналы'));
     expect(onSelectFeed).toHaveBeenCalledWith(undefined);
   });
+
+  it('triggers onAddFeed and closes sheet when clicking add feed button', () => {
+    const onAddFeed = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <FeedCategoriesSheet
+        isOpen={true}
+        onClose={onClose}
+        activeTabs={mockTabs}
+        onSelectFeed={vi.fn()}
+        totalCount={57}
+        onAddFeed={onAddFeed}
+      />
+    );
+
+    const addButtons = screen.getAllByRole('button', { name: /фид/i });
+    expect(addButtons.length).toBeGreaterThan(0);
+    fireEvent.click(addButtons[0]);
+
+    expect(onClose).toHaveBeenCalled();
+    expect(onAddFeed).toHaveBeenCalledTimes(1);
+  });
 });

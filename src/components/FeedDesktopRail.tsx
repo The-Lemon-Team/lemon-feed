@@ -29,6 +29,7 @@ export interface FeedDesktopRailProps {
   currentMonthName?: string;
   isPublicMode?: boolean;
   onCreateNote?: () => void;
+  onAddFeed?: () => void;
 
   periods?: PeriodItem[];
   selectedPeriodId?: string;
@@ -50,6 +51,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
   currentMonthName = 'октябрь 2026',
   isPublicMode = false,
   onCreateNote,
+  onAddFeed,
   periods = [],
   selectedPeriodId,
   onSelectPeriod,
@@ -350,9 +352,21 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
             <Layers className="w-3 h-3 text-[#2481cc]" />
             <span>{widgetTitle}</span>
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
-            {tabs.length}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-slate-400">
+              {tabs.length}
+            </span>
+            {!isPublicMode && onAddFeed && (
+              <button
+                type="button"
+                onClick={onAddFeed}
+                className="p-1 rounded-lg text-slate-400 hover:text-[#2481cc] dark:hover:text-[#64b5f6] hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title="Создать новый рабочий фид / проект"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -429,6 +443,19 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
               </button>
             );
           })}
+
+          {/* Permanent Add Feed Button at bottom of channel list */}
+          {!isPublicMode && onAddFeed && (
+            <button
+              type="button"
+              onClick={onAddFeed}
+              className="w-full mt-2 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl border border-dashed border-slate-200 dark:border-white/10 hover:border-[#2481cc]/50 dark:hover:border-[#64b5f6]/50 text-slate-500 dark:text-slate-400 hover:text-[#2481cc] dark:hover:text-[#64b5f6] hover:bg-[#2481cc]/5 dark:hover:bg-[#2481cc]/10 transition-all text-xs font-medium cursor-pointer group shadow-2xs"
+              title="Создать новый рабочий фид / проект"
+            >
+              <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform text-[#2481cc] dark:text-[#64b5f6]" />
+              <span>Новый фид / проект</span>
+            </button>
+          )}
         </div>
       </div>
 

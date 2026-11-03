@@ -159,14 +159,24 @@ export function resolveSparkFeeds(
 
     if (count === 0) continue;
 
+    const rawTitle = existing?.title || primary.title;
+    const cleanTitle = rawTitle
+      .replace(/\s*\(Spark\)/gi, '')
+      .replace(/^Spark\s*[—–-]\s*/gi, '')
+      .replace(/\s*\(daily\)/gi, '')
+      .trim();
+    const shortTitle = existing?.title
+      ? (cleanTitle.length > 24 ? cleanTitle.slice(0, 24) + '...' : cleanTitle)
+      : primary.shortTitle;
+
     result.push({
       id: existing?.id || primary.slug,
       slug: primary.slug,
-      title: existing?.title || primary.title,
-      shortTitle: primary.shortTitle,
-      emoji: primary.emoji,
+      title: existing?.title ? `${cleanTitle} (daily)` : primary.title,
+      shortTitle,
+      emoji: existing?.icon || primary.emoji,
       category: primary.category,
-      accentColor: primary.accentColor,
+      accentColor: existing?.color || primary.accentColor,
       badgeBgLight: primary.badgeBgLight,
       badgeTextLight: primary.badgeTextLight,
       badgeBgDark: primary.badgeBgDark,
@@ -205,10 +215,10 @@ export function resolveSparkFeeds(
         id: feed.id,
         slug: feed.slug,
         title: `${cleanTitle} (daily)`,
-        shortTitle: cleanTitle.length > 16 ? cleanTitle.slice(0, 16) + '...' : cleanTitle,
-        emoji: feed.slug === 'spark-notebooklmai' ? '🎙️' : feed.slug === 'spark-changelogsfeed' ? '🚀' : palette.emoji,
+        shortTitle: cleanTitle.length > 24 ? cleanTitle.slice(0, 24) + '...' : cleanTitle,
+        emoji: feed.icon || (feed.slug === 'spark-notebooklmai' ? '🎙️' : feed.slug === 'spark-changelogsfeed' ? '🚀' : palette.emoji),
         category: `${cleanTitle} (daily)`,
-        accentColor: palette.accent,
+        accentColor: feed.color || palette.accent,
         badgeBgLight: palette.badgeBgLight,
         badgeTextLight: palette.badgeTextLight,
         badgeBgDark: palette.badgeBgDark,

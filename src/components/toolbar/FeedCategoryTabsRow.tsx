@@ -235,12 +235,16 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
           </button>
         )}
 
-        {/* Add New Feed Chip (Visible in Edit Mode) */}
-        {isEditMode && onAddFeed && (
+        {/* Add New Feed Chip (Permanently accessible when adding feeds is supported) */}
+        {onAddFeed && (
           <button
             type="button"
             onClick={onAddFeed}
-            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-dashed border-amber-500/40 hover:border-amber-500 transition-all cursor-pointer shadow-2xs"
+            className={`shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+              isEditMode
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-dashed border-amber-500/40 hover:border-amber-500'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 border border-dashed border-slate-300 dark:border-white/20 hover:border-[#2481cc] hover:text-[#2481cc] dark:hover:text-[#64b5f6]'
+            }`}
             title="Создать новую ленту / фид"
           >
             <Plus className="w-3.5 h-3.5" />

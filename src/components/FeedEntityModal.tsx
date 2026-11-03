@@ -4,6 +4,8 @@ import { Feed } from '@lenta/shared';
 import { UnifiedFeedTab } from '../adapters/feeds/types';
 import { useCreateFeed, useUpdateFeed, useDeleteFeed } from '../api/queries';
 import { SymbolIcon } from './common/SymbolIcon';
+import { FeedModeOption } from './toolbar/types';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import {
   X,
   Save,
@@ -23,7 +25,9 @@ export interface FeedEntityModalProps {
   feedData?: Feed | null;
   isOpen: boolean;
   onClose: () => void;
-  onSaved?: () => void;
+  onSaved?: (savedFeed?: any, targetModeId?: string) => void;
+  currentSourceMode?: FeedModeOption | null;
+  availableSourceModes?: FeedModeOption[];
 }
 
 const PRESET_COLORS = [
@@ -46,22 +50,31 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
   isOpen,
   onClose,
   onSaved,
+  currentSourceMode,
+  availableSourceModes,
 }) => {
+  const { backdropProps } = useModalBackdrop(onClose);
   const isEditing = Boolean(feedTab || feedData);
 
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
-  const [description, setDescription] = useState('');
-  const [emoji, setEmoji] = useState('📁');
-  const [color, setColor] = useState('#2481cc');
-  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+  const [title, setTitle] = useState(() => feedData?.title || feedTab?.title || feedTab?.shortTitle || '');
+  const [slug, setSlug] = useState(() => feedData?.slug || feedTab?.slug || '');
+  const [description, setDescription] = useState(() => feedData?.description || feedTab?.description || '');
+  const [emoji, setEmoji] = useState(() => feedData?.icon || feedTab?.emoji || '📁');
+  const [color, setColor] = useState(() => feedData?.color || feedTab?.accentColor || '#2481cc');
+  const [privacy, setPrivacy] = useState<'public' | 'private'>(() => {
+    if (feedData?.privacy) return feedData.privacy === 'private' ? 'private' : 'public';
+    return currentSourceMode?.filterConfig?.privacy === 'private' || currentSourceMode?.id === 'private_feeds'
+      ? 'private'
+      : 'public';
+  });
+  const [targetModeId, setTargetModeId] = useState<string>(() => currentSourceMode?.id || 'all');
 
   // Folder paths state
-  const [folderPaths, setFolderPaths] = useState<string[]>([]);
+  const [folderPaths, setFolderPaths] = useState<string[]>(() => feedData?.folderPaths || []);
   const [folderInput, setFolderInput] = useState('');
 
   // Hashtags state
-  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [hashtags, setHashtags] = useState<string[]>(() => feedData?.hashtags || []);
   const [tagInput, setTagInput] = useState('');
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -98,13 +111,18 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
         setDescription('');
         setEmoji('📁');
         setColor('#2481cc');
-        setPrivacy('public');
+        const defaultPriv =
+          currentSourceMode?.filterConfig?.privacy === 'private' || currentSourceMode?.id === 'private_feeds'
+            ? 'private'
+            : 'public';
+        setPrivacy(defaultPriv);
         setFolderPaths([]);
         setHashtags([]);
       }
+      setTargetModeId(currentSourceMode?.id || 'all');
       setErrorMsg(null);
     }
-  }, [isOpen, feedTab, feedData]);
+  }, [isOpen, feedTab, feedData, currentSourceMode]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -183,13 +201,14 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
 
       const feedId = feedData?.id || (feedTab && feedTab.id !== feedTab.slug ? feedTab.id : undefined);
 
+      let savedFeed: any;
       if (feedId) {
-        await updateFeedMutation.mutateAsync({ id: feedId, data: payload });
+        savedFeed = await updateFeedMutation.mutateAsync({ id: feedId, data: payload });
       } else {
-        await createFeedMutation.mutateAsync(payload);
+        savedFeed = await createFeedMutation.mutateAsync(payload);
       }
 
-      onSaved?.();
+      onSaved?.(savedFeed, targetModeId);
       onClose();
     } catch (err: any) {
       console.error('Failed to save feed:', err);
@@ -220,7 +239,9 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="w-full max-w-xl bg-white dark:bg-[#18222d] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
@@ -292,6 +313,47 @@ export const FeedEntityModal: React.FC<FeedEntityModalProps> = ({
               />
             </div>
           </div>
+
+          {/* Target Section / Mode Selection */}
+          {!isEditing && availableSourceModes && availableSourceModes.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <label className="font-semibold text-slate-700 dark:text-slate-300">
+                Раздел ленты (Канал размещения)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {availableSourceModes
+                  .filter((m) => m.id !== 'telegram')
+                  .map((m) => {
+                    const isSelected = targetModeId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setTargetModeId(m.id);
+                          if (m.filterConfig?.privacy === 'private' || m.id === 'private_feeds') {
+                            setPrivacy('private');
+                          } else if (m.filterConfig?.privacy === 'public') {
+                            setPrivacy('public');
+                          }
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer transition-colors text-left ${
+                          isSelected
+                            ? 'bg-[#2481cc]/15 text-[#2481cc] dark:text-[#64b5f6] border-[#2481cc]/50 shadow-2xs font-semibold'
+                            : 'bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-sm shrink-0">{m.emoji}</span>
+                        <span className="truncate">{m.label}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Лента будет включена в выбранный раздел и сразу появится среди тематических вкладок.
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1">

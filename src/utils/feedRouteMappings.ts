@@ -172,7 +172,9 @@ export function getPathForFeedSource(
     opts = optionsOrFeedSlug;
   }
 
-  const basePath = SOURCE_TO_PATH[source] || '/all';
+  const basePath =
+    SOURCE_TO_PATH[source] ||
+    (source && source !== 'all' ? `/${encodeURIComponent(source.replace(/_/g, '-'))}` : '/all');
 
   let feedSlug = opts.feedSlug;
   let subtopic = opts.subtopic;
@@ -246,6 +248,8 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   let streamSource: FeedSourceMode = 'all';
   if (primarySegment && PATH_TO_SOURCE[primarySegment]) {
     streamSource = PATH_TO_SOURCE[primarySegment];
+  } else if (segments.length > 1 && primarySegment && primarySegment !== 'all') {
+    streamSource = primarySegment.replace(/-/g, '_') as FeedSourceMode;
   }
 
   let selectedFeedSlug: string | undefined;
@@ -262,6 +266,14 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
       if (decomp.subtopic) {
         subtopicSlug = decomp.subtopic;
       }
+    }
+  } else if (segments.length === 1 && primarySegment && primarySegment !== 'all' && !PATH_TO_SOURCE[primarySegment]) {
+    // Single path segment not matching a known source mode is treated as direct feed slug / alias
+    const rawFeed = ALIAS_TO_FEED_SLUG[primarySegment] || primarySegment;
+    selectedFeedSlug = rawFeed;
+    const decomp = decomposeFeedSlug(selectedFeedSlug);
+    if (decomp.subtopic) {
+      subtopicSlug = decomp.subtopic;
     }
   }
 

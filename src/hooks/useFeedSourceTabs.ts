@@ -206,14 +206,9 @@ export function useFeedSourceTabs({
     return FEED_ADAPTERS.all;
   }, [streamSource, sourceModes]);
 
-  // Thematic tabs (only tabs that actually have notes in current view)
-  const activeTabs: UnifiedFeedTab[] = useMemo(() => {
-    return activeAdapter.getTabs({ allFeeds, notes }).filter((t) => t.count > 0);
-  }, [activeAdapter, allFeeds, notes]);
-
   // Helper to match selected feed slug or alias/subtopic against tabs
   const matchesTabOrSubtopic = (tab: UnifiedFeedTab, targetSlug: string): boolean => {
-    if (tab.slug === targetSlug) return true;
+    if (tab.slug === targetSlug || tab.id === targetSlug) return true;
     if (tab.slug === 'spark-changelogsfeed' && (targetSlug === 'changelogs' || targetSlug === 'changelog')) return true;
     if (tab.slug === 'spark-notebooklmai' && (targetSlug === 'notebooklm' || targetSlug === 'notebooklmai')) return true;
     if (tab.subtopics && tab.subtopics.length > 0) {
@@ -227,9 +222,41 @@ export function useFeedSourceTabs({
     return false;
   };
 
+  // Thematic tabs: keep tabs with notes, or actual database feeds (configured for view), or selected feed
+  const activeTabs: UnifiedFeedTab[] = useMemo(() => {
+    const rawTabs = activeAdapter.getTabs({ allFeeds, notes });
+    const filtered = rawTabs.filter((t) => {
+      if (t.count > 0) return true;
+      const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug);
+      if (isDbFeed) return true;
+      if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug)) return true;
+      return false;
+    });
+
+    // If selectedFeedSlug matches a known DB feed that is not yet in rawTabs for this adapter,
+    // inject it so the newly created or directly navigated feed tab is instantly visible and selectable
+    if (selectedFeedSlug && !filtered.some((t) => matchesTabOrSubtopic(t, selectedFeedSlug))) {
+      const dbFeed = allFeeds.find((f) => f.slug === selectedFeedSlug || f.id === selectedFeedSlug);
+      if (dbFeed) {
+        filtered.push({
+          id: dbFeed.id,
+          slug: dbFeed.slug,
+          title: dbFeed.title,
+          shortTitle: dbFeed.title.length > 18 ? `${dbFeed.title.slice(0, 18)}...` : dbFeed.title,
+          emoji: dbFeed.icon || '📁',
+          accentColor: dbFeed.color || '#2481cc',
+          count: dbFeed._count?.notes || 0,
+          category: dbFeed.category || 'Общее',
+        });
+      }
+    }
+
+    return filtered;
+  }, [activeAdapter, allFeeds, notes, selectedFeedSlug]);
+
   // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
   useEffect(() => {
-    if (!selectedFeedSlug || isLoading) return;
+    if (!selectedFeedSlug || isLoading || activeTabs.length === 0) return;
     const stillExists = activeTabs.some((t) => matchesTabOrSubtopic(t, selectedFeedSlug));
     if (!stillExists) {
       setSelectedFeedSlug(undefined);

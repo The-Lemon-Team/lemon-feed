@@ -51,9 +51,9 @@ export const DEFAULT_FEED_MODES: FeedModeOption[] = [
     emoji: '🍿',
     description: 'Киновселенная Marvel, игры, киноновинки и музыкальные релизы',
     filterConfig: {
-      feedSlugs: ['marvel', 'cinema', 'games', 'music'],
-      tags: ['marvel', 'cinema', 'games', 'кино', 'игры', 'музыка'],
-      folderPaths: ['entertainment/'],
+      feedSlugs: ['marvel', 'cinema', 'films', 'games', 'music'],
+      tags: ['marvel', 'cinema', 'films', 'games', 'кино', 'игры', 'музыка'],
+      folderPaths: ['entertainment/', 'myfilms/'],
     },
   },
   {
