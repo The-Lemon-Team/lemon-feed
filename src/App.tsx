@@ -18,6 +18,8 @@ import { FeedCategoriesSheet } from './components/navigation/FeedCategoriesSheet
 import { FeedModals } from './components/FeedModals';
 import { FeedBottomNav } from './components/FeedBottomNav';
 import { FeedPeriodEndingSoonToast } from './components/notifications/FeedPeriodEndingSoonToast';
+import { FeedLiveUpdatesBanner } from './components/notifications/FeedLiveUpdatesBanner';
+import { useFeedLiveEvents } from './hooks/useFeedLiveEvents';
 import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 import { navigateToHostCalendar, navigateToHostTimeline } from './utils/hostNavigation';
 import { FeedSourceMode } from './adapters/feeds/types';
@@ -71,6 +73,14 @@ export const App: React.FC = () => {
     streamSource,
     selectedFeedSlug,
   });
+
+  // Live SSE stream & channel-grouped real-time updates
+  const {
+    newEventsCount,
+    groupedChannels,
+    applyUpdates: handleApplyLiveUpdates,
+    dismissUpdates: handleDismissLiveUpdates,
+  } = useFeedLiveEvents();
 
   // Source Modes & Tabs Management
   const {
@@ -321,6 +331,18 @@ export const App: React.FC = () => {
             onSelectPeriod={handleSelectPeriod}
           />
         )}
+
+        {/* Live Real-Time Channel-Grouped Updates Banner */}
+        <FeedLiveUpdatesBanner
+          newEventsCount={newEventsCount}
+          groupedChannels={groupedChannels}
+          onApply={handleApplyLiveUpdates}
+          onDismiss={handleDismissLiveUpdates}
+          onSelectChannel={(slug) => {
+            setSelectedFeedSlug(slug);
+            handleApplyLiveUpdates();
+          }}
+        />
 
         {/* Responsive Body: Stream-only or Split layout with desktop rail */}
         <div
