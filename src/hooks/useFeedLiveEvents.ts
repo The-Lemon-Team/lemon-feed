@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getFeedAppMode, getFeedAuthToken } from '../api/client';
+import { apiClient, getFeedAppMode, getFeedAuthToken } from '../api/client';
 
 export interface LiveNoteEvent {
   id: string;
@@ -47,7 +47,8 @@ export function useFeedLiveEvents() {
       query.set('token', token);
     }
 
-    const sseUrl = `/events/stream${query.toString() ? `?${query.toString()}` : ''}`;
+    const base = apiClient.defaults.baseURL ? apiClient.defaults.baseURL.replace(/\/$/, '') : '';
+    const sseUrl = `${base}/events/stream${query.toString() ? `?${query.toString()}` : ''}`;
     let eventSource: EventSource | null = null;
 
     try {
