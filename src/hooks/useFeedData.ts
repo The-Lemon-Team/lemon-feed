@@ -8,12 +8,18 @@ export interface UseFeedDataOptions {
   appMode: FeedAppRuntimeMode;
   streamSource?: string;
   selectedFeedSlug?: string;
+  search?: string;
+  startDateFrom?: string;
+  startDateTo?: string;
 }
 
 export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
   const appMode = typeof options === 'string' ? options : options.appMode;
   const streamSource = typeof options === 'object' ? options.streamSource : undefined;
   const selectedFeedSlug = typeof options === 'object' ? options.selectedFeedSlug : undefined;
+  const search = typeof options === 'object' ? options.search : undefined;
+  const startDateFrom = typeof options === 'object' ? options.startDateFrom : undefined;
+  const startDateTo = typeof options === 'object' ? options.startDateTo : undefined;
 
   const notesQueryParams = useMemo(
     () => ({
@@ -23,9 +29,13 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
         ? { appMode: 'staging' as const, privacy: 'public' as const }
         : { appMode: 'dev' as const, privacy: 'all' as const }),
       streamSource,
+      feedSlug: selectedFeedSlug || undefined,
       selectedFeedSlug,
+      search: search && search.trim() ? search.trim() : undefined,
+      startDateFrom,
+      startDateTo,
     }),
-    [appMode, streamSource, selectedFeedSlug]
+    [appMode, streamSource, selectedFeedSlug, search, startDateFrom, startDateTo]
   );
 
   const {

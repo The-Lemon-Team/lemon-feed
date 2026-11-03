@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { useFeedRouter } from './utils/feedRouter';
 import { useFeedAuthSync } from './hooks/useFeedAuthSync';
 import { useFeedTheme } from './hooks/useFeedTheme';
 import { useFeedAppModeSync } from './hooks/useFeedAppModeSync';
 import { useFeedData } from './hooks/useFeedData';
+import { useFeedPeriods } from './api/queries';
 import { useFeedSourceTabs } from './hooks/useFeedSourceTabs';
 import { useFeedFilters } from './hooks/useFeedFilters';
 import { useFeedItemsPipeline } from './hooks/useFeedItemsPipeline';
@@ -54,16 +55,55 @@ export const App: React.FC = () => {
     handleToggleEditMode,
   } = useFeedAppModeSync(isEmbed);
 
-  // Base Data Fetching & Normalization
+  // Dedicated Lightweight Periods / Channels Rail Data (Fast Boot)
+  const { data: allPeriods = [], refetch: refetchPeriods } = useFeedPeriods(appMode);
+
+  // Filters (Search, Month, Period, Horizon, Unassigned)
+  const {
+    searchQuery,
+    setSearchQuery,
+    deferredSearchQuery,
+    selectedMonth,
+    isMonthFilterActive,
+    filterUnassignedOnly,
+    setFilterUnassignedOnly,
+    feedHorizon,
+    handleSetHorizon,
+    selectedPeriodId,
+    periodFilterMode,
+    setPeriodFilterMode,
+    handleSelectPeriod,
+    handleSelectTag,
+    handleSelectFeed,
+    handlePrevMonth,
+    handleNextMonth,
+    handleSelectMonth,
+    handleResetMonthFilter,
+    handleToday,
+  } = useFeedFilters({
+    allPeriods,
+    setSelectedFeedSlug,
+    onAfterSelectFeed: () => setActiveMobileNav('stream'),
+  });
+
+  const startDateFrom = useMemo(
+    () => (isMonthFilterActive ? selectedMonth.startOf('month').toISOString() : undefined),
+    [isMonthFilterActive, selectedMonth]
+  );
+  const startDateTo = useMemo(
+    () => (isMonthFilterActive ? selectedMonth.endOf('month').toISOString() : undefined),
+    [isMonthFilterActive, selectedMonth]
+  );
+
+  // Base Data Fetching & Normalization (Server-Filtered Stream)
   const {
     rawNotes,
     allMappedNotes,
     notes,
     allFeeds,
     isLoading,
-    refetch,
+    refetch: refetchStream,
     isRefetching,
-    allPeriods,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -72,7 +112,14 @@ export const App: React.FC = () => {
     appMode,
     streamSource,
     selectedFeedSlug,
+    search: deferredSearchQuery,
+    startDateFrom,
+    startDateTo,
   });
+
+  const refetch = useCallback(async () => {
+    await Promise.all([refetchStream(), refetchPeriods()]);
+  }, [refetchStream, refetchPeriods]);
 
   // Live SSE stream & channel-grouped real-time updates
   const {
@@ -116,34 +163,6 @@ export const App: React.FC = () => {
 
   // Mobile navigation active tab
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
-
-  // Filters (Search, Month, Period, Horizon, Unassigned)
-  const {
-    searchQuery,
-    setSearchQuery,
-    deferredSearchQuery,
-    selectedMonth,
-    isMonthFilterActive,
-    filterUnassignedOnly,
-    setFilterUnassignedOnly,
-    feedHorizon,
-    handleSetHorizon,
-    selectedPeriodId,
-    periodFilterMode,
-    setPeriodFilterMode,
-    handleSelectPeriod,
-    handleSelectTag,
-    handleSelectFeed,
-    handlePrevMonth,
-    handleNextMonth,
-    handleSelectMonth,
-    handleResetMonthFilter,
-    handleToday,
-  } = useFeedFilters({
-    allPeriods,
-    setSelectedFeedSlug,
-    onAfterSelectFeed: () => setActiveMobileNav('stream'),
-  });
 
   // Feed Items Pipeline (Adaptation, Filtering, Pagination, Tag & Feed Aggregation)
   const {
