@@ -252,30 +252,73 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
 
     const presetTabs: UnifiedFeedTab[] = ALL_STREAMS_PRESETS
       .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
-      .map((preset) => ({
-        id: preset.slug,
-        slug: preset.slug,
-        title: preset.title,
-        shortTitle: preset.shortTitle,
-        emoji: preset.emoji,
-        category: preset.category,
-        count: countsByPreset[preset.slug] || 0,
-        accentColor: preset.accentColor,
-        badgeBgLight: preset.badgeBgLight,
-        badgeTextLight: preset.badgeTextLight,
-        badgeBgDark: preset.badgeBgDark,
-        badgeTextDark: preset.badgeTextDark,
-        description: preset.description,
-        isHot: preset.isHot,
-      }));
+      .map((preset) => {
+        const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
+        const resolvedTitle = dbFeed?.title || preset.title;
+        const cleanTitle = dbFeed?.title
+          ? dbFeed.title.replace(/\s*\(Spark\)/gi, '').replace(/\s*\(daily\)/gi, '').trim()
+          : preset.shortTitle;
+        const resolvedShortTitle = dbFeed?.title
+          ? (cleanTitle.length > 18 ? cleanTitle.slice(0, 18) + '...' : cleanTitle)
+          : preset.shortTitle;
+
+        return {
+          id: dbFeed?.id || preset.slug,
+          slug: preset.slug,
+          title: resolvedTitle,
+          shortTitle: resolvedShortTitle,
+          emoji: dbFeed?.icon || preset.emoji,
+          category: preset.category,
+          count: countsByPreset[preset.slug] || 0,
+          accentColor: dbFeed?.color || preset.accentColor,
+          badgeBgLight: preset.badgeBgLight,
+          badgeTextLight: preset.badgeTextLight,
+          badgeBgDark: preset.badgeBgDark,
+          badgeTextDark: preset.badgeTextDark,
+          description: dbFeed?.description || preset.description,
+          isHot: preset.isHot,
+        };
+      });
 
     const hotTab = presetTabs.find((t) => t.slug === 'hot-daily');
     const otherPresets = presetTabs.filter((t) => t.slug !== 'hot-daily');
 
-    // Return: Hot preset -> Daily folder feeds -> Remaining thematic presets
+    // Custom database feeds (e.g. My Music, MY_films, Public Stream)
+    const customDbTabs: UnifiedFeedTab[] = context.allFeeds
+      .filter(
+        (f) =>
+          !isSparkSlug(f.slug) &&
+          !f.slug.startsWith('spark-') &&
+          !ALL_STREAMS_PRESETS.some((p) => p.slug === f.slug) &&
+          !dailyFolderTabs.some((t) => t.id === f.id || t.slug === f.slug) &&
+          !(f.folderPaths || []).some((p: string) => p.toLowerCase().startsWith('spark'))
+      )
+      .map((f) => {
+        const count = context.notes.filter(
+          (n) => n.feed?.id === f.id || n.feed?.slug === f.slug
+        ).length;
+        return {
+          id: f.id,
+          slug: f.slug,
+          title: f.title,
+          shortTitle: f.title.length > 18 ? f.title.slice(0, 18) + '...' : f.title,
+          emoji: f.icon || '📁',
+          category: 'Каналы & Ленты',
+          count,
+          accentColor: f.color || '#2481cc',
+          badgeBgLight: 'rgba(36, 129, 204, 0.1)',
+          badgeTextLight: '#1e6cb0',
+          badgeBgDark: 'rgba(36, 129, 204, 0.25)',
+          badgeTextDark: '#93c5fd',
+          description: f.description || undefined,
+        };
+      });
+
+    // Return: Hot preset -> Daily folder feeds -> Custom DB feeds -> Remaining thematic presets
     return [
       ...(hotTab ? [hotTab] : []),
       ...dailyFolderTabs,
+      ...customDbTabs,
       ...otherPresets,
     ];
   },

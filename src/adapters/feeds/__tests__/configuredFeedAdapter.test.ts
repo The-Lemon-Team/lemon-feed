@@ -329,4 +329,30 @@ describe('createConfiguredFeedAdapter with DEFAULT_FEED_MODES', () => {
     const adapted = adapter.adaptNotes([publicFeedNote]);
     expect(adapted.length).toBe(0);
   });
+
+  it('includes custom database feeds (e.g. "My Music") in entertainment tab even with 0 notes', () => {
+    const entertainmentMode = DEFAULT_FEED_MODES.find((m) => m.id === 'entertainment')!;
+    const adapter = createConfiguredFeedAdapter(entertainmentMode);
+
+    const allFeeds = [
+      {
+        id: 'ef76023f-e39b-4fa2-8354-7efe8f9c2ca7',
+        title: 'My Music',
+        slug: 'my-music',
+        icon: '📁',
+        color: '#2481cc',
+        privacy: 'public',
+        folderPaths: [],
+        hashtags: [],
+      },
+    ];
+
+    // Zero notes in database for this feed
+    const tabs = adapter.getTabs({ allFeeds, notes: [] });
+    const myMusicTab = tabs.find((t) => t.slug === 'my-music');
+    expect(myMusicTab).toBeDefined();
+    expect(myMusicTab?.title).toBe('My Music');
+    expect(myMusicTab?.count).toBe(0);
+    expect(myMusicTab?.id).toBe('ef76023f-e39b-4fa2-8354-7efe8f9c2ca7');
+  });
 });

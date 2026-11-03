@@ -27,7 +27,7 @@ export function useFeedFilters({
         if (parsed.isValid()) return parsed;
       }
     }
-    return dayjs('2026-10-17');
+    return dayjs();
   });
   const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(false);

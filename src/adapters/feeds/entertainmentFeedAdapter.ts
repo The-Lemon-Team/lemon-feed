@@ -64,7 +64,7 @@ export const ENTERTAINMENT_FEED_PRESETS: EntertainmentFeedPreset[] = [
     badgeBgDark: 'rgba(236, 72, 153, 0.25)',
     badgeTextDark: '#f472b6',
     description: 'Новые музыкальные альбомы, официальные саундтреки и ключевые музыкальные релизы',
-    matchingSlugs: ['music', 'soundtrack', 'albums', 'музыка'],
+    matchingSlugs: ['music', 'soundtrack', 'albums', 'музыка', 'my-music'],
   },
   {
     slug: 'gaming',
@@ -92,8 +92,10 @@ export function getEntertainmentPresetForSlug(feedSlug?: string | null): Enterta
 
 export function isEntertainmentNote(note: Note): boolean {
   if (getEntertainmentPresetForSlug(note.feed?.slug)) return true;
+  const s = (note.feed?.slug || '').toLowerCase();
+  if (s.includes('music') || s.includes('film') || s.includes('movie') || s.includes('marvel') || s.includes('game')) return true;
   const p = (note.folderPath || '').toLowerCase();
-  if (p.includes('marvel') || p.includes('mcu') || p.includes('cinema') || p.includes('movie') || p.includes('music') || p.includes('game')) {
+  if (p.includes('marvel') || p.includes('mcu') || p.includes('cinema') || p.includes('movie') || p.includes('film') || p.includes('music') || p.includes('game')) {
     return true;
   }
   return false;
@@ -119,21 +121,29 @@ export const EntertainmentFeedAdapter: FeedAdapter = {
       countsByPreset[preset.slug] = (countsByPreset[preset.slug] || 0) + 1;
     }
 
-    return ENTERTAINMENT_FEED_PRESETS
+    const presetTabs = ENTERTAINMENT_FEED_PRESETS
       .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
         const count = countsByPreset[preset.slug] || 0;
 
+        const title = dbFeed?.title || preset.title;
+        const cleanTitle = dbFeed?.title
+          ? dbFeed.title.replace(/\s*\(Spark\)/gi, '').replace(/\s*\(daily\)/gi, '').trim()
+          : preset.shortTitle;
+        const shortTitle = dbFeed?.title
+          ? (cleanTitle.length > 18 ? cleanTitle.slice(0, 18) + '...' : cleanTitle)
+          : preset.shortTitle;
+
         return {
           id: dbFeed?.id || preset.slug,
           slug: preset.slug,
-          title: preset.title,
-          shortTitle: preset.shortTitle,
-          emoji: preset.emoji,
+          title,
+          shortTitle,
+          emoji: dbFeed?.icon || preset.emoji,
           category: preset.category,
           count,
-          accentColor: preset.accentColor,
+          accentColor: dbFeed?.color || preset.accentColor,
           badgeBgLight: preset.badgeBgLight,
           badgeTextLight: preset.badgeTextLight,
           badgeBgDark: preset.badgeBgDark,
@@ -141,6 +151,49 @@ export const EntertainmentFeedAdapter: FeedAdapter = {
           description: dbFeed?.description || preset.description,
         };
       });
+
+    // Custom database feeds matching entertainment (e.g. My Music, MY_films)
+    const customDbTabs: UnifiedFeedTab[] = context.allFeeds
+      .filter((f) => {
+        if (ENTERTAINMENT_FEED_PRESETS.some((p) => p.matchingSlugs.includes(f.slug.toLowerCase()))) return false;
+        const s = f.slug.toLowerCase();
+        const p = (f.folderPaths || []).join(' ').toLowerCase();
+        const t = (f.hashtags || []).join(' ').toLowerCase();
+        return (
+          s.includes('music') ||
+          s.includes('film') ||
+          s.includes('movie') ||
+          s.includes('marvel') ||
+          s.includes('game') ||
+          p.includes('entertainment') ||
+          p.includes('music') ||
+          p.includes('film') ||
+          t.includes('music') ||
+          t.includes('film')
+        );
+      })
+      .map((f) => {
+        const count = context.notes.filter(
+          (n) => n.feed?.id === f.id || n.feed?.slug === f.slug
+        ).length;
+        return {
+          id: f.id,
+          slug: f.slug,
+          title: f.title,
+          shortTitle: f.title.length > 18 ? f.title.slice(0, 18) + '...' : f.title,
+          emoji: f.icon || '📁',
+          category: 'Развлечения',
+          count,
+          accentColor: f.color || '#ec4899',
+          badgeBgLight: 'rgba(236, 72, 153, 0.1)',
+          badgeTextLight: '#be185d',
+          badgeBgDark: 'rgba(236, 72, 153, 0.25)',
+          badgeTextDark: '#f472b6',
+          description: f.description || undefined,
+        };
+      });
+
+    return [...presetTabs, ...customDbTabs];
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {
@@ -155,6 +208,12 @@ export const EntertainmentFeedAdapter: FeedAdapter = {
           const p = (n.folderPath || '').toLowerCase();
           if (activePreset.matchingSlugs.some((ms) => p.includes(ms))) return true;
           return false;
+        });
+      } else {
+        matched = matched.filter((n) => {
+          const s = (n.feed?.slug || '').toLowerCase();
+          const target = activeFeedSlug.toLowerCase();
+          return s === target || s.includes(target) || target.includes(s);
         });
       }
     }

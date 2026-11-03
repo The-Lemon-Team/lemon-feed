@@ -105,6 +105,8 @@ export interface FeedAdapterContext {
     privacy?: 'public' | 'private' | string;
     icon?: string | null;
     color?: string | null;
+    folderPaths?: string[];
+    hashtags?: string[];
     _count?: { notes: number };
   }>;
   notes: Note[];

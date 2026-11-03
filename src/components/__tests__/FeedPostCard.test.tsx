@@ -54,16 +54,14 @@ describe('FeedPostCard', () => {
       expect(screen.getByText(/31/)).toBeInTheDocument();
     });
 
-    it('shows views count and high resonance badge when score >= 80', () => {
+    it('shows high resonance badge when score >= 80', () => {
       const normalItem = makeFeedItem({ resonanceScore: 45 });
       const { unmount } = render(<FeedPostCard item={normalItem} appMode="public" />);
-      expect(screen.getByText('45')).toBeInTheDocument();
-      expect(screen.queryByText(/Резонанс 45%/)).toBeNull();
+      expect(screen.queryByText(/Резонанс/)).toBeNull();
       unmount();
 
       const highResItem = makeFeedItem({ resonanceScore: 92 });
       render(<FeedPostCard item={highResItem} appMode="public" />);
-      expect(screen.getByText('92')).toBeInTheDocument();
       expect(screen.getByText('Резонанс 92%')).toBeInTheDocument();
     });
 

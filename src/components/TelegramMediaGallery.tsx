@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { TelegramMediaItem } from '../api/telegramReaderApi';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import {
   Image as ImageIcon,
   Film,
@@ -41,9 +42,10 @@ export const TelegramMediaGallery: React.FC<TelegramMediaGalleryProps> = ({
     setLightboxIndex(index);
   };
 
-  const closeLightbox = () => {
+  const closeLightbox = useCallback(() => {
     setLightboxIndex(null);
-  };
+  }, []);
+  const { backdropProps: lightboxBackdropProps } = useModalBackdrop(closeLightbox);
 
   const handlePrev = useCallback(() => {
     if (lightboxIndex === null) return;
@@ -280,7 +282,9 @@ export const TelegramMediaGallery: React.FC<TelegramMediaGalleryProps> = ({
         <div
           className="fixed inset-0 z-[10001] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in select-none"
           style={{ zIndex: 10001 }}
-          onClick={closeLightbox}
+          {...lightboxBackdropProps}
+          role="dialog"
+          aria-modal="true"
         >
           {/* Top Control Bar */}
           <div

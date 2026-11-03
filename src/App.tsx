@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import dayjs from 'dayjs';
 import { useFeedRouter } from './utils/feedRouter';
 import { useFeedAuthSync } from './hooks/useFeedAuthSync';
 import { useFeedTheme } from './hooks/useFeedTheme';
@@ -19,6 +20,7 @@ import { FeedBottomNav } from './components/FeedBottomNav';
 import { FeedPeriodEndingSoonToast } from './components/notifications/FeedPeriodEndingSoonToast';
 import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 import { navigateToHostCalendar, navigateToHostTimeline } from './utils/hostNavigation';
+import { FeedSourceMode } from './adapters/feeds/types';
 
 export const App: React.FC = () => {
   const {
@@ -32,6 +34,7 @@ export const App: React.FC = () => {
     toggleLayoutMode,
     openNote,
     closeNote,
+    navigateTo,
   } = useFeedRouter();
 
   // Synchronize authentication token and session from parent host via postMessage
@@ -63,6 +66,7 @@ export const App: React.FC = () => {
 
   // Source Modes & Tabs Management
   const {
+    sourceModes,
     visibleSourceModes,
     activeAdapter,
     activeTabs,
@@ -200,6 +204,37 @@ export const App: React.FC = () => {
     [setStreamSource, setSelectedFeedSlug]
   );
 
+  const handleFeedSaved = useCallback(
+    (savedFeed?: any, targetModeId?: string) => {
+      if (savedFeed) {
+        const targetId = (targetModeId || streamSource || 'all') as FeedSourceMode;
+        if (targetId && targetId !== 'all') {
+          const targetMode = sourceModes.find((m) => m.id === targetId);
+          if (targetMode) {
+            const currentSlugs = targetMode.filterConfig?.feedSlugs || [];
+            if (!currentSlugs.includes(savedFeed.slug)) {
+              const updatedMode = {
+                ...targetMode,
+                filterConfig: {
+                  ...targetMode.filterConfig,
+                  feedSlugs: [...currentSlugs, savedFeed.slug],
+                },
+              };
+              handleSaveSourceTab(updatedMode);
+            }
+          }
+        }
+        if (savedFeed.slug) {
+          navigateTo(targetId, savedFeed.slug);
+        } else {
+          setStreamSource(targetId);
+        }
+      }
+      refetch();
+    },
+    [streamSource, sourceModes, handleSaveSourceTab, navigateTo, setStreamSource, refetch]
+  );
+
   const isPublicOnly = isPublicMode || appMode === 'public';
 
   return (
@@ -331,6 +366,7 @@ export const App: React.FC = () => {
               currentMonthName={selectedMonth.format('MMMM YYYY')}
               isPublicMode={isPublicMode}
               onCreateNote={!isPublicOnly ? handleOpenCreateNote : undefined}
+              onAddFeed={!isPublicOnly ? handleOpenAddFeed : undefined}
               periods={activeChannelPeriods}
               selectedPeriodId={selectedPeriodId}
               onSelectPeriod={handleSelectPeriod}
@@ -347,6 +383,8 @@ export const App: React.FC = () => {
         selectedFeedSlug={selectedFeedSlug}
         onSelectFeed={handleSelectFeed}
         totalCount={totalCount}
+        onAddFeed={!isPublicOnly ? handleOpenAddFeed : undefined}
+        isPublicMode={isPublicMode}
       />
 
       {/* Lazy Modals */}
@@ -361,7 +399,7 @@ export const App: React.FC = () => {
         isCreateNoteOpen={isCreateNoteOpen}
         onCloseCreateNote={handleCloseCreateNote}
         selectedFeedSlug={selectedFeedSlug}
-        defaultDate={selectedMonth.format('YYYY-MM-DD')}
+        defaultDate={isMonthFilterActive ? selectedMonth.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')}
         appMode={appMode}
         isPublicMode={isPublicMode}
         aiCoverItem={aiCoverItem}
@@ -375,6 +413,9 @@ export const App: React.FC = () => {
         editingDbFeed={editingDbFeed}
         isFeedEntityModalOpen={isFeedEntityModalOpen}
         onCloseFeedEntityModal={handleCloseFeedEntityModal}
+        onFeedSaved={handleFeedSaved}
+        currentSourceMode={visibleSourceModes.find((m) => m.id === streamSource) || null}
+        availableSourceModes={visibleSourceModes}
         editingSourceTab={editingSourceTab}
         isSourceTabModalOpen={isSourceTabModalOpen}
         onCloseSourceTabModal={handleCloseSourceTabModal}

@@ -169,10 +169,20 @@ describe('FeedDetailModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it.todo(
-      'does not close when a drag that started inside the card is released on the backdrop ' +
-        '(currently closes: the card stops mousedown propagation, so the overlay never records the origin)'
-    );
+    it('does not close when a drag that started inside the card is released on the backdrop', () => {
+      const onClose = vi.fn();
+      render(<FeedDetailModal item={makeFeedItem()} onClose={onClose} />);
+      const card = backdrop().firstElementChild as HTMLElement;
+
+      // Start drag inside the card (e.g. text selection)
+      fireEvent.mouseDown(card);
+      // Release outside on the backdrop
+      fireEvent.mouseUp(backdrop());
+      // Browser dispatches click on the common ancestor (backdrop)
+      fireEvent.click(backdrop());
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
   });
 
   describe('Detail › related notes', () => {

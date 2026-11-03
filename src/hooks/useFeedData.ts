@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useFeedNotes, useFeedSources } from '../api/queries';
 import { FeedAppRuntimeMode, normalizeNotesForPublicFeeds } from '../utils/appMode';
 import { extractPeriodItems, PeriodItem } from '../utils/periods';
@@ -14,8 +14,12 @@ export function useFeedData(appMode: FeedAppRuntimeMode) {
     [appMode]
   );
 
-  const { data: rawNotes = [], isLoading, refetch, isRefetching } = useFeedNotes(notesQueryParams);
-  const { data: allFeeds = [] } = useFeedSources();
+  const { data: rawNotes = [], isLoading, refetch: refetchNotes, isRefetching } = useFeedNotes(notesQueryParams);
+  const { data: allFeeds = [], refetch: refetchFeeds } = useFeedSources();
+
+  const refetch = useCallback(async () => {
+    await Promise.all([refetchNotes(), refetchFeeds()]);
+  }, [refetchNotes, refetchFeeds]);
 
   const allMappedNotes = useMemo(
     () => normalizeNotesForPublicFeeds(rawNotes),

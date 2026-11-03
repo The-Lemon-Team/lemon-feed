@@ -109,15 +109,23 @@ export const HolidaysFeedAdapter: FeedAdapter = {
         const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
         const count = countsByPreset[preset.slug] || 0;
 
+        const title = dbFeed?.title || preset.title;
+        const cleanTitle = dbFeed?.title
+          ? dbFeed.title.replace(/\s*\(Spark\)/gi, '').replace(/\s*\(daily\)/gi, '').trim()
+          : preset.shortTitle;
+        const shortTitle = dbFeed?.title
+          ? (cleanTitle.length > 18 ? cleanTitle.slice(0, 18) + '...' : cleanTitle)
+          : preset.shortTitle;
+
         return {
           id: dbFeed?.id || preset.slug,
           slug: preset.slug,
-          title: preset.title,
-          shortTitle: preset.shortTitle,
-          emoji: preset.emoji,
+          title,
+          shortTitle,
+          emoji: dbFeed?.icon || preset.emoji,
           category: preset.category,
           count,
-          accentColor: preset.accentColor,
+          accentColor: dbFeed?.color || preset.accentColor,
           badgeBgLight: preset.badgeBgLight,
           badgeTextLight: preset.badgeTextLight,
           badgeBgDark: preset.badgeBgDark,

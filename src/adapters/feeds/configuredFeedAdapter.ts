@@ -182,30 +182,54 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       const countsBySlug: Record<string, number> = {};
       const feedMetaBySlug: Record<
         string,
-        { title: string; emoji: string; color: string; description?: string }
+        { id?: string; title: string; emoji: string; color: string; description?: string }
       > = {};
 
       const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
+      const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
+      const hasTags = Boolean(targetTags && targetTags.length > 0);
 
-      if (hasSlugs) {
-        for (const f of context.allFeeds) {
-          if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
-          if (targetPrivacy === 'public' && f.privacy === 'private') continue;
-
-          // Child subtopics of changelogs/notebooklm roll up into their parent tabs
-          if (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')) continue;
-          if (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-')) continue;
-
-          if (!targetSlugs!.has(f.slug.toLowerCase())) continue;
-
-          countsBySlug[f.slug] = 0;
-          feedMetaBySlug[f.slug] = {
-            title: f.title,
-            emoji: f.icon || modeOption.emoji || '📁',
-            color: f.color || '#2481cc',
-            description: f.description || undefined,
-          };
+      const feedMatchesFilter = (f: { slug: string; folderPaths?: string[]; hashtags?: string[] }): boolean => {
+        const slug = f.slug.toLowerCase();
+        if (hasSlugs) {
+          if (targetSlugs!.has(slug)) return true;
+          if (Array.from(targetSlugs!).some((s) => slug.includes(s) || s.includes(slug))) return true;
         }
+        if (hasFolders && f.folderPaths && f.folderPaths.length > 0) {
+          const matched = f.folderPaths.some((fp) => {
+            const p = fp.toLowerCase();
+            return targetFolders!.some((tf) => p.includes(tf) || tf.includes(p));
+          });
+          if (matched) return true;
+        }
+        if (hasTags && f.hashtags && f.hashtags.length > 0) {
+          const matched = f.hashtags.some((ht) => {
+            const t = (typeof ht === 'string' ? ht : (ht as any)?.name || '').toLowerCase().replace(/^#/, '');
+            return targetTags!.some((tt) => t === tt);
+          });
+          if (matched) return true;
+        }
+        return false;
+      };
+
+      for (const f of context.allFeeds) {
+        if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
+        if (targetPrivacy === 'public' && f.privacy === 'private') continue;
+
+        // Child subtopics of changelogs/notebooklm roll up into their parent tabs
+        if (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')) continue;
+        if (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-')) continue;
+
+        if (!feedMatchesFilter(f)) continue;
+
+        countsBySlug[f.slug] = 0;
+        feedMetaBySlug[f.slug] = {
+          id: f.id,
+          title: f.title,
+          emoji: f.icon || modeOption.emoji || '📁',
+          color: f.color || '#2481cc',
+          description: f.description || undefined,
+        };
       }
 
       const allowsChangelogs =
@@ -257,26 +281,33 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
           }
 
           const slug = n.feed?.slug || (targetPrivacy === 'private' ? 'private-notes' : 'general-notes');
-          if (targetSlugs && !targetSlugs.has(slug.toLowerCase())) {
+          const slugLower = slug.toLowerCase();
+          if (
+            targetSlugs &&
+            !targetSlugs.has(slugLower) &&
+            !Array.from(targetSlugs).some((s) => slugLower.includes(s) || s.includes(slugLower))
+          ) {
             continue;
           }
           countsBySlug[slug] = (countsBySlug[slug] || 0) + 1;
           if (!feedMetaBySlug[slug]) {
+            const matchedDbFeed = context.allFeeds.find((f) => f.slug === slug || f.id === n.feed?.id);
             feedMetaBySlug[slug] = {
-              title: n.feed?.title || (slug === 'private-notes' ? 'Личные заметки' : slug),
-              emoji: n.feed?.icon || modeOption.emoji || '📁',
-              color: n.feed?.color || '#2481cc',
-              description: n.feed?.description || undefined,
+              id: matchedDbFeed?.id || n.feed?.id,
+              title: matchedDbFeed?.title || n.feed?.title || (slug === 'private-notes' ? 'Личные заметки' : slug),
+              emoji: matchedDbFeed?.icon || n.feed?.icon || modeOption.emoji || '📁',
+              color: matchedDbFeed?.color || n.feed?.color || '#2481cc',
+              description: matchedDbFeed?.description || n.feed?.description || undefined,
             };
           }
         }
       }
 
       const feedTabs: UnifiedFeedTab[] = Object.entries(feedMetaBySlug)
-        .filter(([slug]) => (countsBySlug[slug] || 0) > 0)
+        .filter(([slug, meta]) => (countsBySlug[slug] || 0) > 0 || Boolean(meta.id))
         .map(([slug, meta]) => {
           const tab: UnifiedFeedTab = {
-            id: `tab-cfg-${slug}`,
+            id: meta.id || `tab-cfg-${slug}`,
             slug,
             title: meta.title,
             shortTitle: meta.title.length > 18 ? meta.title.slice(0, 18) + '...' : meta.title,

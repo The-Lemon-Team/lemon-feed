@@ -19,6 +19,7 @@ export const queryKeys = {
 export function useFeedNotes(params?: QueryNotesParams) {
   return useQuery({
     queryKey: queryKeys.allNotes(params),
+    staleTime: 1000 * 60 * 3, // 3 minutes cache keeps client navigation instant
     placeholderData: (previousData, previousQuery) => {
       const prevParams = previousQuery?.queryKey?.[2] as QueryNotesParams | undefined;
       if (prevParams?.appMode !== params?.appMode) {
@@ -51,7 +52,13 @@ export function useCreateFeed() {
     mutationFn: async (data: CreateFeedPayload) => {
       return await feedApi.createFeed(data);
     },
-    onSuccess: () => {
+    onSuccess: (newFeed) => {
+      if (newFeed) {
+        queryClient.setQueryData(queryKeys.feeds, (old: any) => {
+          if (!old || !Array.isArray(old)) return [newFeed];
+          return [...old.filter((f: any) => f.id !== newFeed.id && f.slug !== newFeed.slug), newFeed];
+        });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
     },
@@ -64,7 +71,13 @@ export function useUpdateFeed() {
     mutationFn: async ({ id, data }: { id: string; data: UpdateFeedPayload }) => {
       return await feedApi.updateFeed(id, data);
     },
-    onSuccess: () => {
+    onSuccess: (updatedFeed) => {
+      if (updatedFeed) {
+        queryClient.setQueryData(queryKeys.feeds, (old: any) => {
+          if (!old || !Array.isArray(old)) return [updatedFeed];
+          return old.map((f: any) => (f.id === updatedFeed.id || f.slug === updatedFeed.slug ? updatedFeed : f));
+        });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
     },
@@ -77,7 +90,13 @@ export function useDeleteFeed() {
     mutationFn: async (id: string) => {
       return await feedApi.deleteFeed(id);
     },
-    onSuccess: () => {
+    onSuccess: (_data, deletedId) => {
+      if (deletedId) {
+        queryClient.setQueryData(queryKeys.feeds, (old: any) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.filter((f: any) => f.id !== deletedId && f.slug !== deletedId);
+        });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.feeds });
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
     },
