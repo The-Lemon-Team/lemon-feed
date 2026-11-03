@@ -42,6 +42,9 @@ export interface FeedModalsProps {
   editingDbFeed: any | null;
   isFeedEntityModalOpen: boolean;
   onCloseFeedEntityModal: () => void;
+  onFeedSaved?: (savedFeed?: any, targetModeId?: string) => void;
+  currentSourceMode?: FeedModeOption | null;
+  availableSourceModes?: FeedModeOption[];
   // Source Tab Modal
   editingSourceTab: FeedModeOption | null;
   isSourceTabModalOpen: boolean;
@@ -79,6 +82,9 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
   editingDbFeed,
   isFeedEntityModalOpen,
   onCloseFeedEntityModal,
+  onFeedSaved,
+  currentSourceMode,
+  availableSourceModes,
   editingSourceTab,
   isSourceTabModalOpen,
   onCloseSourceTabModal,
@@ -160,7 +166,9 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           feedData={editingDbFeed}
           isOpen={isFeedEntityModalOpen}
           onClose={onCloseFeedEntityModal}
-          onSaved={onRefetch}
+          onSaved={onFeedSaved || onRefetch}
+          currentSourceMode={currentSourceMode}
+          availableSourceModes={availableSourceModes}
         />
       )}
 

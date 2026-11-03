@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FeedModeOption } from './toolbar/types';
 import { FeedTabFilterConfig, FeedPrivacyFilter } from '../adapters/feeds/types';
 import { SymbolIcon } from './common/SymbolIcon';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import {
   X,
   Save,
@@ -50,6 +51,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   allFeeds = [],
   availableHashtags = [],
 }) => {
+  const { backdropProps } = useModalBackdrop(onClose);
   const isEditing = Boolean(tab);
 
   const [label, setLabel] = useState('');
@@ -266,7 +268,9 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="w-full max-w-2xl max-h-[92vh] bg-white dark:bg-[#18222d] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden"

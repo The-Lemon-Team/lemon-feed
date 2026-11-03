@@ -10,6 +10,7 @@ import { WorkspaceBatchBar } from './WorkspaceBatchBar';
 import { GeneralNotesSection } from './GeneralNotesSection';
 import { WorkspaceFloatingButton } from './WorkspaceFloatingButton';
 import { WorkspaceDockHeader } from './WorkspaceDockHeader';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 import { PinCardItem } from './PinCardItem';
 import { AddTrackInlineControl, WorkspaceDockModals } from './WorkspaceDockExtras';
 import { useWorkspaceDnd, WORKSPACE_DROP_ANIMATION } from './useWorkspaceDnd';
@@ -200,6 +201,7 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({
 
   const handleOpenDock = useCallback(() => setIsDockOpen(true), [setIsDockOpen]);
   const handleCloseDock = useCallback(() => setIsDockOpen(false), [setIsDockOpen]);
+  const { backdropProps: dockBackdropProps } = useModalBackdrop(handleCloseDock);
   const handleToggleFilterAttention = useCallback(
     () => setFilterAttentionOnly((prev) => !prev),
     []
@@ -245,7 +247,7 @@ export const PinnedNotesDock: React.FC<PinnedNotesDockProps> = ({
       {isDockOpen && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex justify-end animate-fadeIn"
-          onClick={handleCloseDock}
+          {...dockBackdropProps}
         >
           <div
             className="w-full sm:w-[460px] max-w-full h-full bg-white dark:bg-[#151e27] border-l border-slate-200 dark:border-white/10 shadow-2xl flex flex-col animate-slideInRight"

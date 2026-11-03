@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Note } from '@lenta/shared';
 import { useCreateNote, useFeedSources } from '../api/queries';
 import { FeedAppRuntimeMode } from '../utils/appMode';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import dayjs from 'dayjs';
 import {
   X,
@@ -51,6 +52,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
 }) => {
   const { data: feeds = [] } = useFeedSources();
   const createNoteMutation = useCreateNote();
+  const { backdropProps } = useModalBackdrop(onClose);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -162,7 +164,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
       style={{ zIndex: 10000 }}
-      onClick={onClose}
+      {...backdropProps}
       role="dialog"
       aria-modal="true"
     >

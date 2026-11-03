@@ -24,6 +24,7 @@ import {
   detectFeedItStyleRecommendation,
 } from './cover-studio/feedCoverStudio.utils';
 import { FeedCoverStudioItControls } from './cover-studio/FeedCoverStudioItControls';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 
 export interface FeedAiCoverModalProps {
   item: UnifiedFeedItem | null;
@@ -38,6 +39,7 @@ export const FeedAiCoverModal: React.FC<FeedAiCoverModalProps> = ({
   onClose,
   onCoverApplied,
 }) => {
+  const { backdropProps } = useModalBackdrop(onClose);
   const [prompt, setPrompt] = useState('');
   const [style, setStyle] = useState('ai-neural');
   const [aspectRatio, setAspectRatio] = useState<FeedCoverAspectRatio>('16:9');
@@ -207,7 +209,7 @@ export const FeedAiCoverModal: React.FC<FeedAiCoverModalProps> = ({
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
       style={{ zIndex: 10000 }}
-      onClick={onClose}
+      {...backdropProps}
       role="dialog"
       aria-modal="true"
     >

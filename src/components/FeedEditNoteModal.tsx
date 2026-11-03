@@ -6,6 +6,7 @@ import { resolveMediaUrl } from '../api/client';
 import { extractCleanSnippet } from '@lenta/shared';
 import dayjs from 'dayjs';
 import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import {
   X,
   Edit3,
@@ -42,6 +43,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   onOpenAiCover,
   onSaved,
 }) => {
+  const { backdropProps } = useModalBackdrop(onClose);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [summary, setSummary] = useState('');
@@ -149,7 +151,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
       style={{ zIndex: 10000 }}
-      onClick={onClose}
+      {...backdropProps}
       role="dialog"
       aria-modal="true"
     >

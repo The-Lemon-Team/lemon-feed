@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Sparkles, ExternalLink, Calendar, RefreshCw } from 'lucide-react';
 import { LemonLogo } from './LemonLogo';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 
 export interface LemonSeasonsModalProps {
   isOpen: boolean;
@@ -23,13 +24,17 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({ isOpen, on
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { backdropProps } = useModalBackdrop(onClose);
+
   if (!isOpen) return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="w-full max-w-lg bg-white dark:bg-[#18222d] border border-amber-500/30 dark:border-amber-400/20 rounded-3xl p-6 sm:p-7 shadow-2xl relative space-y-5 overflow-hidden"

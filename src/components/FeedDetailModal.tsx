@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown } from '@lenta/shared';
+import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -38,7 +39,6 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   onOpenNoteById,
   disableEscClose = false,
 }) => {
-  const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const [imageError, setImageError] = useState(false);
 
   // In-modal navigation history stack
@@ -130,25 +130,9 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     return null;
   }, [activeItem]);
 
+  const { backdropProps } = useModalBackdrop(onClose);
+
   if (!activeItem) return null;
-
-  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    mouseDownTargetRef.current = e.target;
-  };
-
-  const handleOverlayTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    mouseDownTargetRef.current = e.target;
-  };
-
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (
-      e.target === e.currentTarget &&
-      (!mouseDownTargetRef.current || mouseDownTargetRef.current === e.currentTarget)
-    ) {
-      onClose();
-    }
-    mouseDownTargetRef.current = null;
-  };
 
   const coverUrl =
     activeItem.coverUrl ||
@@ -168,17 +152,13 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in"
       style={{ zIndex: 9999 }}
-      onMouseDown={handleOverlayMouseDown}
-      onTouchStart={handleOverlayTouchStart}
-      onClick={handleOverlayClick}
+      {...backdropProps}
       role="dialog"
       aria-modal="true"
     >
       <div
         className="w-full sm:max-w-2xl max-h-[90vh] bg-white dark:bg-[#17212b] rounded-t-3xl sm:rounded-2xl shadow-elevated border border-slate-200/80 dark:border-white/10 flex flex-col overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
       >
         {/* Breadcrumb for Direct Link entry (when no local history exists) */}
         {!canGoBack && parentMilestone && (

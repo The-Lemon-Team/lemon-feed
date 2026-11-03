@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X, Loader2 } from 'lucide-react';
 import { Workspace } from '@lenta/shared';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface DeleteWorkspaceModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { backdropProps } = useModalBackdrop(onClose);
+
   if (!isOpen || !workspace) return null;
 
   const targetTitle = workspace.title.trim();
@@ -69,7 +72,7 @@ export const DeleteWorkspaceModal: React.FC<DeleteWorkspaceModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
     >
       <div
         className="w-full max-w-md bg-white dark:bg-[#18222d] rounded-2xl shadow-2xl border border-red-200 dark:border-red-900/40 overflow-hidden animate-scaleUp"

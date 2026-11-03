@@ -74,6 +74,49 @@ describe.each(modals)('$name modal UX contract', ({ renderModal }) => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('does not close when mousedown starts on dialog card and mouseup releases on backdrop', () => {
+    const onClose = vi.fn();
+    render(renderModal({ isOpen: true, onClose }));
+    const backdrop = getBackdrop();
+    const card = backdrop.firstElementChild as HTMLElement;
+
+    fireEvent.mouseDown(card);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not close when mousedown starts on backdrop and mouseup releases inside card', () => {
+    const onClose = vi.fn();
+    render(renderModal({ isOpen: true, onClose }));
+    const backdrop = getBackdrop();
+    const card = backdrop.firstElementChild as HTMLElement;
+
+    fireEvent.mouseDown(backdrop);
+    fireEvent.mouseUp(card);
+    fireEvent.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes on subsequent genuine backdrop click after dragging from card', () => {
+    const onClose = vi.fn();
+    render(renderModal({ isOpen: true, onClose }));
+    const backdrop = getBackdrop();
+    const card = backdrop.firstElementChild as HTMLElement;
+
+    fireEvent.mouseDown(card);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.mouseDown(backdrop);
+    fireEvent.mouseUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('removes the Escape listener on unmount', () => {
     const onClose = vi.fn();
     const { unmount } = render(renderModal({ isOpen: true, onClose }));

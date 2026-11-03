@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Check } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface CreateWorkspaceModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const PRESET_COLORS = [
 const PRESET_ICONS = ['🏠', '🎨', '📊', '🚀', '💡', '📚', '🔬', '🛡️', '💼', '⚡'];
 
 export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOpen, onClose }) => {
+  const { backdropProps } = useModalBackdrop(onClose);
   const { createWorkspace, createTrack } = useWorkspace();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -96,7 +98,9 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOp
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="w-full max-w-md rounded-2xl bg-white dark:bg-[#18222d] border border-slate-200 dark:border-white/10 shadow-2xl p-5 space-y-4"

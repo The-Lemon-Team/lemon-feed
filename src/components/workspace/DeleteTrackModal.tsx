@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, Trash2, X, Loader2 } from 'lucide-react';
 import { WorkspaceTrack } from '@lenta/shared';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface DeleteTrackModalProps {
   isOpen: boolean;
@@ -40,6 +41,8 @@ export const DeleteTrackModal: React.FC<DeleteTrackModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const { backdropProps } = useModalBackdrop(onClose);
+
   if (!isOpen || !track) return null;
 
   const handleDelete = async () => {
@@ -63,7 +66,7 @@ export const DeleteTrackModal: React.FC<DeleteTrackModalProps> = ({
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
       style={{ zIndex: 9999 }}
-      onClick={onClose}
+      {...backdropProps}
     >
       <div
         className="w-full max-w-sm bg-white dark:bg-[#18222d] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-scaleUp"
