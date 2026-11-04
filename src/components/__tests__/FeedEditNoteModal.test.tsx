@@ -80,15 +80,23 @@ describe('FeedEditNoteModal', () => {
       const onOpenAiCover = vi.fn();
       const item = makeFeedItem();
       renderWithProviders(<FeedEditNoteModal item={item} onClose={vi.fn()} onOpenAiCover={onOpenAiCover} />);
-      expect(screen.getByText('У записи нет обложки')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: /Создать обложку/ }));
+      expect(screen.getByText('Постеры не добавлены')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /AI Cover/ }));
       expect(onOpenAiCover).toHaveBeenCalledWith(item);
     });
 
     it('shows the active-cover state when the item has a cover', () => {
-      renderWithProviders(<FeedEditNoteModal item={makeFeedItem({ coverUrl: '/uploads/c.png' })} onClose={vi.fn()} />);
-      expect(screen.getByText('Обложка записи активна')).toBeInTheDocument();
+      renderWithProviders(
+        <FeedEditNoteModal
+          item={makeFeedItem({
+            coverUrl: '/uploads/c.png',
+            rawPayload: { images: [{ id: 'img-1', url: '/uploads/c.png', isMain: true, caption: 'Cover preview' }] },
+          })}
+          onClose={vi.fn()}
+        />
+      );
       expect(screen.getByAltText('Cover preview')).toBeInTheDocument();
+      expect(screen.getByTitle('Главная обложка')).toBeInTheDocument();
     });
   });
 

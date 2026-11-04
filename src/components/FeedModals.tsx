@@ -113,6 +113,14 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
                 }
               : undefined
           }
+          onDeleteNote={
+            !isPublicOnly
+              ? () => {
+                  onCloseDetail();
+                  onRefetch?.();
+                }
+              : undefined
+          }
           onAiCover={
             !isPublicOnly
               ? (item) => {
@@ -130,6 +138,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           disableEscClose={Boolean(aiCoverItem)}
           onOpenAiCover={(item, templateId) => onOpenAiCover(item, templateId)}
           onSaved={onRefetch}
+          onDeleted={onRefetch}
         />
       )}
 

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Note } from '@lenta/shared';
+import { Note, PendingPosterItem } from '@lenta/shared';
 import { useCreateNote, useFeedSources } from '../api/queries';
+import { feedApi } from '../api/client';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import dayjs from 'dayjs';
+import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
+import { NotePosterPicker } from './notes/NotePosterPicker';
 import {
   X,
   PlusCircle,
@@ -42,6 +45,8 @@ const NOTE_TYPES = [
   { value: 'DONE', label: 'Выполненная цель (DONE)', icon: CheckCircle2 },
 ] as const;
 
+const EMPTY_FEEDS: any[] = [];
+
 export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   isOpen,
   onClose,
@@ -50,7 +55,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   appMode = 'dev',
   onCreated,
 }) => {
-  const { data: feeds = [] } = useFeedSources();
+  const { data: feeds = EMPTY_FEEDS } = useFeedSources();
   const createNoteMutation = useCreateNote();
   const { backdropProps } = useModalBackdrop(onClose);
 
@@ -70,6 +75,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>(() =>
     appMode === 'staging' ? 'DRAFT' : 'PUBLISHED'
   );
+  const [pendingPosters, setPendingPosters] = useState<PendingPosterItem[]>([]);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Initialize or reset form on open
@@ -86,6 +92,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setEndDate('');
       setTargetPrivacy(appMode === 'staging' ? 'public' : 'private');
       setTargetStatus(appMode === 'staging' ? 'DRAFT' : 'PUBLISHED');
+      setPendingPosters([]);
       setFeedback(null);
 
       // Pre-select feed if matching defaultFeedSlug
@@ -147,6 +154,21 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         hashtags: hashtags.length > 0 ? hashtags : undefined,
         publishAt: targetStatus === 'PUBLISHED' ? new Date().toISOString() : null,
       });
+
+      // Attach pending posters if selected during creation
+      if (pendingPosters.length > 0) {
+        try {
+          const items = pendingPosters.map((p) => ({
+            url: p.url,
+            caption: p.title,
+            alt: p.title,
+            isMain: p.isMain,
+          }));
+          await feedApi.attachImagesFromUrls(newNote.id, items);
+        } catch (e) {
+          console.warn('[FeedCreateNoteModal] Could not attach posters:', e);
+        }
+      }
 
       setFeedback({ text: 'Запись успешно создана!', type: 'success' });
       if (onCreated) onCreated(newNote);
@@ -224,6 +246,15 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Введите заголовок события или статьи..."
               className="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+          </div>
+
+          {/* Posters & Media */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923]">
+            <NotePosterPicker
+              noteTitle={title}
+              pendingPosters={pendingPosters}
+              onPendingPostersChange={setPendingPosters}
             />
           </div>
 
@@ -401,6 +432,29 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
               Основной текст заметки (Markdown)
             </label>
+
+            <FeedAiDescriptionAssistant
+              title={title}
+              eventDate={startDate}
+              noteType={type}
+              category={feeds.find((f) => f.id === feedId)?.title || undefined}
+              currentDescription={description}
+              onDescriptionGenerated={setDescription}
+              onSummaryGenerated={(newSum) => {
+                setSummary((prev) => (prev.trim() ? prev : newSum));
+              }}
+              onHashtagsSuggested={(newTags) => {
+                setHashtagsStr((prev) => {
+                  const existing = prev
+                    .split(/[,\s]+/)
+                    .map((h) => h.trim().replace(/^#/, ''))
+                    .filter(Boolean);
+                  const combined = Array.from(new Set([...existing, ...newTags.map((t) => t.replace(/^#/, ''))]));
+                  return combined.map((h) => `#${h}`).join(' ');
+                });
+              }}
+            />
+
             <textarea
               rows={5}
               value={description}

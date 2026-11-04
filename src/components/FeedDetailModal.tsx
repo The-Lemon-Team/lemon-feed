@@ -17,8 +17,11 @@ import {
   ArrowRight,
   ArrowLeft,
   CornerDownRight,
+  ZoomIn,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { SymbolIcon } from './common/SymbolIcon';
+import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
 
 export interface FeedDetailModalProps {
   item: UnifiedFeedItem | null;
@@ -26,6 +29,7 @@ export interface FeedDetailModalProps {
   onSelectTag?: (tag: string) => void;
   onEditNote?: (item: UnifiedFeedItem) => void;
   onAiCover?: (item: UnifiedFeedItem) => void;
+  onDeleteNote?: (item: UnifiedFeedItem) => void;
   onOpenNoteById?: (noteId: string) => void;
   disableEscClose?: boolean;
 }
@@ -36,10 +40,13 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   onSelectTag,
   onEditNote,
   onAiCover,
+  onDeleteNote,
   onOpenNoteById,
   disableEscClose = false,
 }) => {
   const [imageError, setImageError] = useState(false);
+  const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   // In-modal navigation history stack
   const [historyStack, setHistoryStack] = useState<UnifiedFeedItem[]>(() => (item ? [item] : []));
@@ -77,6 +84,8 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
 
   useEffect(() => {
     setImageError(false);
+    setSelectedImageIndex(null);
+    setZoomedUrl(null);
   }, [activeItem?.id]);
 
   useEffect(() => {
@@ -89,7 +98,11 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
       if (e.key === 'Escape' && !disableEscClose) {
         e.stopImmediatePropagation();
         e.stopPropagation();
-        onClose();
+        if (zoomedUrl) {
+          setZoomedUrl(null);
+        } else {
+          onClose();
+        }
       }
     };
 
@@ -98,7 +111,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [activeItem, onClose, disableEscClose]);
+  }, [activeItem, onClose, disableEscClose, zoomedUrl]);
 
   const canGoBack = historyStack.length > 1;
 
@@ -139,6 +152,28 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     (activeItem.rawPayload?.images?.find((img: any) => img.isMain)?.url) ||
     activeItem.rawPayload?.images?.[0]?.url ||
     null;
+
+  const allImages: Array<{ id: string; url: string; thumbnailUrl?: string; caption?: string; isMain?: boolean }> =
+    useMemo(() => {
+      if (!activeItem) return [];
+      const list = activeItem.rawPayload?.images;
+      if (Array.isArray(list) && list.length > 0) {
+        return list;
+      }
+      if (coverUrl) {
+        return [{ id: 'main', url: coverUrl, isMain: true }];
+      }
+      return [];
+    }, [activeItem, coverUrl]);
+
+  const activeImageIndex = useMemo(() => {
+    if (selectedImageIndex !== null) return selectedImageIndex;
+    const mainIdx = allImages.findIndex((img) => img.isMain);
+    return mainIdx >= 0 ? mainIdx : 0;
+  }, [allImages, selectedImageIndex]);
+
+  const activeImage = allImages[activeImageIndex] || allImages[0] || null;
+  const currentCoverUrl = activeImage?.url || coverUrl;
 
   const formattedDate = new Date(activeItem.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -241,14 +276,77 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
               : ''
           }`}
         >
-          {coverUrl && !imageError && (
-            <div className="relative w-full h-52 sm:h-64 overflow-hidden rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 shrink-0">
-              <img
-                src={resolveMediaUrl(coverUrl)}
-                alt={activeItem.title}
-                onError={() => setImageError(true)}
-                className="w-full h-full object-cover"
-              />
+          {currentCoverUrl && !imageError && (
+            <div className="space-y-2 shrink-0">
+              <div
+                className="group relative w-full h-72 sm:h-88 overflow-hidden rounded-2xl bg-slate-900/40 dark:bg-black/60 border border-slate-200/60 dark:border-white/10 cursor-pointer flex items-center justify-center"
+                onClick={() => setZoomedUrl(resolveMediaUrl(currentCoverUrl))}
+              >
+                {/* Ambient Blurred Backdrop */}
+                <div
+                  className="absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 opacity-40 dark:opacity-50 pointer-events-none transition-all duration-500"
+                  style={{ backgroundImage: `url("${resolveMediaUrl(currentCoverUrl)}")` }}
+                  aria-hidden="true"
+                />
+                <div className="absolute inset-0 bg-black/15 dark:bg-black/35 pointer-events-none" aria-hidden="true" />
+
+                {/* Foreground Image: Full, Uncropped */}
+                <img
+                  src={resolveMediaUrl(currentCoverUrl)}
+                  alt={activeImage?.caption || activeItem.title}
+                  onError={() => setImageError(true)}
+                  className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain drop-shadow-xl transition-transform duration-300 group-hover:scale-[1.01]"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setZoomedUrl(resolveMediaUrl(currentCoverUrl));
+                  }}
+                  className="absolute z-20 bottom-2.5 right-2.5 p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-xs transition-opacity opacity-0 group-hover:opacity-100 cursor-pointer shadow-md"
+                  title="Увеличить постер"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                {allImages.length > 1 && (
+                  <div className="absolute z-20 top-2.5 right-2.5 px-2 py-0.5 rounded-lg bg-black/60 text-white text-[11px] font-mono backdrop-blur-xs flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" />
+                    <span>
+                      {activeImageIndex + 1} / {allImages.length}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Gallery Thumbnails Strip (if note has multiple images) */}
+              {allImages.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll">
+                  {allImages.map((img, idx) => {
+                    const isSelected = idx === activeImageIndex;
+                    return (
+                      <button
+                        key={img.id || idx}
+                        type="button"
+                        onClick={() => setSelectedImageIndex(idx)}
+                        className={`relative w-14 h-14 rounded-xl overflow-hidden border shrink-0 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-[#2481cc] ring-2 ring-[#2481cc]/40 scale-105'
+                            : 'border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={resolveMediaUrl(img.thumbnailUrl || img.url)}
+                          alt={img.caption || `Poster ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {img.isMain && (
+                          <div className="absolute top-1 left-1 w-2 h-2 rounded-full bg-amber-400" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -391,6 +489,19 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
                 <span>Редактировать</span>
               </button>
             )}
+
+            {onDeleteNote && (
+              <FeedNoteDeleteButton
+                noteId={activeItem.id}
+                noteTitle={activeItem.title}
+                variant="button"
+                confirmPlacement="top"
+                onDeleted={() => {
+                  onClose();
+                  onDeleteNote(activeItem);
+                }}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -415,6 +526,29 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Lightbox Zoom */}
+      {zoomedUrl && (
+        <div
+          className="fixed inset-0 bg-black/95 z-[11000] flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setZoomedUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setZoomedUrl(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+            aria-label="Закрыть полноэкранный просмотр"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={zoomedUrl}
+            alt="Zoomed Poster"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>,
     document.body
   );

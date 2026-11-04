@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { useUpdateNote } from '../api/queries';
-import { resolveMediaUrl } from '../api/client';
-import { extractCleanSnippet } from '@lenta/shared';
+import { resolveMediaUrl, feedApi } from '../api/client';
+import { extractCleanSnippet, NoteImage } from '@lenta/shared';
 import dayjs from 'dayjs';
 import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
+import { NotePosterPicker } from './notes/NotePosterPicker';
 import {
   X,
   Edit3,
@@ -27,6 +28,8 @@ import {
 } from 'lucide-react';
 import { FEED_IT_WORKFLOW_TEMPLATES } from './cover-studio/feedCoverStudio.constants';
 import { FeedItEditAssistant } from './cover-studio/FeedItEditAssistant';
+import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
+import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
 
 export interface FeedEditNoteModalProps {
   item: UnifiedFeedItem | null;
@@ -34,6 +37,7 @@ export interface FeedEditNoteModalProps {
   disableEscClose?: boolean;
   onOpenAiCover?: (item: UnifiedFeedItem, templateId?: string) => void;
   onSaved?: () => void;
+  onDeleted?: () => void;
 }
 
 export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
@@ -42,6 +46,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   disableEscClose = false,
   onOpenAiCover,
   onSaved,
+  onDeleted,
 }) => {
   const { backdropProps } = useModalBackdrop(onClose);
   const [title, setTitle] = useState('');
@@ -54,6 +59,9 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>('private');
   const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>('DRAFT');
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [existingImages, setExistingImages] = useState<NoteImage[]>(() => {
+    return (item?.rawPayload?.images as NoteImage[]) || [];
+  });
 
   const updateNoteMutation = useUpdateNote();
 
@@ -75,9 +83,23 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       );
       setTargetPrivacy(raw.privacy === 'public' ? 'public' : 'private');
       setTargetStatus(raw.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT');
+      setExistingImages((raw.images as NoteImage[]) || []);
       setFeedback(null);
     }
   }, [item]);
+
+  const handleImagesUpdated = async () => {
+    if (!item) return;
+    try {
+      const refreshed = await feedApi.getNoteById(item.id);
+      if (refreshed?.images) {
+        setExistingImages(refreshed.images);
+      }
+      onSaved?.();
+    } catch {
+      // fallback
+    }
+  };
 
   useEffect(() => {
     if (!item || disableEscClose) return;
@@ -93,12 +115,6 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   }, [item, disableEscClose, onClose]);
 
   if (!item) return null;
-
-  const currentCoverUrl =
-    item.coverUrl ||
-    item.rawPayload?.images?.find((img: any) => img.isMain)?.url ||
-    item.rawPayload?.images?.[0]?.url ||
-    null;
 
   const formattedEventDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -214,40 +230,15 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
             </div>
           )}
 
-          {/* Cover preview & AI Studio Trigger + Quick IT Presets */}
-          <div className="p-3 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923] space-y-2.5">
-            <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-              <div className="flex items-center gap-3 min-w-0">
-                {currentCoverUrl ? (
-                  <img
-                    src={resolveMediaUrl(currentCoverUrl)}
-                    alt="Cover preview"
-                    className="w-16 h-12 object-cover rounded-lg border border-slate-200 dark:border-white/10 shrink-0"
-                  />
-                ) : (
-                  <div className="w-16 h-12 rounded-lg bg-slate-200 dark:bg-white/5 border border-dashed border-slate-300 dark:border-white/10 flex items-center justify-center text-slate-400 shrink-0">
-                    <ImageIcon className="w-5 h-5" />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
-                    {currentCoverUrl ? 'Обложка записи активна' : 'У записи нет обложки'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 block truncate">
-                    Используется для карточки в IT-лентах, подкастах и дайджестах
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onOpenAiCover?.(item)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 text-xs font-semibold transition-colors shrink-0 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{currentCoverUrl ? 'AI Cover Studio (IT)' : 'Создать обложку (AI)'}</span>
-              </button>
-            </div>
+          {/* Posters & Covers Manager (Google Serper + AI + IT Presets) */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923] space-y-3">
+            <NotePosterPicker
+              noteId={item.id}
+              noteTitle={title || item.title}
+              existingImages={existingImages}
+              onImagesUpdated={handleImagesUpdated}
+              onOpenAiCover={() => onOpenAiCover?.(item)}
+            />
 
             {/* Quick-Launch IT Cover Scenario Buttons */}
             <div className="pt-2 border-t border-slate-200/60 dark:border-white/5 flex flex-wrap items-center justify-between gap-2">
@@ -393,6 +384,29 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
               </label>
               <span className="text-[11px] text-slate-400">Поддерживает GFM Markdown</span>
             </div>
+
+            <FeedAiDescriptionAssistant
+              title={title}
+              eventDate={eventDate}
+              noteType={(item.rawPayload as any)?.type}
+              category={item.channelTitle || item.category?.label || item.feedSlug || undefined}
+              currentDescription={description}
+              onDescriptionGenerated={setDescription}
+              onSummaryGenerated={(newSummary) => {
+                setSummary((prev) => (prev.trim() ? prev : newSummary));
+              }}
+              onHashtagsSuggested={(newTags) => {
+                setHashtagsStr((prev) => {
+                  const existing = prev
+                    .split(/[,\s]+/)
+                    .map((h) => h.trim().replace(/^#/, ''))
+                    .filter(Boolean);
+                  const combined = Array.from(new Set([...existing, ...newTags.map((t) => t.replace(/^#/, ''))]));
+                  return combined.map((h) => `#${h}`).join(' ');
+                });
+              }}
+            />
+
             <textarea
               rows={7}
               value={description}
@@ -479,9 +493,22 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
 
         {/* Footer Actions */}
         <div className="p-3 sm:p-4 bg-slate-50 dark:bg-[#131b24] border-t border-slate-100 dark:border-white/[0.08] flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Обновится `updatedAt`</span>
+          <div className="flex items-center gap-3">
+            <FeedNoteDeleteButton
+              noteId={item.id}
+              noteTitle={item.title}
+              variant="button"
+              confirmPlacement="top"
+              onDeleted={() => {
+                onClose();
+                onDeleted?.();
+                onSaved?.();
+              }}
+            />
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>Обновится `updatedAt`</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
