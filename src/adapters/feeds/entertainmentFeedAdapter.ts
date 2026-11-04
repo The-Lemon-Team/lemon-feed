@@ -50,7 +50,7 @@ export const ENTERTAINMENT_FEED_PRESETS: EntertainmentFeedPreset[] = [
     badgeBgDark: 'rgba(139, 92, 246, 0.25)',
     badgeTextDark: '#c4b5fd',
     description: 'Мировые премьеры проката и стримингов, обзоры и рейтинги киноиндустрии',
-    matchingSlugs: ['cinema', 'movies', 'tmdb', 'films', 'series'],
+    matchingSlugs: ['cinema', 'movies', 'tmdb', 'films', 'series', 'my-films', 'my-movies'],
   },
   {
     slug: 'music',

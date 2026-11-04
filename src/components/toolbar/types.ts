@@ -51,9 +51,28 @@ export const DEFAULT_FEED_MODES: FeedModeOption[] = [
     emoji: '🍿',
     description: 'Киновселенная Marvel, игры, киноновинки и музыкальные релизы',
     filterConfig: {
-      feedSlugs: ['marvel', 'cinema', 'films', 'games', 'music'],
+      feedSlugs: ['marvel', 'cinema', 'films', 'games', 'music', 'my-music', 'my-films', 'my-movies'],
       tags: ['marvel', 'cinema', 'films', 'games', 'кино', 'игры', 'музыка'],
       folderPaths: ['entertainment/', 'myfilms/'],
+    },
+  },
+  {
+    id: 'js_interview',
+    label: 'JS Interview',
+    emoji: '💡',
+    description: 'Подготовка к собеседованиям по JavaScript, React, архитектуре и алгоритмам',
+    filterConfig: {
+      feedSlugs: [
+        'daily-questions',
+        'advanced-react',
+        'advanced-reactx',
+        'interesting-questions',
+        'react',
+        'javascript',
+        'interview',
+      ],
+      tags: ['js', 'javascript', 'react', 'interview', 'questions'],
+      folderPaths: ['interview/', 'questions/'],
     },
   },
   {

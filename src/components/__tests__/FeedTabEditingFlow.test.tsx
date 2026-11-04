@@ -43,14 +43,28 @@ vi.mock('../../context/WorkspaceContext', () => ({
 describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
   let feedsState: any[];
   let notesState: any[];
+  let streamsState: any[];
   let patchHistory: Array<{ id: string; body: any }>;
   let postHistory: any[];
+  let streamsPostHistory: any[];
+  let streamsPatchHistory: Array<{ id: string; body: any }>;
 
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState({}, '', '/');
     patchHistory = [];
     postHistory = [];
+    streamsPostHistory = [];
+    streamsPatchHistory = [];
+
+    streamsState = [
+      { id: 'all', slug: 'all', title: 'Все ленты', isBuiltin: true, privacy: 'public', feedIds: [] },
+      { id: 'it_dev', slug: 'it_dev', title: 'IT & Dev', isBuiltin: true, privacy: 'public', feedIds: [] },
+      { id: 'js_interview', slug: 'js_interview', title: 'JS Interview', isBuiltin: true, privacy: 'public', feedIds: [] },
+      { id: 'entertainment', slug: 'entertainment', title: 'Развлечения', isBuiltin: true, privacy: 'public', feedIds: [] },
+      { id: 'seasons', slug: 'seasons', title: 'Seasons', isBuiltin: true, privacy: 'public', feedIds: [] },
+      { id: 'holidays', slug: 'holidays', title: 'Праздники', isBuiltin: true, privacy: 'public', feedIds: [] },
+    ];
 
     const initialFeedId = `${TEST_RESERVED_PREFIX.FEED}1`;
     const initialFeedSlug = createTestFeedSlug('main');
@@ -123,6 +137,28 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
         };
         feedsState.push(newFeed);
         return HttpResponse.json(newFeed, { status: 201 });
+      }),
+
+      http.get('*/streams', () => {
+        return HttpResponse.json(streamsState);
+      }),
+
+      http.post('*/streams', async ({ request }) => {
+        const body = (await request.json()) as any;
+        streamsPostHistory.push(body);
+        const newStream = {
+          id: `stream-${Date.now()}`,
+          isBuiltin: false,
+          ...body,
+        };
+        streamsState.push(newStream);
+        return HttpResponse.json(newStream, { status: 201 });
+      }),
+
+      http.patch('*/streams/:id', async ({ request, params }) => {
+        const body = (await request.json()) as any;
+        streamsPatchHistory.push({ id: String(params.id), body });
+        return HttpResponse.json({ id: String(params.id), ...body });
       })
     );
   });
@@ -340,5 +376,46 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
 
     // Tab must be rendered in toolbar
     expect(screen.getAllByText('Cyberpunk Beats').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('user can create a new Stream (source tab) in edit mode via top rail "+ Таб", which persists to backend API', async () => {
+    renderWithProviders(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(createTestFeedTitle('Main')).length).toBeGreaterThanOrEqual(1);
+    });
+
+    // 1. Enter edit mode
+    const editModeToggle = screen.getByRole('button', { name: /режим редактирования/i });
+    await userEvent.click(editModeToggle);
+
+    // 2. Click "+ Таб" in the top stream row
+    const addSourceTabBtn = screen.getByTitle('Добавить новый раздел/таб в верхнюю панель');
+    expect(addSourceTabBtn).toBeInTheDocument();
+    await userEvent.click(addSourceTabBtn);
+
+    // 3. Modal opens
+    await waitFor(() => {
+      expect(screen.getByText('Создать новый таб')).toBeInTheDocument();
+    });
+
+    // 4. Fill in title
+    const titleInput = screen.getByPlaceholderText('Например: AI & Технологии');
+    fireEvent.change(titleInput, { target: { value: 'Frontend Radar' } });
+
+    // 5. Click "Сохранить таб"
+    const saveBtn = screen.getByRole('button', { name: /Сохранить таб/i });
+    await userEvent.click(saveBtn);
+
+    // 6. Verify POST /streams was dispatched to API
+    await waitFor(() => {
+      expect(streamsPostHistory.length).toBeGreaterThanOrEqual(1);
+      expect(streamsPostHistory[0].title).toBe('Frontend Radar');
+    });
+
+    // 7. Verify the new stream appears in the top row
+    await waitFor(() => {
+      expect(screen.getAllByText('Frontend Radar').length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

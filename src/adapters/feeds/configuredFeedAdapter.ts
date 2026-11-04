@@ -214,7 +214,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
 
       for (const f of context.allFeeds) {
         if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
-        if (targetPrivacy === 'public' && f.privacy === 'private') continue;
+        if (targetPrivacy !== 'private' && f.privacy === 'private') continue;
 
         // Child subtopics of changelogs/notebooklm roll up into their parent tabs
         if (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')) continue;

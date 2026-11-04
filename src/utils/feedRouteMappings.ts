@@ -48,6 +48,7 @@ export const SOURCE_TO_PATH: Record<string, string> = {
 export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
   all: 'all',
   'it-dev': 'it_dev',
+  it_dev: 'it_dev',
   it: 'it_dev',
   tech: 'it_dev',
   spark: 'all',
@@ -57,6 +58,10 @@ export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
   entertainment: 'entertainment',
   marvel: 'entertainment',
   cinema: 'entertainment',
+  'js-interview': 'js_interview',
+  js_interview: 'js_interview',
+  js: 'js_interview',
+  interview: 'js_interview',
   holidays: 'holidays',
   classic: 'holidays',
   general: 'all',
@@ -239,6 +244,8 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   const searchQuery = params.get('q') || params.get('tag') || params.get('search') || undefined;
   const layoutParam = params.get('layout') || params.get('view');
   const isEmbed = params.get('embed') === 'true';
+  const modeParam = params.get('mode') || params.get('stream') || params.get('streamSource');
+  const feedParam = params.get('feed') || params.get('feedSlug');
 
   const segments = pathPart.split('/').filter(Boolean);
   const primarySegment = segments[0] || 'all';
@@ -246,13 +253,16 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   const subtopicSegment = segments[2];
 
   let streamSource: FeedSourceMode = 'all';
-  if (primarySegment && PATH_TO_SOURCE[primarySegment]) {
+  if (modeParam) {
+    const cleanMode = modeParam.toLowerCase().trim();
+    streamSource = PATH_TO_SOURCE[cleanMode] || (cleanMode.replace(/-/g, '_') as FeedSourceMode);
+  } else if (primarySegment && PATH_TO_SOURCE[primarySegment]) {
     streamSource = PATH_TO_SOURCE[primarySegment];
   } else if (segments.length > 1 && primarySegment && primarySegment !== 'all') {
     streamSource = primarySegment.replace(/-/g, '_') as FeedSourceMode;
   }
 
-  let selectedFeedSlug: string | undefined;
+  let selectedFeedSlug: string | undefined = feedParam || undefined;
   let subtopicSlug: string | undefined;
 
   if (feedSegment) {
@@ -267,7 +277,14 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
         subtopicSlug = decomp.subtopic;
       }
     }
-  } else if (segments.length === 1 && primarySegment && primarySegment !== 'all' && !PATH_TO_SOURCE[primarySegment]) {
+  } else if (
+    !modeParam &&
+    segments.length === 1 &&
+    primarySegment &&
+    primarySegment !== 'all' &&
+    primarySegment !== 'stream' &&
+    !PATH_TO_SOURCE[primarySegment]
+  ) {
     // Single path segment not matching a known source mode is treated as direct feed slug / alias
     const rawFeed = ALIAS_TO_FEED_SLUG[primarySegment] || primarySegment;
     selectedFeedSlug = rawFeed;

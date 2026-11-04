@@ -26,7 +26,7 @@ export interface FeedSourceTabModalProps {
   tab?: FeedModeOption | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tab: FeedModeOption) => void;
+  onSave: (tab: FeedModeOption) => void | Promise<void>;
   onDelete?: (tabId: string) => void;
   allFeeds?: Array<{
     id: string;
@@ -41,6 +41,25 @@ export interface FeedSourceTabModalProps {
 }
 
 const PRESET_EMOJIS = ['🌐', '💻', '🍋', '🍿', '🎉', '✈️', '🔮', '🔒', '📈', '🔬', '🎮', '⚡', '🧠', '🎧', '🚀', '🤖'];
+
+const CYRILLIC_MAP: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
+  з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
+  п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts',
+  ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'
+};
+
+export function slugifyStreamTitle(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .split('')
+    .map((char) => CYRILLIC_MAP[char] || char)
+    .join('')
+    .replace(/[^a-z0-9_\s-]/g, '')
+    .replace(/[\s_-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
 
 export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   tab,
@@ -66,6 +85,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   const [folderPrefixes, setFolderPrefixes] = useState('');
   const [feedSearchQuery, setFeedSearchQuery] = useState('');
   const [feedCategoryFilter, setFeedCategoryFilter] = useState<'all' | 'tech' | 'media' | 'holidays' | 'private'>('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -119,11 +139,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   const handleLabelChange = (val: string) => {
     setLabel(val);
     if (!isEditing || !id) {
-      const slug = val
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '_');
+      const slug = slugifyStreamTitle(val);
       setId(slug);
     }
   };
@@ -231,13 +247,13 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
     });
   }, [allFeeds, privacyContour, feedCategoryFilter, feedSearchQuery]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!label.trim()) {
       setErrorMsg('Укажите название раздела');
       return;
     }
-    const finalId = id.trim() || label.toLowerCase().replace(/\s+/g, '_');
+    const finalId = id.trim() || slugifyStreamTitle(label) || 'custom_stream';
 
     const folderPathsArray = folderPrefixes
       .split(',')
@@ -251,15 +267,25 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
       folderPaths: folderPathsArray.length > 0 ? folderPathsArray : undefined,
     };
 
-    onSave({
-      id: finalId,
-      label: label.trim(),
-      emoji: emoji || '📁',
-      badge: badge.trim() || undefined,
-      description: description.trim() || undefined,
-      filterConfig,
-    });
-    onClose();
+    try {
+      setIsSubmitting(true);
+      setErrorMsg(null);
+      await Promise.resolve(
+        onSave({
+          id: finalId,
+          label: label.trim(),
+          emoji: emoji || '📁',
+          badge: badge.trim() || undefined,
+          description: description.trim() || undefined,
+          filterConfig,
+        })
+      );
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Ошибка сохранения стрима');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -822,10 +848,11 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#2481cc] hover:bg-[#1e6cb0] text-white shadow-xs transition-colors cursor-pointer"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#2481cc] hover:bg-[#1e6cb0] disabled:opacity-50 text-white shadow-xs transition-colors cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Сохранить таб</span>
+                <span>{isSubmitting ? 'Сохранение...' : 'Сохранить таб'}</span>
               </button>
             </div>
           </div>

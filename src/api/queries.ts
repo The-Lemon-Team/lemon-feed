@@ -8,7 +8,7 @@ import {
   GenerateAiCoverPayload,
   GenerateAiBatchPayload,
 } from './client';
-import { QueryNotesParams, NotesResponse } from '@lenta/shared';
+import { QueryNotesParams, NotesResponse, ExternalImageItem, Stream, CreateStreamPayload, UpdateStreamPayload } from '@lenta/shared';
 import { extractPeriodItems, PeriodItem } from '../utils/periods';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 
@@ -18,6 +18,8 @@ export const queryKeys = {
     ['feed', 'stream', params] as const,
   periods: (appMode?: string) => ['feed', 'periods', appMode] as const,
   feeds: ['feed', 'sources'] as const,
+  streams: (includePrivate?: boolean) => ['streams', { includePrivate }] as const,
+  streamDetail: (slug: string) => ['streams', slug] as const,
   noteDetail: (id: string) => ['feed', 'note', id] as const,
 };
 
@@ -189,6 +191,32 @@ export function useUpdateNote() {
   });
 }
 
+export function useDeleteNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await feedApi.deleteNote(id);
+    },
+    onSuccess: (_data, deletedId) => {
+      // In-place remove from active stream cache pages
+      queryClient.setQueriesData<any>({ queryKey: ['feed', 'stream'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.pages)) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: any) => ({
+            ...page,
+            items: (page.items || []).filter((item: any) => item.id !== deletedId),
+          })),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(deletedId) });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+    },
+  });
+}
+
 export function useGenerateNoteCover() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -235,6 +263,109 @@ export function useAttachCoverToNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(variables.noteId) });
+    },
+  });
+}
+
+export function useAttachImagesFromUrls() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ noteId, items }: { noteId: string; items: ExternalImageItem[] }) => {
+      return await feedApi.attachImagesFromUrls(noteId, items);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(variables.noteId) });
+    },
+  });
+}
+
+// ==========================================
+// Streams API Hooks
+// ==========================================
+
+export function useStreams(includePrivate = false) {
+  return useQuery<Stream[]>({
+    queryKey: queryKeys.streams(includePrivate),
+    staleTime: 1000 * 60 * 2,
+    queryFn: async () => {
+      return await feedApi.getStreams(includePrivate);
+    },
+  });
+}
+
+export function useStream(slug: string) {
+  return useQuery<Stream>({
+    queryKey: queryKeys.streamDetail(slug),
+    enabled: Boolean(slug),
+    staleTime: 1000 * 60 * 2,
+    queryFn: async () => {
+      return await feedApi.getStream(slug);
+    },
+  });
+}
+
+export function useCreateStream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateStreamPayload) => {
+      return await feedApi.createStream(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+    },
+  });
+}
+
+export function useUpdateStream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateStreamPayload }) => {
+      return await feedApi.updateStream(id, data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useDeleteStream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await feedApi.deleteStream(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useAttachFeedToStream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ streamId, feedId }: { streamId: string; feedId: string }) => {
+      return await feedApi.attachFeedToStream(streamId, feedId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useDetachFeedFromStream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ streamId, feedId }: { streamId: string; feedId: string }) => {
+      return await feedApi.detachFeedFromStream(streamId, feedId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
     },
   });
 }

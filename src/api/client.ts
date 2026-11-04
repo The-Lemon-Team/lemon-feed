@@ -1,5 +1,18 @@
 import axios from 'axios';
-import { Note, Feed, NotesResponse, QueryNotesParams } from '@lenta/shared';
+import {
+  Note,
+  Feed,
+  NotesResponse,
+  QueryNotesParams,
+  GenerateNoteAiInput,
+  GeneratedNoteEnrichment,
+  WebImageResult,
+  ExternalImageItem,
+  NoteImage,
+  Stream,
+  CreateStreamPayload,
+  UpdateStreamPayload,
+} from '@lenta/shared';
 import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
 
 function resolveApiBaseUrl(): string {
@@ -224,6 +237,16 @@ export const feedApi = {
     return res.data;
   },
 
+  deleteNote: async (id: string): Promise<{ success: boolean }> => {
+    const res = await apiClient.delete<{ success: boolean }>(`/notes/${id}`);
+    return res.data;
+  },
+
+  generateAiContent: async (data: GenerateNoteAiInput): Promise<GeneratedNoteEnrichment> => {
+    const res = await apiClient.post<GeneratedNoteEnrichment>('/ingestion/ai/generate-content', data);
+    return res.data;
+  },
+
   generateNoteCover: async (noteId: string, data?: GenerateAiCoverPayload): Promise<{ image: any; meta: any }> => {
     const res = await apiClient.post(`/ingestion/ai/notes/${noteId}/generate-cover`, data || {}, {
       timeout: 120000,
@@ -250,6 +273,84 @@ export const feedApi = {
     const res = await apiClient.post('/ingestion/wiki/sync', {}, {
       params: dateStr ? { date: dateStr } : undefined,
     });
+    return res.data;
+  },
+
+  // Posters & Web Media
+  searchWebImages: async (
+    query: string,
+    options?: { gl?: string; hl?: string; num?: number }
+  ): Promise<WebImageResult[]> => {
+    const res = await apiClient.get<WebImageResult[]>('/notes/media/search-images', {
+      params: { q: query, ...options },
+    });
+    return res.data;
+  },
+
+  attachImagesFromUrls: async (
+    noteId: string,
+    items: ExternalImageItem[]
+  ): Promise<NoteImage[]> => {
+    const res = await apiClient.post<NoteImage[]>(`/notes/${noteId}/images/from-urls`, { items });
+    return res.data;
+  },
+
+  uploadImages: async (id: string, files: File[]): Promise<NoteImage[]> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    const res = await apiClient.post<NoteImage[]>(`/notes/${id}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  setMainImage: async (noteId: string, imageId: string): Promise<NoteImage> => {
+    const res = await apiClient.patch<NoteImage>(`/notes/${noteId}/images/${imageId}/main`);
+    return res.data;
+  },
+
+  deleteImage: async (noteId: string, imageId: string): Promise<{ success: boolean; newMainId?: string }> => {
+    const res = await apiClient.delete<{ success: boolean; newMainId?: string }>(
+      `/notes/${noteId}/images/${imageId}`
+    );
+    return res.data;
+  },
+
+  // Streams API
+  getStreams: async (includePrivate = false): Promise<Stream[]> => {
+    const res = await apiClient.get<Stream[]>('/streams', {
+      params: includePrivate ? { includePrivate: 'true' } : undefined,
+    });
+    return res.data;
+  },
+
+  getStream: async (slug: string): Promise<Stream> => {
+    const res = await apiClient.get<Stream>(`/streams/${slug}`);
+    return res.data;
+  },
+
+  createStream: async (data: CreateStreamPayload): Promise<Stream> => {
+    const res = await apiClient.post<Stream>('/streams', data);
+    return res.data;
+  },
+
+  updateStream: async (id: string, data: UpdateStreamPayload): Promise<Stream> => {
+    const res = await apiClient.patch<Stream>(`/streams/${id}`, data);
+    return res.data;
+  },
+
+  deleteStream: async (id: string): Promise<{ id: string }> => {
+    const res = await apiClient.delete<{ id: string }>(`/streams/${id}`);
+    return res.data;
+  },
+
+  attachFeedToStream: async (streamId: string, feedId: string): Promise<Stream> => {
+    const res = await apiClient.post<Stream>(`/streams/${streamId}/feeds/${feedId}`);
+    return res.data;
+  },
+
+  detachFeedFromStream: async (streamId: string, feedId: string): Promise<Stream> => {
+    const res = await apiClient.delete<Stream>(`/streams/${streamId}/feeds/${feedId}`);
     return res.data;
   },
 };

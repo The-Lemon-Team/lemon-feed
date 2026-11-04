@@ -250,11 +250,45 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
       }
     }
 
+    const PRESET_FEED_SLUGS: Record<string, string[]> = {
+      'hot-daily': [
+        'spark-ai', 'spark-habr', 'spark-changelogsfeed', 'spark-notebooklmai',
+        'spark-xakep', 'spark-cyber-security', 'spark-youtube-oneday', 'spark-world-of-warcraft',
+        'spark-ai-economy', 'spark-политика', 'spark-рф-и-украина', 'spark-general'
+      ],
+      'it-tech': [
+        'spark-ai', 'spark-habr', 'spark-changelogsfeed', 'spark-notebooklmai',
+        'spark-xakep', 'spark-cyber-security', 'spark-youtube-oneday'
+      ],
+      'seasons-hub': [
+        'daily-logs', 'tech-strategy', 'product-milestones', 'community-stories',
+        'seasons', 'lemon-seasons'
+      ],
+      'entertainment-hub': [
+        'marvel', 'mcu-radar', 'cinema', 'movies', 'my-films', 'my-movies',
+        'music', 'my-music', 'games'
+      ],
+      'holidays-hub': [
+        'russian-holidays', 'orthodox-holidays', 'world-holidays'
+      ],
+    };
+
+    const getPresetCount = (slug: string): number => {
+      const fromLoadedNotes = countsByPreset[slug] || 0;
+      const targetSlugs = PRESET_FEED_SLUGS[slug] || [];
+      const fromAllFeeds = (context.allFeeds || [])
+        .filter((f) => f.slug && targetSlugs.includes(f.slug.toLowerCase()))
+        .reduce((sum, f) => sum + ((f as any)._count?.notes || 0), 0);
+      const dbFeed = context.allFeeds.find((f) => f.slug === slug);
+      const fromDbFeed = dbFeed?._count?.notes || 0;
+      return Math.max(fromLoadedNotes, fromAllFeeds, fromDbFeed);
+    };
+
     const presetTabs: UnifiedFeedTab[] = ALL_STREAMS_PRESETS
-      .filter((preset) => (countsByPreset[preset.slug] || 0) > 0)
+      .filter((preset) => getPresetCount(preset.slug) > 0)
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
-        const count = countsByPreset[preset.slug] || (dbFeed?._count?.notes ?? 0);
+        const count = getPresetCount(preset.slug);
         const resolvedTitle = dbFeed?.title || preset.title;
         const cleanTitle = dbFeed?.title
           ? dbFeed.title.replace(/\s*\(Spark\)/gi, '').replace(/\s*\(daily\)/gi, '').trim()
@@ -270,7 +304,7 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
           shortTitle: resolvedShortTitle,
           emoji: dbFeed?.icon || preset.emoji,
           category: preset.category,
-          count: countsByPreset[preset.slug] || 0,
+          count,
           accentColor: dbFeed?.color || preset.accentColor,
           badgeBgLight: preset.badgeBgLight,
           badgeTextLight: preset.badgeTextLight,
@@ -288,6 +322,7 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
     const customDbTabs: UnifiedFeedTab[] = context.allFeeds
       .filter(
         (f) =>
+          f.privacy !== 'private' &&
           !isSparkSlug(f.slug) &&
           !f.slug.startsWith('spark-') &&
           !ALL_STREAMS_PRESETS.some((p) => p.slug === f.slug) &&
@@ -313,7 +348,8 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
           badgeTextDark: '#93c5fd',
           description: f.description || undefined,
         };
-      });
+      })
+      .filter((t) => t.count > 0);
 
     // Return: Hot preset -> Daily folder feeds -> Custom DB feeds -> Remaining thematic presets
     return [
@@ -363,11 +399,15 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
         matched = matched.filter((n) => {
           if (n.feed?.slug === activeFeedSlug) return true;
           const sub = activeFeedSlug.replace(/^spark-/, '').toLowerCase();
-          if (n.folderPath && n.folderPath.toLowerCase().includes(sub)) return true;
+          const subWithSpaces = sub.replace(/-/g, ' ');
+          if (n.folderPath) {
+            const fp = n.folderPath.toLowerCase();
+            if (fp.includes(sub) || fp.includes(subWithSpaces)) return true;
+          }
           if (n.folders && Array.isArray(n.folders)) {
             return n.folders.some((f) => {
               const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
-              return p.includes(sub);
+              return p.includes(sub) || p.includes(subWithSpaces);
             });
           }
           return false;

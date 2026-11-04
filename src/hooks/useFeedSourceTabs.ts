@@ -7,6 +7,7 @@ import {
 } from '../adapters/feeds';
 import { FeedModeOption, DEFAULT_FEED_MODES } from '../components/FeedToolbar';
 import { FeedAppRuntimeMode } from '../utils/appMode';
+import { useStreams, useCreateStream, useUpdateStream, useDeleteStream } from '../api/queries';
 
 interface UseFeedSourceTabsOptions {
   streamSource: FeedSourceMode;
@@ -18,6 +19,7 @@ interface UseFeedSourceTabsOptions {
   allFeeds: any[];
   notes: any[];
   isLoading: boolean;
+  isEditMode?: boolean;
 }
 
 export function useFeedSourceTabs({
@@ -30,6 +32,7 @@ export function useFeedSourceTabs({
   allFeeds,
   notes,
   isLoading,
+  isEditMode = false,
 }: UseFeedSourceTabsOptions) {
   // Custom source modes (upper tabs)
   const [sourceModes, setSourceModes] = useState<FeedModeOption[]>(() => {
@@ -68,6 +71,46 @@ export function useFeedSourceTabs({
     return DEFAULT_FEED_MODES;
   });
 
+  const { data: dbStreams = [] } = useStreams(appMode !== 'public');
+  const createStreamMutation = useCreateStream();
+  const updateStreamMutation = useUpdateStream();
+  const deleteStreamMutation = useDeleteStream();
+
+  // Synchronize sourceModes with streams from PostgreSQL database
+  useEffect(() => {
+    if (dbStreams && dbStreams.length > 0) {
+      const mapped: FeedModeOption[] = dbStreams.map((s) => {
+        const feedSlugs = (s.feeds || []).map((f: any) => f.slug);
+        return {
+          id: s.slug,
+          label: s.title,
+          emoji: s.icon || '📁',
+          badge: s.badge || undefined,
+          description: s.description || undefined,
+          isBuiltin: s.isBuiltin,
+          filterConfig: {
+            privacy: s.privacy,
+            feedSlugs: feedSlugs.length > 0 ? feedSlugs : undefined,
+            tags: s.tags?.length > 0 ? s.tags : undefined,
+            folderPaths: s.folderPaths?.length > 0 ? s.folderPaths : undefined,
+          },
+        };
+      });
+
+      // Preserve 'all' and 'telegram' built-ins if absent
+      let list: FeedModeOption[] = mapped;
+      if (!list.some((m) => m.id === 'all')) {
+        const allDef = DEFAULT_FEED_MODES.find((m) => m.id === 'all');
+        if (allDef) list = [allDef, ...list];
+      }
+      if (!list.some((m) => m.id === 'telegram')) {
+        const tgDef = DEFAULT_FEED_MODES.find((m) => m.id === 'telegram');
+        if (tgDef) list.push(tgDef);
+      }
+      setSourceModes(list);
+    }
+  }, [dbStreams]);
+
   // Modal states for tabs and feeds
   const [editingSourceTab, setEditingSourceTab] = useState<FeedModeOption | null>(null);
   const [isSourceTabModalOpen, setIsSourceTabModalOpen] = useState(false);
@@ -91,28 +134,70 @@ export function useFeedSourceTabs({
     setEditingSourceTab(null);
   }, []);
 
-  const handleSaveSourceTab = useCallback((tab: FeedModeOption) => {
-    setSourceModes((prev) => {
-      const existingIndex = prev.findIndex((m) => m.id === tab.id);
-      let updated: FeedModeOption[];
-      if (existingIndex >= 0) {
-        updated = [...prev];
-        updated[existingIndex] = tab;
-      } else {
-        updated = [...prev, tab];
+  const handleSaveSourceTab = useCallback(
+    async (tab: FeedModeOption) => {
+      // Find matching stream in database
+      const existingStream = dbStreams.find((s) => s.slug === tab.id || s.id === tab.id);
+      const resolvedFeedIds: string[] = [];
+      if (tab.filterConfig?.feedSlugs && tab.filterConfig.feedSlugs.length > 0) {
+        for (const slug of tab.filterConfig.feedSlugs) {
+          const matched = allFeeds.find((f) => f.slug === slug || f.id === slug);
+          if (matched && !resolvedFeedIds.includes(matched.id)) {
+            resolvedFeedIds.push(matched.id);
+          }
+        }
       }
+
+      const payload = {
+        slug: tab.id,
+        title: tab.label,
+        icon: tab.emoji,
+        badge: tab.badge,
+        description: tab.description,
+        privacy: tab.filterConfig?.privacy === 'private' ? ('private' as const) : ('public' as const),
+        feedIds: resolvedFeedIds,
+        tags: tab.filterConfig?.tags,
+        folderPaths: tab.filterConfig?.folderPaths,
+      };
+
       try {
-        localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(updated));
-      } catch {
-        // ignore
+        if (existingStream) {
+          await updateStreamMutation.mutateAsync({ id: existingStream.id, data: payload });
+        } else {
+          await createStreamMutation.mutateAsync(payload);
+        }
+      } catch (err) {
+        console.error('[FeedSourceTabs] Failed to persist stream to database:', err);
       }
-      return updated;
-    });
-  }, []);
+
+      setSourceModes((prev) => {
+        const existingIndex = prev.findIndex((m) => m.id === tab.id);
+        let updated: FeedModeOption[];
+        if (existingIndex >= 0) {
+          updated = [...prev];
+          updated[existingIndex] = tab;
+        } else {
+          updated = [...prev, tab];
+        }
+        try {
+          localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
+    },
+    [dbStreams, allFeeds, updateStreamMutation, createStreamMutation]
+  );
 
   const handleDeleteSourceTab = useCallback(
     (tabId: string) => {
       if (tabId === 'all' || tabId === 'telegram') return;
+      const existingStream = dbStreams.find((s) => s.slug === tabId || s.id === tabId);
+      if (existingStream && !existingStream.isBuiltin) {
+        deleteStreamMutation.mutate(existingStream.id);
+      }
+
       setSourceModes((prev) => {
         const updated = prev.filter((m) => m.id !== tabId);
         try {
@@ -128,7 +213,8 @@ export function useFeedSourceTabs({
         setStreamSource('all');
         try {
           const url = new URL(window.location.href);
-          url.pathname = '/stream';
+          url.pathname = '/';
+          url.search = '';
           window.history.replaceState({}, '', url.toString());
         } catch {
           // ignore
@@ -177,7 +263,8 @@ export function useFeedSourceTabs({
         setStreamSource('all');
         try {
           const url = new URL(window.location.href);
-          url.pathname = '/stream';
+          url.pathname = '/';
+          url.search = '';
           window.history.replaceState({}, '', url.toString());
         } catch {
           // ignore
@@ -227,11 +314,13 @@ export function useFeedSourceTabs({
     const rawTabs = activeAdapter.getTabs({ allFeeds, notes });
     const filtered = rawTabs.filter((t) => {
       if (t.count > 0) return true;
+      if (isEditMode) return true;
       const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug);
       if (isDbFeed) return true;
-      if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug)) return true;
-      // Preset tabs defined by adapters stay visible
-      return true;
+      if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug || matchesTabOrSubtopic(t, selectedFeedSlug))) {
+        return true;
+      }
+      return false;
     });
 
     // If selectedFeedSlug matches a known DB feed that is not yet in rawTabs for this adapter,
@@ -253,7 +342,7 @@ export function useFeedSourceTabs({
     }
 
     return filtered;
-  }, [activeAdapter, allFeeds, notes, selectedFeedSlug]);
+  }, [activeAdapter, allFeeds, notes, selectedFeedSlug, isEditMode]);
 
   // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
   useEffect(() => {
