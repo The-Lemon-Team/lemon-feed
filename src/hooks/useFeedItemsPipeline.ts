@@ -171,8 +171,21 @@ export function useFeedItemsPipeline({
           (p.rawNote.folderPath && p.rawNote.folderPath.toLowerCase().includes(selectedFeedSlug.toLowerCase()))
       );
     }
-    return basePeriods.filter((p) => p.status === 'active' || p.status === 'upcoming');
+
+    // Main / Global feed ("Все ленты"): only show truly global periods or promoted periods
+    return basePeriods.filter(
+      (p) =>
+        (p.scope === 'global' || p.isPromoted) &&
+        (p.status === 'active' || p.status === 'upcoming')
+    );
   }, [allPeriods, selectedFeedSlug, streamSource, allSourceItems]);
+
+  // Periods specifically promoted/broadcasted to the bus
+  const promotedPeriods = useMemo(() => {
+    return allPeriods.filter(
+      (p) => p.isPromoted && (p.status === 'active' || p.status === 'upcoming')
+    );
+  }, [allPeriods]);
 
   // Upcoming items count for Horizon switcher badge
   const upcomingCount = useMemo(() => {
@@ -238,8 +251,13 @@ export function useFeedItemsPipeline({
   const BATCH_SIZE = 24;
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
 
+  const lastFetchTimestampRef = useRef<number>(0);
+  const consecutiveEmptyFetchesRef = useRef<number>(0);
+  const prevFeedItemsCountRef = useRef<number>(feedItems.length);
+
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
+    consecutiveEmptyFetchesRef.current = 0;
   }, [
     streamSource,
     selectedFeedSlug,
@@ -252,35 +270,66 @@ export function useFeedItemsPipeline({
     feedHorizon,
   ]);
 
+  // Track if newly fetched pages brought any new matching items
+  useEffect(() => {
+    if (feedItems.length > prevFeedItemsCountRef.current) {
+      consecutiveEmptyFetchesRef.current = 0;
+    }
+    prevFeedItemsCountRef.current = feedItems.length;
+  }, [feedItems.length]);
+
   const visibleFeedItems = useMemo(() => {
     return feedItems.slice(0, visibleCount);
   }, [feedItems, visibleCount]);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const visibleCountRef = useRef(visibleCount);
+  visibleCountRef.current = visibleCount;
+  const feedItemsLengthRef = useRef(feedItems.length);
+  feedItemsLengthRef.current = feedItems.length;
+  const isFetchingRef = useRef(isFetchingNextPage);
+  isFetchingRef.current = isFetchingNextPage;
+  const hasNextPageRef = useRef(hasNextPage);
+  hasNextPageRef.current = hasNextPage;
 
   useEffect(() => {
-    if (visibleCount >= feedItems.length && !hasNextPage) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          if (visibleCount < feedItems.length) {
-            setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, feedItems.length));
-          } else if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
+        if (entries[0]?.isIntersecting) {
+          const currentVis = visibleCountRef.current;
+          const totalItems = feedItemsLengthRef.current;
+
+          if (currentVis < totalItems) {
+            setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, totalItems));
+          } else if (hasNextPageRef.current && !isFetchingRef.current && fetchNextPage) {
+            const now = Date.now();
+            // Enforce minimum 600ms cooldown to eliminate CPU-spiking request loops
+            if (now - lastFetchTimestampRef.current < 600) {
+              return;
+            }
+            // Stop runaway loops when pages yield 0 new items for the active filter
+            if (consecutiveEmptyFetchesRef.current >= 2) {
+              return;
+            }
+            lastFetchTimestampRef.current = now;
+            consecutiveEmptyFetchesRef.current += 1;
             fetchNextPage();
             setVisibleCount((prev) => prev + BATCH_SIZE);
           }
         }
       },
-      { rootMargin: '350px' }
+      { rootMargin: '250px' }
     );
 
-    const el = loadMoreRef.current;
-    if (el) observer.observe(el);
+    observer.observe(el);
     return () => {
-      if (el) observer.unobserve(el);
+      observer.unobserve(el);
       observer.disconnect();
     };
-  }, [visibleCount, feedItems.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Available hashtags extracted from current filtered items
   const availableTags = useMemo(() => {
@@ -300,6 +349,7 @@ export function useFeedItemsPipeline({
     allAvailableHashtags,
     selectedPeriod,
     activeChannelPeriods,
+    promotedPeriods,
     feedItems,
     visibleFeedItems,
     totalCount,

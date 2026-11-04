@@ -4,6 +4,9 @@ import { useInfiniteFeedNotes, useFeedSources, useFeedPeriods } from '../api/que
 import { FeedAppRuntimeMode, normalizeNotesForPublicFeeds } from '../utils/appMode';
 import { PeriodItem } from '../utils/periods';
 
+const EMPTY_FEEDS: any[] = [];
+const EMPTY_PERIODS: PeriodItem[] = [];
+
 export interface UseFeedDataOptions {
   appMode: FeedAppRuntimeMode;
   streamSource?: string;
@@ -48,8 +51,8 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
     isFetchingNextPage,
   } = useInfiniteFeedNotes(notesQueryParams);
 
-  const { data: allFeeds = [], refetch: refetchFeeds } = useFeedSources();
-  const { data: allPeriods = [], refetch: refetchPeriods } = useFeedPeriods(appMode);
+  const { data: allFeeds = EMPTY_FEEDS, refetch: refetchFeeds } = useFeedSources();
+  const { data: allPeriods = EMPTY_PERIODS, refetch: refetchPeriods } = useFeedPeriods(appMode);
 
   // Flatten and deduplicate loaded pages by Note ID
   const rawNotes = useMemo(() => {

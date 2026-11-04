@@ -180,6 +180,29 @@ describe('extractPeriodItems', () => {
     const [feedColor] = extractPeriodItems([note({ feed: { slug: 's', title: 'T', color: '#00ff00' } })]);
     expect(feedColor.color).toBe('#00ff00');
   });
+
+  it('correctly resolves scope (local vs global) and isPromoted from metadata and feed', () => {
+    const [localPeriod] = extractPeriodItems([
+      note({ id: 'wow-beta', feed: { slug: 'spark-world-of-warcraft' } }),
+    ]);
+    expect(localPeriod.scope).toBe('local');
+    expect(localPeriod.isPromoted).toBe(false);
+
+    const [promotedPeriod] = extractPeriodItems([
+      note({
+        id: 'wow-promoted',
+        feed: { slug: 'spark-world-of-warcraft' },
+        metadata: { isPromoted: true, broadcastToBus: true },
+      }),
+    ]);
+    expect(promotedPeriod.scope).toBe('local');
+    expect(promotedPeriod.isPromoted).toBe(true);
+
+    const [globalPeriod] = extractPeriodItems([
+      note({ id: 'global-season', feed: null, metadata: { scope: 'global' } }),
+    ]);
+    expect(globalPeriod.scope).toBe('global');
+  });
 });
 
 describe('filterNotesByHorizon', () => {
@@ -270,17 +293,17 @@ describe('filterNotesByPeriod', () => {
 describe('extractPeriodMicroBadges', () => {
   const mk = (id: string, over: Partial<PeriodItem> = {}) => period({ id, title: id, ...over });
 
-  it('puts bound badges first, then active ones', () => {
-    const inWindowActive = mk('active');
+  it('returns only semantically bound badges when no period is explicitly selected', () => {
+    const unboundActive = mk('unbound-active');
     const inWindowFinished = mk('finished', { status: 'finished' });
     const bound = mk('bound', { hashtags: ['x'], status: 'finished' });
-    const { visible } = extractPeriodMicroBadges(item({ hashtags: ['x'] }), [inWindowActive, inWindowFinished, bound]);
-    expect(visible.map((b) => b.id)).toEqual(['bound', 'active']);
+    const { visible } = extractPeriodMicroBadges(item({ hashtags: ['x'] }), [unboundActive, inWindowFinished, bound]);
+    expect(visible.map((b) => b.id)).toEqual(['bound']);
   });
 
-  it('caps visible at 3 and moves the rest to overflow', () => {
-    const periods = ['a', 'b', 'c', 'd', 'e'].map((id) => mk(id));
-    const { visible, overflow } = extractPeriodMicroBadges(item(), periods);
+  it('caps visible bound badges at 3 and moves the rest to overflow', () => {
+    const periods = ['a', 'b', 'c', 'd', 'e'].map((id) => mk(id, { hashtags: ['x'] }));
+    const { visible, overflow } = extractPeriodMicroBadges(item({ hashtags: ['x'] }), periods);
     expect(visible).toHaveLength(3);
     expect(overflow).toHaveLength(2);
   });
@@ -290,7 +313,7 @@ describe('extractPeriodMicroBadges', () => {
     expect(visible.map((b) => b.id)).toEqual(['b']);
   });
 
-  it('returns nothing when the item is outside every window', () => {
+  it('returns nothing when the item is outside every window and not bound', () => {
     const { visible, overflow } = extractPeriodMicroBadges(item({ publishedAt: '2019-01-01T12:00:00' }), [mk('a')]);
     expect(visible).toEqual([]);
     expect(overflow).toEqual([]);

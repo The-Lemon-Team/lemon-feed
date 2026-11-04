@@ -4,18 +4,21 @@ import { apiClient, getFeedAppMode, getFeedAuthToken } from '../api/client';
 
 export interface LiveNoteEvent {
   id: string;
-  type: 'NOTE_CREATED' | 'NOTE_UPDATED' | 'NOTE_DELETED';
-  noteId: string;
-  title: string;
+  type: 'NOTE_CREATED' | 'NOTE_UPDATED' | 'NOTE_DELETED' | 'STREAM_UPDATED';
+  noteId?: string;
+  title?: string;
+  streamSlug?: string;
   feedId?: string | null;
   feedSlug?: string | null;
   feedTitle?: string | null;
   feedIcon?: string | null;
   feedColor?: string | null;
-  privacy: 'public' | 'private';
-  status: string;
+  privacy?: 'public' | 'private';
+  status?: string;
   publishedAt?: string | null;
   timestamp: number;
+  noteType?: string;
+  isPromoted?: boolean;
 }
 
 export interface ChannelUpdateGroup {
@@ -61,6 +64,11 @@ export function useFeedLiveEvents() {
       eventSource.addEventListener('note', (e: MessageEvent) => {
         try {
           const parsed: LiveNoteEvent = JSON.parse(e.data);
+          if (parsed?.type === 'STREAM_UPDATED') {
+            queryClient.invalidateQueries({ queryKey: ['streams'] });
+            queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+            return;
+          }
           if (parsed && parsed.noteId) {
             setEvents((prev) => {
               if (prev.some((item) => item.id === parsed.id || item.noteId === parsed.noteId)) {
@@ -93,6 +101,7 @@ export function useFeedLiveEvents() {
     const groups = new Map<string, ChannelUpdateGroup>();
 
     for (const evt of events) {
+      if (!evt.noteId) continue;
       const slug = evt.feedSlug || 'general';
       const title = evt.feedTitle || (slug === 'general' ? 'Общая лента' : slug);
       const icon = evt.feedIcon || '📁';
@@ -101,7 +110,7 @@ export function useFeedLiveEvents() {
       const existing = groups.get(slug);
       if (existing) {
         existing.count += 1;
-        existing.notes.push({ noteId: evt.noteId, title: evt.title });
+        existing.notes.push({ noteId: evt.noteId, title: evt.title || '' });
       } else {
         groups.set(slug, {
           feedSlug: slug,
@@ -109,7 +118,7 @@ export function useFeedLiveEvents() {
           feedIcon: icon,
           feedColor: color,
           count: 1,
-          notes: [{ noteId: evt.noteId, title: evt.title }],
+          notes: [{ noteId: evt.noteId, title: evt.title || '' }],
         });
       }
     }

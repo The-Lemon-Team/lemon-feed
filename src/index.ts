@@ -4,6 +4,8 @@ export * from './components/FeedToolbar';
 export * from './components/FeedDesktopRail';
 export * from './components/FeedMonthPicker';
 export * from './components/FeedDetailModal';
+export * from './components/FeedEditNoteModal';
+export * from './components/FeedNoteDeleteButton';
 export * from './components/TelegramStreamView';
 export * from './adapters/feeds';
 export * from './api/queries';

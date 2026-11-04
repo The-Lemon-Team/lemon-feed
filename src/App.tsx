@@ -20,6 +20,7 @@ import { FeedModals } from './components/FeedModals';
 import { FeedBottomNav } from './components/FeedBottomNav';
 import { FeedPeriodEndingSoonToast } from './components/notifications/FeedPeriodEndingSoonToast';
 import { FeedLiveUpdatesBanner } from './components/notifications/FeedLiveUpdatesBanner';
+import { FeedPromotedPeriodSpotlight } from './components/notifications/FeedPromotedPeriodSpotlight';
 import { useFeedLiveEvents } from './hooks/useFeedLiveEvents';
 import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 import { navigateToHostCalendar, navigateToHostTimeline } from './utils/hostNavigation';
@@ -159,6 +160,7 @@ export const App: React.FC = () => {
     allFeeds,
     notes,
     isLoading,
+    isEditMode,
   });
 
   // Mobile navigation active tab
@@ -170,6 +172,7 @@ export const App: React.FC = () => {
     allAvailableHashtags,
     selectedPeriod,
     activeChannelPeriods,
+    promotedPeriods,
     feedItems,
     visibleFeedItems,
     totalCount,
@@ -351,6 +354,15 @@ export const App: React.FC = () => {
           />
         )}
 
+        {/* Promoted Period Spotlight (Broadcasted from the Bus) */}
+        {!selectedFeedSlug && (streamSource === 'all' || streamSource === 'classic') && (
+          <FeedPromotedPeriodSpotlight
+            periods={promotedPeriods}
+            onSelectFeed={handleSelectFeed}
+            onSelectPeriod={handleSelectPeriod}
+          />
+        )}
+
         {/* Live Real-Time Channel-Grouped Updates Banner */}
         <FeedLiveUpdatesBanner
           newEventsCount={newEventsCount}
@@ -388,6 +400,7 @@ export const App: React.FC = () => {
             onSelectTag={handleSelectTag}
             onCreateNote={!isPublicOnly ? handleOpenCreateNote : undefined}
             onEditNote={!isPublicOnly ? handleOpenEdit : undefined}
+            onDeleteNote={!isPublicOnly ? () => refetch() : undefined}
             onAiCover={!isPublicOnly ? handleOpenAiCover : undefined}
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}

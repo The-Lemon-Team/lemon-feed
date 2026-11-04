@@ -152,12 +152,12 @@ export function resolveSparkFeeds(
   const result: SparkFeedItem[] = [];
   const processedSlugs = new Set<string>();
 
-  // 1. Add primary Spark feeds that have notes in the current view
+  // 1. Add primary Spark feeds that have notes in the database or current view
   for (const primary of PRIMARY_SPARK_FEEDS) {
     const existing = allFeeds.find((f) => f.slug === primary.slug);
-    const count = countsBySlug[primary.slug] ?? 0;
+    const count = (existing as any)?._count?.notes ?? countsBySlug[primary.slug] ?? 0;
 
-    if (count === 0) continue;
+    if (count === 0 && !existing) continue;
 
     const rawTitle = existing?.title || primary.title;
     const cleanTitle = rawTitle
@@ -188,7 +188,7 @@ export function resolveSparkFeeds(
     processedSlugs.add(primary.slug);
   }
 
-  // 2. Discover additional feeds from backend that match spark-* and have notes in current view
+  // 2. Discover additional feeds from backend that match spark-* and have notes
   for (const feed of allFeeds) {
     const isFolderSpark =
       isSparkSlug(feed.slug) ||
@@ -201,7 +201,7 @@ export function resolveSparkFeeds(
       !feed.slug.startsWith('spark-changelogsfeed-') &&
       !feed.slug.startsWith('spark-notebooklmai-')
     ) {
-      const count = countsBySlug[feed.slug] ?? 0;
+      const count = (feed as any)._count?.notes ?? countsBySlug[feed.slug] ?? 0;
       if (count === 0) continue;
 
       const palette = getDynamicPalette(feed.slug);

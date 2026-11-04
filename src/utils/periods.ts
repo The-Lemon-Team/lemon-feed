@@ -37,6 +37,8 @@ export interface PeriodItem {
   progressPercent?: number | null;
   timeRemainingText?: string | null;
   hashtags: string[];
+  scope?: 'global' | 'local';
+  isPromoted?: boolean;
   rawNote: Note;
 }
 
@@ -184,6 +186,11 @@ export function extractPeriodItems(notes: Note[]): PeriodItem[] {
     const status = getPeriodActivityStatus(n, now);
     const metrics = calculatePeriodMetrics(n.startDate, n.endDate, now);
 
+    const explicitScope = meta.scope as 'global' | 'local' | undefined;
+    const hasSpecificFeed = Boolean(n.feedId || n.feed?.slug);
+    const resolvedScope: 'global' | 'local' = explicitScope || (hasSpecificFeed ? 'local' : 'global');
+    const isPromoted = Boolean(meta.isPromoted || meta.promoted || meta.broadcastToBus || meta.spotlight);
+
     return {
       id: n.id,
       feedId: n.feedId || null,
@@ -200,6 +207,8 @@ export function extractPeriodItems(notes: Note[]): PeriodItem[] {
       progressPercent: metrics.progressPercent,
       timeRemainingText: metrics.timeRemainingText,
       hashtags,
+      scope: resolvedScope,
+      isPromoted,
       rawNote: n,
     };
   });
@@ -325,7 +334,7 @@ export function extractPeriodMicroBadges(
           isEndingSoon: period.isEndingSoon,
         });
       }
-    } else if (isBound || (inTimeWindow && period.status === 'active')) {
+    } else if (isBound) {
       matchedBadges.push({
         id: period.id,
         title: period.title,

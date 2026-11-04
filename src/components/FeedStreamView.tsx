@@ -26,6 +26,7 @@ export interface FeedStreamViewProps {
   onOpenDetail: (item: UnifiedFeedItem) => void;
   onSelectTag: (tag: string) => void;
   onEditNote?: (item: UnifiedFeedItem) => void;
+  onDeleteNote?: (item: UnifiedFeedItem) => void;
   onAiCover?: (item: UnifiedFeedItem) => void;
   visibleCount: number;
   loadMoreRef?: RefObject<HTMLDivElement>;
@@ -64,6 +65,7 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   onOpenDetail,
   onSelectTag,
   onEditNote,
+  onDeleteNote,
   onAiCover,
   visibleCount,
   loadMoreRef,
@@ -210,6 +212,7 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
                   onOpenDetail={onOpenDetail}
                   onSelectTag={onSelectTag}
                   onEditNote={appMode !== 'public' ? onEditNote : undefined}
+                  onDeleteNote={appMode !== 'public' ? onDeleteNote : undefined}
                   onAiCover={appMode !== 'public' ? onAiCover : undefined}
                   appMode={appMode}
                   onApprovePublish={onApprovePublish}

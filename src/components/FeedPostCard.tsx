@@ -6,8 +6,7 @@ import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { PeriodItem, extractPeriodMicroBadges } from '../utils/periods';
-import { PeriodMicroBadgesBar } from './PeriodMicroBadgesBar';
+import { PeriodItem } from '../utils/periods';
 import { NotePinButton } from './workspace/NotePinButton';
 import { SymbolIcon } from './common/SymbolIcon';
 import {
@@ -26,12 +25,14 @@ import {
   Pause,
   Edit3,
 } from 'lucide-react';
+import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
 
 export interface FeedPostCardProps {
   item: UnifiedFeedItem;
   onOpenDetail?: (item: UnifiedFeedItem) => void;
   onSelectTag?: (tag: string) => void;
   onEditNote?: (item: UnifiedFeedItem) => void;
+  onDeleteNote?: (item: UnifiedFeedItem) => void;
   onAiCover?: (item: UnifiedFeedItem) => void;
   appMode?: FeedAppRuntimeMode;
   onApprovePublish?: (item: UnifiedFeedItem) => void;
@@ -48,6 +49,7 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   onOpenDetail,
   onSelectTag,
   onEditNote,
+  onDeleteNote,
   onAiCover,
   appMode = 'staging',
   onApprovePublish,
@@ -62,7 +64,6 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [isBadgePopoverOpen, setIsBadgePopoverOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleToggleAudio = (e: React.MouseEvent) => {
@@ -102,11 +103,6 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
     hour: '2-digit',
     minute: '2-digit',
   });
-
-  const periodBadges = useMemo(() => {
-    if (!allPeriods || allPeriods.length === 0) return { visible: [], overflow: [] };
-    return extractPeriodMicroBadges(item, allPeriods, selectedPeriodId);
-  }, [item, allPeriods, selectedPeriodId]);
 
   const coverUrl =
     item.coverUrl ||
@@ -167,9 +163,7 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   return (
     <article
       onClick={() => onOpenDetail?.(item)}
-      className={`relative rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full ${
-        isBadgePopoverOpen ? 'z-40' : 'z-0'
-      }`}
+      className="relative rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full z-0"
     >
       {/* 1. Card Header */}
       {appMode === 'staging' && (
@@ -240,18 +234,6 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
         </div>
       </div>
 
-      {/* 1.5 Period Micro-Badges Bar */}
-      {periodBadges.visible.length > 0 && (
-        <div className="mb-2">
-          <PeriodMicroBadgesBar
-            badges={periodBadges.visible}
-            overflowBadges={periodBadges.overflow}
-            onSelectPeriod={onSelectPeriod}
-            onOpenChange={setIsBadgePopoverOpen}
-          />
-        </div>
-      )}
-
       {/* 2. Title */}
       <h3 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white leading-snug tracking-[-0.01em] mb-2 group-hover:text-[#2481cc] dark:group-hover:text-[#64b5f6] transition-colors break-words">
         {item.title}
@@ -259,13 +241,22 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 
       {/* 2.5 Cover image banner */}
       {coverUrl && !imageError && (
-        <div className="relative w-full h-44 sm:h-52 overflow-hidden rounded-xl mb-3 bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+        <div className="relative w-full h-52 sm:h-64 overflow-hidden rounded-xl mb-3 bg-slate-900/40 dark:bg-black/60 border border-slate-200/60 dark:border-white/10 flex items-center justify-center">
+          {/* Ambient Blurred Backdrop */}
+          <div
+            className="absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 opacity-35 dark:opacity-45 pointer-events-none"
+            style={{ backgroundImage: `url("${resolveMediaUrl(coverUrl)}")` }}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-black/15 dark:bg-black/35 pointer-events-none" aria-hidden="true" />
+
+          {/* Foreground Image: Full, Uncropped */}
           <img
             src={resolveMediaUrl(coverUrl)}
             alt={item.title}
             loading="lazy"
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+            className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain drop-shadow-md group-hover:scale-[1.01] transition-transform duration-300"
           />
         </div>
       )}
@@ -467,6 +458,16 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>
+          )}
+
+          {onDeleteNote && (
+            <FeedNoteDeleteButton
+              noteId={item.id}
+              noteTitle={item.title}
+              variant="icon"
+              confirmPlacement="top"
+              onDeleted={() => onDeleteNote(item)}
+            />
           )}
 
           <button
