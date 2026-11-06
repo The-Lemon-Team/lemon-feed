@@ -44,6 +44,8 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   appMode = 'dev',
   onSetAppMode,
   isPublicMode = false,
+  notesPrivacy,
+  onSetNotesPrivacy,
   filterUnassigned = false,
   onToggleFilterUnassigned,
 
@@ -53,8 +55,10 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   sourceModes,
   onEditSourceTab,
   onAddSourceTab,
+  onReorderSourceModes,
   onEditFeed,
   onAddFeed,
+  onReorderTabs,
 }) => {
   return (
     <div className="relative z-20 shrink-0 w-full rounded-2xl bg-white/95 dark:bg-[#18222d]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/[0.08] p-3 sm:p-4.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3 transition-colors select-none">
@@ -63,6 +67,8 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         appMode={appMode}
         onSetAppMode={onSetAppMode}
         isPublicMode={isPublicMode}
+        notesPrivacy={notesPrivacy}
+        onSetNotesPrivacy={onSetNotesPrivacy}
         isEditMode={isEditMode}
         onToggleEditMode={onToggleEditMode}
         onCreateNote={onCreateNote}
@@ -85,6 +91,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         isEditMode={isEditMode}
         onEditSourceTab={onEditSourceTab}
         onAddSourceTab={onAddSourceTab}
+        onReorderSourceModes={onReorderSourceModes}
       />
 
       {/* 3. Thematic Tabs Row (Category & Folder chips) */}
@@ -100,6 +107,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
           isEditMode={isEditMode}
           onEditFeed={onEditFeed}
           onAddFeed={onAddFeed}
+          onReorderTabs={onReorderTabs}
         />
       )}
 

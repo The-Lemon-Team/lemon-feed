@@ -9,6 +9,7 @@ const EMPTY_PERIODS: PeriodItem[] = [];
 
 export interface UseFeedDataOptions {
   appMode: FeedAppRuntimeMode;
+  notesPrivacy?: 'all' | 'public' | 'private';
   streamSource?: string;
   selectedFeedSlug?: string;
   search?: string;
@@ -18,6 +19,7 @@ export interface UseFeedDataOptions {
 
 export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
   const appMode = typeof options === 'string' ? options : options.appMode;
+  const notesPrivacy = typeof options === 'object' ? options.notesPrivacy : undefined;
   const streamSource = typeof options === 'object' ? options.streamSource : undefined;
   const selectedFeedSlug = typeof options === 'object' ? options.selectedFeedSlug : undefined;
   const search = typeof options === 'object' ? options.search : undefined;
@@ -30,7 +32,10 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
         ? { appMode: 'public' as const, privacy: 'public' as const, status: 'PUBLISHED' as const }
         : appMode === 'staging'
         ? { appMode: 'staging' as const, privacy: 'public' as const }
-        : { appMode: 'dev' as const, privacy: 'all' as const }),
+        : {
+            appMode: 'dev' as const,
+            privacy: notesPrivacy && notesPrivacy !== 'all' ? notesPrivacy : ('all' as const),
+          }),
       streamSource,
       feedSlug: selectedFeedSlug || undefined,
       selectedFeedSlug,
@@ -38,7 +43,7 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
       startDateFrom,
       startDateTo,
     }),
-    [appMode, streamSource, selectedFeedSlug, search, startDateFrom, startDateTo]
+    [appMode, notesPrivacy, streamSource, selectedFeedSlug, search, startDateFrom, startDateTo]
   );
 
   const {
@@ -86,8 +91,14 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
     if (appMode === 'staging') {
       return allMappedNotes.filter((n) => n.privacy === 'public' && n.status !== 'PUBLISHED');
     }
+    if (notesPrivacy === 'private') {
+      return allMappedNotes.filter((n) => n.privacy === 'private');
+    }
+    if (notesPrivacy === 'public') {
+      return allMappedNotes.filter((n) => n.privacy === 'public');
+    }
     return allMappedNotes;
-  }, [allMappedNotes, appMode]);
+  }, [allMappedNotes, appMode, notesPrivacy]);
 
   return {
     rawNotes,

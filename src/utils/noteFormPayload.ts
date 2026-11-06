@@ -13,6 +13,7 @@ export interface NoteFormValues {
   eventDate: string; // 'YYYY-MM-DD'
   targetPrivacy: 'private' | 'public';
   targetStatus: 'DRAFT' | 'PUBLISHED';
+  feedId?: string | null;
 }
 
 /**
@@ -75,6 +76,16 @@ export function buildSafeNoteUpdatePayload(
     publishAt = null;
   }
 
+  // 4. Safe feed handling:
+  let feedPayload: { feedId?: string | null; publicFeedId?: string | null } = {};
+  if (values.feedId !== undefined) {
+    const cleanFeedId = values.feedId ? values.feedId.trim() : null;
+    feedPayload = {
+      feedId: cleanFeedId,
+      publicFeedId: values.targetPrivacy === 'public' ? cleanFeedId : (raw.publicFeedId ? null : undefined),
+    };
+  }
+
   return {
     title: values.title.trim(),
     description: values.description.trim(),
@@ -86,6 +97,7 @@ export function buildSafeNoteUpdatePayload(
     startDate,
     privacy: values.targetPrivacy,
     status: values.targetStatus,
+    ...feedPayload,
     ...(publishAt !== undefined ? { publishAt } : {}),
   };
 }

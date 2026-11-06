@@ -276,6 +276,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           label: label.trim(),
           emoji: emoji || '📁',
           badge: badge.trim() || undefined,
+          privacy: privacyContour === 'private' ? 'private' : 'public',
           description: description.trim() || undefined,
           filterConfig,
         })
@@ -421,7 +422,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
               <input
                 type="text"
                 value={id}
-                disabled={isEditing && (tab?.id === 'all' || tab?.id === 'telegram')}
+                disabled={isEditing && (tab?.id === 'all' || tab?.id === 'telegram' || tab?.id === 'private_feeds')}
                 onChange={(e) => setId(e.target.value)}
                 placeholder="ai_tech"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#121921] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-mono placeholder-slate-400 outline-none focus:border-[#2481cc] disabled:opacity-60 disabled:cursor-not-allowed"
@@ -820,7 +821,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/[0.08] shrink-0">
-            {isEditing && onDelete && tab && tab.id !== 'all' && tab.id !== 'telegram' ? (
+            {isEditing && onDelete && tab && tab.id !== 'all' && tab.id !== 'telegram' && tab.id !== 'private_feeds' ? (
               <button
                 type="button"
                 onClick={() => {

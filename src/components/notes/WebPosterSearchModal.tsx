@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Image as ImageIcon, Check, X, Loader2, ZoomIn } from 'lucide-react';
 import { WebImageResult } from '@lenta/shared';
 import { feedApi } from '../../api/client';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 export interface WebPosterSearchModalProps {
   isOpen: boolean;
@@ -35,8 +36,10 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
   const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { backdropProps } = useModalBackdrop(onClose);
+  const { backdropProps: zoomBackdropProps } = useModalBackdrop(() => setZoomedUrl(null));
 
-  // Keyboard Escape handler (Rule 7)
+  // Keyboard Escape handler (Rule 7) — capture phase prevents closing parent modals
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,8 +53,8 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, zoomedUrl, onClose]);
 
   // Reset or run initial search
@@ -87,6 +90,7 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     performSearch(query);
   };
 
@@ -132,13 +136,14 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in"
       style={{ zIndex }}
-      onClick={onClose}
+      {...backdropProps}
       role="dialog"
       aria-modal="true"
     >
       <div
         className="bg-white dark:bg-[#17212b] border border-slate-200 dark:border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-xs sm:text-sm"
         onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-[#121923]/70 flex items-center justify-between gap-3">
@@ -177,6 +182,13 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    performSearch(query);
+                  }
+                }}
                 placeholder="Введите название фильма, игры, персоны или новости..."
                 className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:border-[#2481cc] dark:focus:border-[#2481cc] rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none transition-colors"
               />
@@ -377,7 +389,7 @@ export const WebPosterSearchModal: React.FC<WebPosterSearchModalProps> = ({
       {zoomedUrl && (
         <div
           className="fixed inset-0 bg-black/90 z-[11000] flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setZoomedUrl(null)}
+          {...zoomBackdropProps}
         >
           <button
             type="button"

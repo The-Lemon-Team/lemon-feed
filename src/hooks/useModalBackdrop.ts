@@ -40,6 +40,7 @@ export function useModalBackdrop(onClose?: () => void, disabled?: boolean) {
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      e.stopPropagation();
       if (disabled) return;
 
       // Close only if click target is directly the backdrop AND interaction did not involve modal content

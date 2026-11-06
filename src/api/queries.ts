@@ -331,6 +331,57 @@ export function useUpdateStream() {
   });
 }
 
+export function useReorderStreams() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: Array<{ id: string; order: number }>) => {
+      return await feedApi.reorderStreams(items);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useReorderStreamTabs() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      streamId,
+      items,
+    }: {
+      streamId: string;
+      items: Array<{ tabId: string; order: number }>;
+    }) => {
+      return await feedApi.reorderStreamTabs(streamId, items);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useUpdateStreamTab() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      tabId,
+      data,
+    }: {
+      tabId: string;
+      data: Partial<{ customTitle: string; customIcon: string; badge: string; isHidden: boolean; order: number }>;
+    }) => {
+      return await feedApi.updateStreamTab(tabId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
 export function useDeleteStream() {
   const queryClient = useQueryClient();
   return useMutation({

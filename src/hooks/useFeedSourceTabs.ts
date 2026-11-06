@@ -5,9 +5,22 @@ import {
   UnifiedFeedTab,
   createConfiguredFeedAdapter,
 } from '../adapters/feeds';
-import { FeedModeOption, DEFAULT_FEED_MODES } from '../components/FeedToolbar';
+import {
+  FeedModeOption,
+  DEFAULT_FEED_MODES,
+  PUBLIC_STREAM_PRESETS,
+  PRIVATE_STREAM_PRESETS,
+  resolveStreamPrivacy,
+} from '../components/toolbar/types';
 import { FeedAppRuntimeMode } from '../utils/appMode';
-import { useStreams, useCreateStream, useUpdateStream, useDeleteStream } from '../api/queries';
+import {
+  useStreams,
+  useCreateStream,
+  useUpdateStream,
+  useDeleteStream,
+  useReorderStreams,
+  useReorderStreamTabs,
+} from '../api/queries';
 
 interface UseFeedSourceTabsOptions {
   streamSource: FeedSourceMode;
@@ -16,6 +29,7 @@ interface UseFeedSourceTabsOptions {
   setSelectedFeedSlug: (slug?: string) => void;
   isPublicMode: boolean;
   appMode: FeedAppRuntimeMode;
+  notesPrivacy?: 'all' | 'public' | 'private';
   allFeeds: any[];
   notes: any[];
   isLoading: boolean;
@@ -29,6 +43,7 @@ export function useFeedSourceTabs({
   setSelectedFeedSlug,
   isPublicMode,
   appMode,
+  notesPrivacy = 'all',
   allFeeds,
   notes,
   isLoading,
@@ -42,24 +57,39 @@ export function useFeedSourceTabs({
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const enriched = parsed.map((item: any) => {
-              const defaultMatch = DEFAULT_FEED_MODES.find((d) => d.id === item.id);
-              if (defaultMatch && !item.filterConfig && defaultMatch.filterConfig) {
-                return { ...item, filterConfig: defaultMatch.filterConfig };
-              }
-              return item;
-            });
+            const LEGACY_DELETED_PRIVATE_IDS = new Set([
+              'personal_notes',
+              'work_vault',
+              'secure_vault',
+            ]);
+            const enriched = parsed
+              .filter((item: any) => !LEGACY_DELETED_PRIVATE_IDS.has(item?.id))
+              .map((item: any) => {
+                const defaultMatch = DEFAULT_FEED_MODES.find((d) => d.id === item.id);
+                if (defaultMatch && !item.filterConfig && defaultMatch.filterConfig) {
+                  return { ...item, filterConfig: defaultMatch.filterConfig, privacy: defaultMatch.privacy };
+                }
+                return item;
+              });
 
-            const hasAll = enriched.some((m: any) => m.id === 'all');
-            const hasTelegram = enriched.some((m: any) => m.id === 'telegram');
             let list = enriched;
-            if (!hasAll) {
-              const allDef = DEFAULT_FEED_MODES.find((m) => m.id === 'all');
+            if (!list.some((m: any) => m.id === 'all')) {
+              const allDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'all');
               if (allDef) list = [allDef, ...list];
             }
-            if (!hasTelegram) {
-              const tgDef = DEFAULT_FEED_MODES.find((m) => m.id === 'telegram');
+            if (!list.some((m: any) => m.id === 'telegram')) {
+              const tgDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'telegram');
               if (tgDef) list.push(tgDef);
+            }
+            if (!list.some((m: any) => m.id === 'private_feeds')) {
+              const privAllDef = PRIVATE_STREAM_PRESETS.find((m) => m.id === 'private_feeds');
+              if (privAllDef) list.push(privAllDef);
+            } else {
+              list = list.map((m: any) =>
+                m.id === 'private_feeds'
+                  ? { ...m, isBuiltin: true, privacy: 'private', label: m.label === 'Private feeds' ? 'Все приватные' : m.label }
+                  : m
+              );
             }
             return list;
           }
@@ -71,14 +101,30 @@ export function useFeedSourceTabs({
     return DEFAULT_FEED_MODES;
   });
 
-  const { data: dbStreams = [] } = useStreams(appMode !== 'public');
+  const { data: dbStreams = [], isLoading: isStreamsLoading } = useStreams(appMode !== 'public');
   const createStreamMutation = useCreateStream();
   const updateStreamMutation = useUpdateStream();
   const deleteStreamMutation = useDeleteStream();
+  const reorderStreamsMutation = useReorderStreams();
+  const reorderTabsMutation = useReorderStreamTabs();
+  const [customTabOrders, setCustomTabOrders] = useState<Record<string, string[]>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('lenta_custom_tab_orders');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return {};
+  });
 
   // Synchronize sourceModes with streams from PostgreSQL database
   useEffect(() => {
-    if (dbStreams && dbStreams.length > 0) {
+    if (Array.isArray(dbStreams) && dbStreams.length > 0) {
       const mapped: FeedModeOption[] = dbStreams.map((s) => {
         const feedSlugs = (s.feeds || []).map((f: any) => f.slug);
         return {
@@ -86,6 +132,7 @@ export function useFeedSourceTabs({
           label: s.title,
           emoji: s.icon || '📁',
           badge: s.badge || undefined,
+          privacy: s.privacy || (s.slug === 'private_feeds' ? 'private' : 'public'),
           description: s.description || undefined,
           isBuiltin: s.isBuiltin,
           filterConfig: {
@@ -97,17 +144,39 @@ export function useFeedSourceTabs({
         };
       });
 
-      // Preserve 'all' and 'telegram' built-ins if absent
+      // Preserve built-ins ('all', 'telegram', 'private_feeds') if absent, without resurrecting deleted presets
       let list: FeedModeOption[] = mapped;
       if (!list.some((m) => m.id === 'all')) {
-        const allDef = DEFAULT_FEED_MODES.find((m) => m.id === 'all');
+        const allDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'all');
         if (allDef) list = [allDef, ...list];
       }
       if (!list.some((m) => m.id === 'telegram')) {
-        const tgDef = DEFAULT_FEED_MODES.find((m) => m.id === 'telegram');
+        const tgDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'telegram');
         if (tgDef) list.push(tgDef);
       }
+      if (!list.some((m) => m.id === 'private_feeds')) {
+        const privAllDef = PRIVATE_STREAM_PRESETS.find((m) => m.id === 'private_feeds');
+        if (privAllDef) {
+          const firstPrivIdx = list.findIndex((m) => resolveStreamPrivacy(m) === 'private');
+          if (firstPrivIdx >= 0) {
+            list = [...list.slice(0, firstPrivIdx), privAllDef, ...list.slice(firstPrivIdx)];
+          } else {
+            list.push(privAllDef);
+          }
+        }
+      } else {
+        list = list.map((m) =>
+          m.id === 'private_feeds'
+            ? { ...m, isBuiltin: true, privacy: 'private', label: m.label === 'Private feeds' ? 'Все приватные' : m.label }
+            : m
+        );
+      }
       setSourceModes(list);
+      try {
+        localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(list));
+      } catch {
+        // ignore
+      }
     }
   }, [dbStreams]);
 
@@ -192,7 +261,7 @@ export function useFeedSourceTabs({
 
   const handleDeleteSourceTab = useCallback(
     (tabId: string) => {
-      if (tabId === 'all' || tabId === 'telegram') return;
+      if (tabId === 'all' || tabId === 'telegram' || tabId === 'private_feeds') return;
       const existingStream = dbStreams.find((s) => s.slug === tabId || s.id === tabId);
       if (existingStream && !existingStream.isBuiltin) {
         deleteStreamMutation.mutate(existingStream.id);
@@ -208,12 +277,12 @@ export function useFeedSourceTabs({
         return updated;
       });
 
-      // If deleting currently active tab, gracefully fallback to 'all'
+      // If deleting currently active tab, gracefully fallback to 'private_feeds' or 'all'
       if (streamSource === tabId) {
-        setStreamSource('all');
+        setStreamSource(notesPrivacy === 'private' ? 'private_feeds' : 'all');
         try {
           const url = new URL(window.location.href);
-          url.pathname = '/';
+          url.pathname = notesPrivacy === 'private' ? '/private' : '/';
           url.search = '';
           window.history.replaceState({}, '', url.toString());
         } catch {
@@ -221,7 +290,81 @@ export function useFeedSourceTabs({
         }
       }
     },
-    [streamSource, setStreamSource]
+    [streamSource, notesPrivacy, setStreamSource, dbStreams, deleteStreamMutation]
+  );
+
+  const handleReorderSourceModes = useCallback(
+    (newModes: FeedModeOption[]) => {
+      setSourceModes((prev) => {
+        // Merge reordered visible subset back into full sourceModes list so hidden contour tabs are never lost!
+        const reorderedIds = new Set(newModes.map((m) => m.id));
+        const result: FeedModeOption[] = [];
+        let reorderedIdx = 0;
+
+        for (const item of prev) {
+          if (reorderedIds.has(item.id)) {
+            if (reorderedIdx < newModes.length) {
+              result.push(newModes[reorderedIdx]);
+              reorderedIdx++;
+            }
+          } else {
+            result.push(item);
+          }
+        }
+        while (reorderedIdx < newModes.length) {
+          result.push(newModes[reorderedIdx]);
+          reorderedIdx++;
+        }
+
+        try {
+          localStorage.setItem('lenta_custom_stream_modes', JSON.stringify(result));
+        } catch {
+          // ignore
+        }
+        return result;
+      });
+
+      const reorderPayload = newModes.map((m, idx) => ({
+        id: m.id,
+        order: idx,
+      }));
+
+      reorderStreamsMutation.mutate(reorderPayload);
+    },
+    [reorderStreamsMutation]
+  );
+
+  const handleReorderCategoryTabs = useCallback(
+    (newTabs: UnifiedFeedTab[]) => {
+      const tabIds = newTabs.map((t) => t.slug || t.id);
+      setCustomTabOrders((prev) => {
+        const next = {
+          ...prev,
+          [streamSource]: tabIds,
+        };
+        try {
+          localStorage.setItem('lenta_custom_tab_orders', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+
+      const currentStream = Array.isArray(dbStreams)
+        ? dbStreams.find((s) => s.slug === streamSource || s.id === streamSource)
+        : undefined;
+      if (currentStream) {
+        const items = newTabs.map((t, idx) => ({
+          tabId: t.slug || t.id,
+          order: idx,
+        }));
+        reorderTabsMutation.mutate({
+          streamId: currentStream.id,
+          items,
+        });
+      }
+    },
+    [streamSource, dbStreams, reorderTabsMutation]
   );
 
   const handleOpenEditFeed = useCallback(
@@ -246,20 +389,76 @@ export function useFeedSourceTabs({
     setEditingDbFeed(null);
   }, []);
 
-  // Visible source modes depending on runtime mode
+  // Visible source modes depending on runtime mode and notesPrivacy contour
   const visibleSourceModes = useMemo(() => {
     if (isPublicMode || appMode === 'public') {
       return sourceModes.filter(
-        (m) => m.id !== 'telegram' && m.filterConfig?.privacy !== 'private'
+        (m) => m.id !== 'telegram' && resolveStreamPrivacy(m) !== 'private'
+      );
+    }
+    if (notesPrivacy === 'private') {
+      const privates = sourceModes.filter((m) => resolveStreamPrivacy(m) === 'private');
+      const list = privates.length > 0 ? [...privates] : [...PRIVATE_STREAM_PRESETS];
+      // Guarantee the master "All Private Notes" ('private_feeds') tab is always present in Private mode
+      const allPrivIndex = list.findIndex((m) => m.id === 'private_feeds');
+      if (allPrivIndex === -1) {
+        const privDef = PRIVATE_STREAM_PRESETS.find((m) => m.id === 'private_feeds');
+        if (privDef) list.unshift(privDef);
+      }
+      return list;
+    }
+    if (notesPrivacy === 'public') {
+      return sourceModes.filter(
+        (m) => resolveStreamPrivacy(m) === 'public' && (m.id !== 'telegram' || appMode === 'dev')
       );
     }
     return sourceModes;
-  }, [sourceModes, isPublicMode, appMode]);
+  }, [sourceModes, isPublicMode, appMode, notesPrivacy]);
 
-  // If in public mode and currently viewing a hidden tab (e.g. telegram or private), redirect to 'all'
+  // If in public mode or contour changes, synchronize active stream with visible contour
   useEffect(() => {
+    const normalizeId = (id: string) => id.toLowerCase().replace(/-/g, '_');
+    const matchedMode = sourceModes.find(
+      (m) => m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)
+    );
+    const isKnownBuiltinOrPreset = Boolean(
+      matchedMode ||
+        DEFAULT_FEED_MODES.some(
+          (d) => d.id === streamSource || normalizeId(d.id) === normalizeId(streamSource)
+        )
+    );
+
+    // Wait for database streams (and feeds) to load before redirecting unknown custom stream/feed slugs (e.g. /jm-daily)
+    if (!isKnownBuiltinOrPreset && (isStreamsLoading || isLoading)) {
+      return;
+    }
+
+    // If custom stream in DB uses underscores (e.g. jm_daily) and URL parsed with hyphens or vice versa, align streamSource id
+    if (matchedMode && matchedMode.id !== streamSource) {
+      setStreamSource(matchedMode.id as FeedSourceMode);
+      return;
+    }
+
+    // If streamSource is neither a known stream/mode nor loading, check if it matches a known feed slug in allFeeds
+    if (!isKnownBuiltinOrPreset && !isStreamsLoading && allFeeds.length > 0) {
+      const matchedFeed = allFeeds.find(
+        (f) => f.slug && normalizeId(f.slug) === normalizeId(streamSource)
+      );
+      if (matchedFeed) {
+        const targetSource =
+          matchedFeed.privacy === 'private' || notesPrivacy === 'private'
+            ? 'private_feeds'
+            : 'all';
+        setStreamSource(targetSource);
+        setSelectedFeedSlug(matchedFeed.slug);
+        return;
+      }
+    }
+
+    // Resolve privacy via the actual mode definition (custom DB streams like code-learning or jm-daily are not in presets)
+    const activeStreamPrivacy = resolveStreamPrivacy(matchedMode || streamSource);
     if (isPublicMode || appMode === 'public') {
-      if (streamSource === 'telegram' || streamSource === 'private_feeds') {
+      if (streamSource === 'telegram' || activeStreamPrivacy === 'private') {
         setStreamSource('all');
         try {
           const url = new URL(window.location.href);
@@ -270,8 +469,32 @@ export function useFeedSourceTabs({
           // ignore
         }
       }
+      return;
     }
-  }, [isPublicMode, appMode, streamSource, setStreamSource]);
+
+    if (notesPrivacy === 'private') {
+      if (activeStreamPrivacy === 'public') {
+        setStreamSource('private_feeds');
+        setSelectedFeedSlug(undefined);
+      }
+    } else if (notesPrivacy === 'public') {
+      if (activeStreamPrivacy === 'private') {
+        setStreamSource('all');
+        setSelectedFeedSlug(undefined);
+      }
+    }
+  }, [
+    isPublicMode,
+    appMode,
+    notesPrivacy,
+    streamSource,
+    sourceModes,
+    isStreamsLoading,
+    isLoading,
+    allFeeds,
+    setStreamSource,
+    setSelectedFeedSlug,
+  ]);
 
   // Active adapter
   const activeAdapter = useMemo(() => {
@@ -281,8 +504,14 @@ export function useFeedSourceTabs({
     if (streamSource === 'telegram') {
       return FEED_ADAPTERS.telegram;
     }
+    if (streamSource === 'private_feeds') {
+      return FEED_ADAPTERS.private_feeds;
+    }
 
-    const customMode = sourceModes.find((m) => m.id === streamSource);
+    const normalizeId = (id: string) => id.toLowerCase().replace(/-/g, '_');
+    const customMode = sourceModes.find(
+      (m) => m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)
+    );
     if (customMode) {
       return createConfiguredFeedAdapter(customMode);
     }
@@ -312,9 +541,13 @@ export function useFeedSourceTabs({
   // Thematic tabs: keep tabs with notes, or actual database feeds (configured for view), or selected feed
   const activeTabs: UnifiedFeedTab[] = useMemo(() => {
     const rawTabs = activeAdapter.getTabs({ allFeeds, notes });
+    const currentMode = sourceModes.find((m) => m.id === streamSource);
+    const isPrivateStream = streamSource === 'private_feeds' || resolveStreamPrivacy(currentMode || streamSource) === 'private';
+
     const filtered = rawTabs.filter((t) => {
       if (t.count > 0) return true;
       if (isEditMode) return true;
+      if (isPrivateStream) return true; // keep preloaded scaffold tabs in private stream
       const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug);
       if (isDbFeed) return true;
       if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug || matchesTabOrSubtopic(t, selectedFeedSlug))) {
@@ -341,8 +574,47 @@ export function useFeedSourceTabs({
       }
     }
 
+    // Apply overlays and deterministic ordering from StreamTab / custom reorder
+    const currentStream = dbStreams.find((s) => s.slug === streamSource || s.id === streamSource);
+    const customOrder = customTabOrders[streamSource];
+    const streamFeedOrder = currentStream?.feeds?.map((f: any) => f.slug || f.id) || [];
+    const orderList = customOrder || (streamFeedOrder.length > 0 ? streamFeedOrder : null);
+
+    if (currentStream?.feeds && currentStream.feeds.length > 0) {
+      for (const tab of filtered) {
+        const matchingFeed = currentStream.feeds.find(
+          (f: any) => f.slug === tab.slug || f.id === tab.id
+        );
+        if (matchingFeed) {
+          if (matchingFeed.customTitle) {
+            tab.title = matchingFeed.customTitle;
+            tab.shortTitle = matchingFeed.customTitle.length > 18
+              ? `${matchingFeed.customTitle.slice(0, 18)}...`
+              : matchingFeed.customTitle;
+          }
+          if (matchingFeed.customIcon) {
+            tab.emoji = matchingFeed.customIcon;
+          }
+          if (matchingFeed.badge) {
+            tab.badgeLabel = matchingFeed.badge;
+          }
+        }
+      }
+    }
+
+    if (orderList && orderList.length > 0) {
+      filtered.sort((a, b) => {
+        const indexA = orderList.findIndex((idOrSlug) => idOrSlug === a.id || idOrSlug === a.slug);
+        const indexB = orderList.findIndex((idOrSlug) => idOrSlug === b.id || idOrSlug === b.slug);
+        if (indexA === -1 && indexB === -1) return 0;
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+    }
+
     return filtered;
-  }, [activeAdapter, allFeeds, notes, selectedFeedSlug, isEditMode]);
+  }, [activeAdapter, allFeeds, notes, selectedFeedSlug, isEditMode, dbStreams, streamSource, customTabOrders]);
 
   // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
   useEffect(() => {
@@ -373,6 +645,7 @@ export function useFeedSourceTabs({
     handleCloseSourceTabModal,
     handleSaveSourceTab,
     handleDeleteSourceTab,
+    handleReorderSourceModes,
     // Feed entity editing
     editingFeedTab,
     editingDbFeed,
@@ -380,5 +653,6 @@ export function useFeedSourceTabs({
     handleOpenEditFeed,
     handleOpenAddFeed,
     handleCloseFeedEntityModal,
+    handleReorderCategoryTabs,
   };
 }

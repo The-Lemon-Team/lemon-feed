@@ -150,6 +150,7 @@ export interface UpdateNotePayload {
   hashtags?: string[];
   status?: string;
   privacy?: 'private' | 'public';
+  feedId?: string | null;
   publicFeedId?: string | null;
   publishAt?: string | null;
   startDate?: string;
@@ -336,6 +337,27 @@ export const feedApi = {
 
   updateStream: async (id: string, data: UpdateStreamPayload): Promise<Stream> => {
     const res = await apiClient.patch<Stream>(`/streams/${id}`, data);
+    return res.data;
+  },
+
+  reorderStreams: async (items: Array<{ id: string; order: number }>): Promise<{ success: boolean }> => {
+    const res = await apiClient.patch<{ success: boolean }>('/streams/reorder', { items });
+    return res.data;
+  },
+
+  reorderStreamTabs: async (
+    streamId: string,
+    items: Array<{ tabId: string; order: number }>
+  ): Promise<{ success: boolean }> => {
+    const res = await apiClient.patch<{ success: boolean }>(`/streams/${streamId}/tabs/reorder`, { items });
+    return res.data;
+  },
+
+  updateStreamTab: async (
+    tabId: string,
+    data: Partial<{ customTitle: string; customIcon: string; badge: string; isHidden: boolean; order: number }>
+  ): Promise<any> => {
+    const res = await apiClient.patch(`/streams/tabs/${tabId}`, data);
     return res.data;
   },
 

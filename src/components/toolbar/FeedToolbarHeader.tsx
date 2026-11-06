@@ -14,11 +14,16 @@ import {
 } from 'lucide-react';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import { LemonLogo } from '../LemonLogo';
+import { NotesPrivacyContourSwitcher, NotesPrivacyFilter } from './NotesPrivacyContourSwitcher';
 
 export interface FeedToolbarHeaderProps {
   appMode?: FeedAppRuntimeMode;
   onSetAppMode?: (mode: FeedAppRuntimeMode) => void;
   isPublicMode?: boolean;
+
+  // Notes Privacy Contour ('public' | 'private' | 'all')
+  notesPrivacy?: NotesPrivacyFilter;
+  onSetNotesPrivacy?: (privacy: NotesPrivacyFilter) => void;
 
   // Edit Mode Toggle
   isEditMode?: boolean;
@@ -41,6 +46,8 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
   appMode = 'dev',
   onSetAppMode,
   isPublicMode = false,
+  notesPrivacy,
+  onSetNotesPrivacy,
   isEditMode = false,
   onToggleEditMode,
   onCreateNote,
@@ -136,6 +143,15 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
               <span>🌐 Public</span>
             </button>
           </div>
+        )}
+
+        {/* Notes Privacy Contour Switcher: Public | Private | All */}
+        {onSetNotesPrivacy && !isPublicMode && (
+          <NotesPrivacyContourSwitcher
+            privacy={notesPrivacy || 'all'}
+            onChange={onSetNotesPrivacy}
+            isPublicMode={isPublicMode}
+          />
         )}
       </div>
 

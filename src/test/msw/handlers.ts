@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
  */
 export const handlers = [
   http.get('*/health', () => HttpResponse.json({ status: 'ok' })),
+  http.get('*/feeds', () => HttpResponse.json([])),
   http.get('*/streams', () => HttpResponse.json([])),
   http.post('*/streams', async ({ request }) => {
     const body = (await request.json()) as any;
@@ -15,4 +16,5 @@ export const handlers = [
     const body = (await request.json()) as any;
     return HttpResponse.json({ id: params.id, ...body });
   }),
+  http.get('*/notes/media/search-images', () => HttpResponse.json([])),
 ];

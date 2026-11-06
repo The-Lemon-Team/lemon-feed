@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Image as ImageIcon, Upload, Star, X, Layers, Sparkles, Trash2, ZoomIn, Loader2 } from 'lucide-react';
 import { NoteImage, PendingPosterItem, WebImageResult } from '@lenta/shared';
 import { feedApi, resolveMediaUrl } from '../../api/client';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 import { WebPosterSearchModal } from './WebPosterSearchModal';
 
 export interface NotePosterPickerProps {
@@ -31,6 +33,20 @@ export const NotePosterPicker: React.FC<NotePosterPickerProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
+  const { backdropProps: zoomBackdropProps } = useModalBackdrop(() => setZoomedUrl(null));
+
+  useEffect(() => {
+    if (!zoomedUrl) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        setZoomedUrl(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [zoomedUrl]);
 
   const allCount = isExistingNote ? existingImages.length : pendingPosters.length;
 
@@ -421,26 +437,28 @@ export const NotePosterPicker: React.FC<NotePosterPickerProps> = ({
       />
 
       {/* Lightbox Zoom */}
-      {zoomedUrl && (
-        <div
-          className="fixed inset-0 bg-black/90 z-[11000] flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setZoomedUrl(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setZoomedUrl(null)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+      {zoomedUrl &&
+        createPortal(
+          <div
+            className="fixed inset-0 bg-black/90 z-[11000] flex items-center justify-center p-4 animate-fade-in"
+            {...zoomBackdropProps}
           >
-            <X className="w-5 h-5" />
-          </button>
-          <img
-            src={zoomedUrl}
-            alt="Zoomed Poster"
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setZoomedUrl(null)}
+              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={zoomedUrl}
+              alt="Zoomed Poster"
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

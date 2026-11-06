@@ -5,6 +5,7 @@ import { DeleteTrackModal } from '../workspace/DeleteTrackModal';
 import { DeleteWorkspaceModal } from '../workspace/DeleteWorkspaceModal';
 import { LemonSeasonsModal } from '../LemonSeasonsModal';
 import { FeedCategoriesSheet } from '../navigation/FeedCategoriesSheet';
+import { WebPosterSearchModal } from '../notes/WebPosterSearchModal';
 
 /**
  * AGENTS.md §7 "Modal Windows & Keyboard UX Standards" as an executable contract.
@@ -33,6 +34,12 @@ const modals: ModalCase[] = [
     name: 'FeedCategoriesSheet',
     renderModal: (p) => (
       <FeedCategoriesSheet {...p} activeTabs={[]} totalCount={0} onSelectFeed={() => {}} />
+    ),
+  },
+  {
+    name: 'WebPosterSearchModal',
+    renderModal: (p) => (
+      <WebPosterSearchModal {...p} onSelectImages={() => {}} />
     ),
   },
 ];

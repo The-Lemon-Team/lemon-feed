@@ -32,6 +32,41 @@ export function useFeedFilters({
   const [isMonthFilterActive, setIsMonthFilterActive] = useState(false);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(false);
 
+  // Notes Privacy Contour ('public' | 'private' | 'all')
+  const [notesPrivacy, setNotesPrivacy] = useState<'all' | 'public' | 'private'>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlP = (sp.get('notesPrivacy') || sp.get('privacy') || '').toLowerCase();
+      if (urlP === 'private' || urlP === 'public' || urlP === 'all') {
+        return urlP as 'all' | 'public' | 'private';
+      }
+      const saved = localStorage.getItem('lenta_notes_privacy')?.toLowerCase();
+      if (saved === 'private' || saved === 'public' || saved === 'all') {
+        return saved as 'all' | 'public' | 'private';
+      }
+    }
+    return 'all';
+  });
+
+  const handleSetNotesPrivacy = useCallback((newPrivacy: 'all' | 'public' | 'private') => {
+    setNotesPrivacy(newPrivacy);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lenta_notes_privacy', newPrivacy);
+        const url = new URL(window.location.href);
+        if (newPrivacy === 'all') {
+          url.searchParams.delete('notesPrivacy');
+          url.searchParams.delete('privacy');
+        } else {
+          url.searchParams.set('notesPrivacy', newPrivacy);
+        }
+        window.history.replaceState({}, '', url.toString());
+      } catch (err) {
+        console.warn('Failed to update URL notes privacy:', err);
+      }
+    }
+  }, []);
+
   // Horizon State ('recent' = ⚡ Свежее, 'upcoming' = 🔔 Скоро)
   const [feedHorizon, setFeedHorizon] = useState<FeedHorizon>(() => {
     if (typeof window !== 'undefined') {
@@ -170,5 +205,7 @@ export function useFeedFilters({
     handleSelectMonth,
     handleResetMonthFilter,
     handleToday,
+    notesPrivacy,
+    handleSetNotesPrivacy,
   };
 }

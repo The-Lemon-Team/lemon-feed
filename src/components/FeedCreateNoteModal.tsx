@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Note, PendingPosterItem } from '@lenta/shared';
-import { useCreateNote, useFeedSources } from '../api/queries';
+import { useCreateNote, useFeedSources, queryKeys } from '../api/queries';
 import { feedApi } from '../api/client';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
@@ -55,6 +56,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   appMode = 'dev',
   onCreated,
 }) => {
+  const queryClient = useQueryClient();
   const { data: feeds = EMPTY_FEEDS } = useFeedSources();
   const createNoteMutation = useCreateNote();
   const { backdropProps } = useModalBackdrop(onClose);
@@ -156,22 +158,59 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       });
 
       // Attach pending posters if selected during creation
+      let finalNote = newNote;
       if (pendingPosters.length > 0) {
         try {
-          const items = pendingPosters.map((p) => ({
-            url: p.url,
-            caption: p.title,
-            alt: p.title,
-            isMain: p.isMain,
-          }));
-          await feedApi.attachImagesFromUrls(newNote.id, items);
+          const webItems = pendingPosters
+            .filter((p) => !p.file && p.url.startsWith('http'))
+            .map((p) => ({
+              url: p.url,
+              caption: p.title,
+              alt: p.title,
+              isMain: p.isMain,
+            }));
+
+          let attachedImages = finalNote.images || [];
+
+          if (webItems.length > 0) {
+            attachedImages = await feedApi.attachImagesFromUrls(newNote.id, webItems);
+          }
+
+          const localFiles = pendingPosters
+            .filter((p) => Boolean(p.file))
+            .map((p) => p.file as File);
+
+          if (localFiles.length > 0) {
+            attachedImages = await feedApi.uploadImages(newNote.id, localFiles);
+          }
+
+          finalNote = { ...finalNote, images: attachedImages };
+
+          // Immediately update active stream cache in-place and invalidate queries after images are persisted
+          queryClient.setQueriesData<any>({ queryKey: ['feed', 'stream'] }, (oldData: any) => {
+            if (!oldData || !Array.isArray(oldData.pages)) return oldData;
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page: any) => ({
+                ...page,
+                items: (page.items || []).map((item: any) =>
+                  item.id === newNote.id ? { ...item, ...finalNote, images: attachedImages } : item
+                ),
+              })),
+            };
+          });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] }),
+            queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(newNote.id) }),
+          ]);
         } catch (e) {
           console.warn('[FeedCreateNoteModal] Could not attach posters:', e);
         }
       }
 
       setFeedback({ text: 'Запись успешно создана!', type: 'success' });
-      if (onCreated) onCreated(newNote);
+      if (onCreated) onCreated(finalNote);
 
       setTimeout(() => {
         onClose();

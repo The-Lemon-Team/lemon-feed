@@ -144,6 +144,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   }, [activeItem]);
 
   const { backdropProps } = useModalBackdrop(onClose);
+  const { backdropProps: zoomBackdropProps } = useModalBackdrop(() => setZoomedUrl(null));
 
   if (!activeItem) return null;
 
@@ -531,7 +532,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
       {zoomedUrl && (
         <div
           className="fixed inset-0 bg-black/95 z-[11000] flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setZoomedUrl(null)}
+          {...zoomBackdropProps}
         >
           <button
             type="button"

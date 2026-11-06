@@ -136,4 +136,36 @@ describe('buildSafeNoteUpdatePayload', () => {
     // Should apply new date (2026-11-01) with original hours/minutes (18:00:00.000Z)
     expect(payload.startDate).toBe('2026-11-01T18:00:00.000Z');
   });
+
+  it('safely handles feedId when specified, set to empty (unlinked), or omitted', () => {
+    const baseValues: NoteFormValues = {
+      title: 'Note title',
+      description: 'Desc',
+      hashtagsStr: '',
+      eventDate: '2026-10-31',
+      targetPrivacy: 'public',
+      targetStatus: 'PUBLISHED',
+    };
+
+    // 1. Explicit feed selection
+    const payloadWithFeed = buildSafeNoteUpdatePayload(mockBaseItem, {
+      ...baseValues,
+      feedId: 'feed-uuid-123',
+    });
+    expect(payloadWithFeed.feedId).toBe('feed-uuid-123');
+    expect(payloadWithFeed.publicFeedId).toBe('feed-uuid-123');
+
+    // 2. Unlinking / "Без ленты" (empty string -> null)
+    const payloadUnlinked = buildSafeNoteUpdatePayload(mockBaseItem, {
+      ...baseValues,
+      feedId: '',
+    });
+    expect(payloadUnlinked.feedId).toBe(null);
+    expect(payloadUnlinked.publicFeedId).toBe(null);
+
+    // 3. Omitted feedId (leaves feed relations untouched)
+    const payloadUntouched = buildSafeNoteUpdatePayload(mockBaseItem, baseValues);
+    expect(payloadUntouched.feedId).toBeUndefined();
+    expect(payloadUntouched.publicFeedId).toBeUndefined();
+  });
 });

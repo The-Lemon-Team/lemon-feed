@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { StagingCardModerationBar } from './StagingCardModerationBar';
@@ -24,6 +24,8 @@ import {
   Play,
   Pause,
   Edit3,
+  Lock,
+  Globe,
 } from 'lucide-react';
 import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
 
@@ -109,6 +111,10 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
     (item.rawPayload?.images?.find((img: any) => img.isMain)?.url) ||
     item.rawPayload?.images?.[0]?.url ||
     null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [coverUrl]);
 
   const isUpdated = Boolean(
     item.updatedAt &&
@@ -213,11 +219,35 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
           </div>
         </div>
 
-        {/* Category badge, Pin Button & External link */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${item.category.colorClass}`}>
-            {item.category.emoji} {item.category.label}
-          </span>
+        {/* Category badge, Note Privacy Badge, Pin Button & External link */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {item.category.label.trim().toLowerCase() !== 'private' &&
+            item.category.label.trim().toLowerCase() !== 'public' && (
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${item.category.colorClass}`}>
+                {item.category.emoji} {item.category.label}
+              </span>
+            )}
+          {item.rawPayload?.privacy === 'private' ||
+          item.sourceType === 'private_feeds' ||
+          item.rawPayload?.feed?.privacy === 'private' ? (
+            <span
+              data-testid="note-privacy-badge-private"
+              className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-flex items-center gap-1 shrink-0"
+              title="Приватная заметка (Private)"
+            >
+              <Lock className="w-2.5 h-2.5 text-purple-500 dark:text-purple-400" />
+              <span>Private</span>
+            </span>
+          ) : (
+            <span
+              data-testid="note-privacy-badge-public"
+              className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 inline-flex items-center gap-1 shrink-0"
+              title="Публичная заметка (Public)"
+            >
+              <Globe className="w-2.5 h-2.5 text-sky-500 dark:text-sky-400" />
+              <span>Public</span>
+            </span>
+          )}
           <NotePinButton noteId={item.id} />
           {item.sourceLink && (
             <a

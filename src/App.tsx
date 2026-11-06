@@ -25,6 +25,7 @@ import { useFeedLiveEvents } from './hooks/useFeedLiveEvents';
 import { PinnedNotesDock } from './components/workspace/PinnedNotesDock';
 import { navigateToHostCalendar, navigateToHostTimeline } from './utils/hostNavigation';
 import { FeedSourceMode } from './adapters/feeds/types';
+import { resolveStreamPrivacy } from './components/toolbar/types';
 
 export const App: React.FC = () => {
   const {
@@ -81,6 +82,8 @@ export const App: React.FC = () => {
     handleSelectMonth,
     handleResetMonthFilter,
     handleToday,
+    notesPrivacy,
+    handleSetNotesPrivacy,
   } = useFeedFilters({
     allPeriods,
     setSelectedFeedSlug,
@@ -111,6 +114,7 @@ export const App: React.FC = () => {
     totalNotesCount,
   } = useFeedData({
     appMode,
+    notesPrivacy,
     streamSource,
     selectedFeedSlug,
     search: deferredSearchQuery,
@@ -144,12 +148,14 @@ export const App: React.FC = () => {
     handleCloseSourceTabModal,
     handleSaveSourceTab,
     handleDeleteSourceTab,
+    handleReorderSourceModes,
     editingFeedTab,
     editingDbFeed,
     isFeedEntityModalOpen,
     handleOpenEditFeed,
     handleOpenAddFeed,
     handleCloseFeedEntityModal,
+    handleReorderCategoryTabs,
   } = useFeedSourceTabs({
     streamSource,
     setStreamSource,
@@ -157,11 +163,26 @@ export const App: React.FC = () => {
     setSelectedFeedSlug,
     isPublicMode,
     appMode,
+    notesPrivacy,
     allFeeds,
     notes,
     isLoading,
     isEditMode,
   });
+
+  const handleContourPrivacyChange = useCallback(
+    (newPrivacy: 'all' | 'public' | 'private') => {
+      handleSetNotesPrivacy(newPrivacy);
+      if (newPrivacy === 'private') {
+        setStreamSource('private_feeds');
+      } else if (newPrivacy === 'public') {
+        setStreamSource('all');
+      } else if (newPrivacy === 'all') {
+        setStreamSource('all');
+      }
+    },
+    [handleSetNotesPrivacy, setStreamSource]
+  );
 
   // Mobile navigation active tab
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
@@ -243,9 +264,8 @@ export const App: React.FC = () => {
   const handleSelectSource = useCallback(
     (mode: any) => {
       setStreamSource(mode);
-      setSelectedFeedSlug(undefined);
     },
-    [setStreamSource, setSelectedFeedSlug]
+    [setStreamSource]
   );
 
   const handleFeedSaved = useCallback(
@@ -321,6 +341,8 @@ export const App: React.FC = () => {
           onToggleLayoutMode={toggleLayoutMode}
           appMode={appMode}
           onSetAppMode={handleSetAppMode}
+          notesPrivacy={notesPrivacy}
+          onSetNotesPrivacy={handleContourPrivacyChange}
           isPublicMode={isPublicMode}
           filterUnassigned={filterUnassignedOnly}
           onToggleFilterUnassigned={() => setFilterUnassignedOnly((prev) => !prev)}
@@ -329,8 +351,10 @@ export const App: React.FC = () => {
           sourceModes={visibleSourceModes}
           onEditSourceTab={handleOpenEditSourceTab}
           onAddSourceTab={handleOpenAddSourceTab}
+          onReorderSourceModes={handleReorderSourceModes}
           onEditFeed={handleOpenEditFeed}
           onAddFeed={handleOpenAddFeed}
+          onReorderTabs={handleReorderCategoryTabs}
         />
 
         {/* Active Period Banner */}

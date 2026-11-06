@@ -1,5 +1,20 @@
 import React, { useRef, useEffect } from 'react';
-import { Plus, Pencil, X } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Plus, Pencil, X, GripVertical } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
 import { FeedModeOption } from './types';
 import { SymbolIcon } from '../common/SymbolIcon';
@@ -17,7 +32,131 @@ export interface FeedCategoryTabsRowProps {
   isEditMode?: boolean;
   onEditFeed?: (tab: UnifiedFeedTab) => void;
   onAddFeed?: () => void;
+  onReorderTabs?: (tabs: UnifiedFeedTab[]) => void;
 }
+
+interface SortableCategoryTabItemProps {
+  tab: UnifiedFeedTab;
+  isSelected: boolean;
+  isEditMode: boolean;
+  onClick: () => void;
+  activeTabRef?: React.RefObject<HTMLButtonElement | null>;
+}
+
+const SortableCategoryTabItem: React.FC<SortableCategoryTabItemProps> = ({
+  tab,
+  isSelected,
+  isEditMode,
+  onClick,
+  activeTabRef,
+}) => {
+  const tabId = tab.id || tab.slug;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: tabId,
+    disabled: !isEditMode,
+  });
+
+  const horizontalTransform = transform
+    ? { ...transform, y: 0, scaleX: 1, scaleY: 1 }
+    : null;
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(horizontalTransform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.85 : 1,
+  };
+
+  const setMergedRef = (el: HTMLButtonElement | null) => {
+    setNodeRef(el);
+    if (isSelected && activeTabRef) {
+      (activeTabRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+    }
+  };
+
+  return (
+    <button
+      ref={setMergedRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      type="button"
+      onClick={onClick}
+      title={
+        isEditMode
+          ? `Редактировать ленту: ${tab.title}`
+          : tab.description || tab.title
+      }
+      className={`group relative shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-150 select-none ${
+        isEditMode
+          ? 'cursor-grab active:cursor-grabbing hover:bg-slate-200/60 dark:hover:bg-[#1f2b38]'
+          : 'cursor-pointer'
+      } ${
+        isSelected
+          ? 'bg-[#2481cc] text-white border-[#2481cc] shadow-xs font-medium'
+          : 'bg-white/90 dark:bg-[#18222d]/90 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:border-[#2481cc]/40 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-[#1f2b38]'
+      } ${isDragging ? 'ring-2 ring-[#2481cc] shadow-md bg-white dark:bg-[#243343]' : ''}`}
+    >
+      {isEditMode && (
+        <GripVertical className="w-3 h-3 text-slate-400 dark:text-slate-500 -ml-0.5 opacity-60 group-hover:opacity-100" />
+      )}
+      <SymbolIcon icon={tab.emoji} fallback="📁" className="text-xs" />
+      <span>{tab.shortTitle}</span>
+
+      {tab.badgeLabel ? (
+        <span
+          title={tab.badgeLabel}
+          className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full border leading-tight font-mono ${
+            isSelected
+              ? 'bg-orange-500 text-white border-orange-400'
+              : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+          }`}
+        >
+          {tab.badgeLabel}
+        </span>
+      ) : tab.isHot ? (
+        <span
+          title="Ежедневная синхронизация (горячая лента)"
+          className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full border leading-tight ${
+            isSelected
+              ? 'bg-orange-500 text-white border-orange-400'
+              : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+          }`}
+        >
+          🔥 Daily
+        </span>
+      ) : null}
+
+      {/* Note Count Badge */}
+      <span
+        className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full leading-tight font-medium ${
+          isSelected
+            ? 'bg-white/20 text-white'
+            : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400'
+        }`}
+      >
+        {tab.count}
+      </span>
+
+      {/* Edit Mode Pencil Badge */}
+      {isEditMode && (
+        <span
+          className="absolute -top-1 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs pointer-events-none z-10 ring-1 ring-white dark:ring-[#18222d]"
+          title="Редактировать параметры ленты"
+        >
+          <Pencil className="w-2 h-2" />
+        </span>
+      )}
+    </button>
+  );
+};
 
 export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   streamSource,
@@ -30,6 +169,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   isEditMode = false,
   onEditFeed,
   onAddFeed,
+  onReorderTabs,
 }) => {
   const isAll = streamSource === 'all';
   const isPrivateFeeds = streamSource === 'private_feeds';
@@ -92,6 +232,44 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
 
   const activeTabRef = useRef<HTMLButtonElement | null>(null);
   const activeSubtopicRef = useRef<HTMLButtonElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragStart = () => {
+    isDraggingRef.current = true;
+  };
+
+  const handleDragCancel = () => {
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 50);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 50);
+
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorderTabs) return;
+
+    const oldIndex = tabs.findIndex((t) => (t.id || t.slug) === active.id);
+    const newIndex = tabs.findIndex((t) => (t.id || t.slug) === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reordered = arrayMove(tabs, oldIndex, newIndex);
+      onReorderTabs(reordered);
+    }
+  };
+
+  const itemIds = React.useMemo(() => tabs.map((t) => t.id || t.slug), [tabs]);
 
   // Auto-scroll horizontal row smoothly to the selected feed tab
   useEffect(() => {
@@ -102,7 +280,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
         block: 'nearest',
       });
     }
-  }, [activeFeedSlug, tabs]);
+  }, [activeFeedSlug, streamSource]);
 
   // Auto-scroll horizontal subtopics row smoothly to the selected subtopic
   useEffect(() => {
@@ -118,14 +296,14 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
   return (
     <div className="space-y-1.5 w-full">
       {/* Thematic Tabs Row */}
-      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pt-2.5 pb-1.5 px-1 no-scrollbar touch-scroll -mt-1">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto overflow-y-hidden pt-2.5 pb-1.5 px-1 no-scrollbar touch-scroll -mt-1">
         {/* All Channels Option */}
         <button
           type="button"
           onClick={() => onSelectFeed(undefined)}
           className={`relative group shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-150 select-none ${
             isAllSelected
-              ? 'bg-[#2481cc] text-white border-[#2481cc] shadow-xs font-semibold'
+              ? 'bg-[#2481cc] text-white border-[#2481cc] shadow-xs font-medium'
               : 'bg-white/90 dark:bg-[#18222d]/90 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:border-[#2481cc]/40 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-[#1f2b38]'
           }`}
         >
@@ -142,86 +320,52 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
           </span>
         </button>
 
-        {/* Individual Thematic Feed Tabs */}
-        {tabs.map((tab) => {
-          const isSelected =
-            activeFeedSlug === tab.slug ||
-            (tab.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
-            (tab.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
-            Boolean(
-              tab.subtopics &&
-                tab.subtopics.some(
-                  (s) =>
-                    s.slug === activeFeedSlug ||
-                    s.subfolder === activeFeedSlug ||
-                    (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
-                )
-            );
+        {/* Individual Thematic Feed Tabs with DnD Sortable Support */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          <SortableContext items={itemIds} strategy={horizontalListSortingStrategy}>
+            {tabs.map((tab) => {
+              const isSelected =
+                activeFeedSlug === tab.slug ||
+                (tab.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
+                (tab.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
+                Boolean(
+                  tab.subtopics &&
+                    tab.subtopics.some(
+                      (s) =>
+                        s.slug === activeFeedSlug ||
+                        s.subfolder === activeFeedSlug ||
+                        (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
+                    )
+                );
 
-          const handleClick = () => {
-            if (isEditMode && onEditFeed) {
-              onEditFeed(tab);
-            } else {
-              onSelectFeed(tab.slug);
-            }
-          };
+              const handleClick = () => {
+                if (isDraggingRef.current) return;
+                if (isEditMode && onEditFeed) {
+                  onEditFeed(tab);
+                } else {
+                  onSelectFeed(tab.slug);
+                }
+              };
 
-          return (
-            <button
-              key={tab.id}
-              ref={isSelected ? activeTabRef : undefined}
-              type="button"
-              onClick={handleClick}
-              title={
-                isEditMode
-                  ? `Редактировать ленту: ${tab.title}`
-                  : tab.description || tab.title
-              }
-              className={`relative group shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-150 select-none cursor-pointer ${
-                isSelected
-                  ? 'bg-[#2481cc] text-white border-[#2481cc] shadow-xs font-semibold'
-                  : 'bg-white/90 dark:bg-[#18222d]/90 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:border-[#2481cc]/40 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-[#1f2b38]'
-              }`}
-            >
-              <SymbolIcon icon={tab.emoji} fallback="📁" className="text-xs" />
-              <span>{tab.shortTitle}</span>
-
-              {tab.isHot && (
-                <span
-                  title="Ежедневная синхронизация (горячая лента)"
-                  className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full border leading-tight ${
-                    isSelected
-                      ? 'bg-orange-500 text-white border-orange-400'
-                      : 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
-                  }`}
-                >
-                  🔥 Daily
-                </span>
-              )}
-
-              {/* Note Count Badge */}
-              <span
-                className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full leading-tight font-medium ${
-                  isSelected
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400'
-                }`}
-              >
-                {tab.count}
-              </span>
-
-              {/* Edit Mode Pencil Badge - Positioned absolutely to avoid layout reflow */}
-              {isEditMode && (
-                <span
-                  className="absolute -top-1 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs pointer-events-none z-10 ring-1 ring-white dark:ring-[#18222d]"
-                  title="Редактировать параметры ленты"
-                >
-                  <Pencil className="w-2 h-2" />
-                </span>
-              )}
-            </button>
-          );
-        })}
+              return (
+                <SortableCategoryTabItem
+                  key={tab.id || tab.slug}
+                  tab={tab}
+                  isSelected={isSelected}
+                  isEditMode={isEditMode}
+                  onClick={handleClick}
+                  activeTabRef={isSelected ? activeTabRef : undefined}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
 
         {/* Clear filter button (only in normal mode when filtered) */}
         {!isEditMode && !isAllSelected && (
@@ -268,7 +412,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
               activeFeedSlug === activeTabWithSubtopics.slug ||
               (activeTabWithSubtopics.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
               (activeTabWithSubtopics.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai'))
-                ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                ? 'bg-[#2481cc] text-white shadow-xs font-medium'
                 : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
             }`}
           >
@@ -290,7 +434,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
                 onClick={() => onSelectFeed(sub.slug)}
                 className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors select-none ${
                   isSubSelected
-                    ? 'bg-[#2481cc] text-white shadow-xs font-semibold'
+                    ? 'bg-[#2481cc] text-white shadow-xs font-medium'
                     : 'bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300'
                 }`}
               >

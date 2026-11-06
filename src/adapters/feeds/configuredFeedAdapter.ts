@@ -101,14 +101,26 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       return false;
     }
 
+    // Master all-private hub ('private_feeds') matches all private notes (already verified by matchesPrivacy)
+    if (modeOption.id === 'private_feeds') {
+      return true;
+    }
+
     // Clean Slate by Default:
     // If NO criteria are configured, the tab is a clean workspace!
     // It only matches notes that were explicitly authored for or tagged with this tab:
     const normTabId = modeOption.id.toLowerCase().trim();
+    const normTabHyphen = normTabId.replace(/_/g, '-');
     const normLabel = modeOption.label.toLowerCase().trim();
 
     const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
-    if (noteFeedSlug && (noteFeedSlug === normTabId || noteFeedSlug.endsWith(`/${normTabId}`))) {
+    if (
+      noteFeedSlug &&
+      (noteFeedSlug === normTabId ||
+        noteFeedSlug === normTabHyphen ||
+        noteFeedSlug.endsWith(`/${normTabId}`) ||
+        noteFeedSlug.endsWith(`/${normTabHyphen}`))
+    ) {
       return true;
     }
 
@@ -117,6 +129,8 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       noteFolder &&
       (noteFolder.includes(`/${normTabId}/`) ||
         noteFolder.startsWith(`${normTabId}/`) ||
+        noteFolder.includes(`/${normTabHyphen}/`) ||
+        noteFolder.startsWith(`${normTabHyphen}/`) ||
         noteFolder.includes(`/${normLabel}/`) ||
         noteFolder.startsWith(`${normLabel}/`))
     ) {
@@ -126,7 +140,11 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     const noteTags = (note.hashtags || []).map((h: any) =>
       (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
     );
-    if (noteTags.includes(normTabId) || noteTags.includes(normLabel)) {
+    if (
+      noteTags.includes(normTabId) ||
+      noteTags.includes(normTabHyphen) ||
+      noteTags.includes(normLabel)
+    ) {
       return true;
     }
 

@@ -9,10 +9,11 @@ import {
   Plus,
 } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../adapters/feeds/types';
-import { FeedModeOption } from './toolbar/types';
+import { FeedModeOption, resolveStreamPrivacy } from './toolbar/types';
 import { LemonLogo } from './LemonLogo';
 import { PeriodItem } from '../utils/periods';
 import { FeedActivitiesRailSection } from './activities/FeedActivitiesRailSection';
+import { StreamPrivacyBadge } from './common/StreamPrivacyBadge';
 
 export interface FeedDesktopRailProps {
   sourceType: FeedSourceMode;
@@ -199,6 +200,12 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
     ? 'Все папки'
     : 'Все каналы';
 
+  const streamPrivacy = activeMode
+    ? resolveStreamPrivacy(activeMode)
+    : isPrivateFeeds
+    ? 'private'
+    : 'public';
+
   return (
     <aside className="w-72 xl:w-80 shrink-0 hidden md:flex flex-col space-y-3.5 select-none text-xs sticky top-20">
       {/* 1. Channel Overview Card */}
@@ -207,7 +214,8 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
           <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500">
             О канале / ленте
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StreamPrivacyBadge privacy={streamPrivacy} size="xs" />
             {activeFeed?.badgeLabel ? (
               <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 font-mono font-semibold border border-orange-500/30">
                 {activeFeed.badgeLabel}

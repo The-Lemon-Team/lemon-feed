@@ -42,6 +42,7 @@ export default defineConfig(({ mode }) => {
       },
       '/notes': 'http://localhost:3002',
       '/feeds': 'http://localhost:3002',
+      '/streams': 'http://localhost:3002',
       '/taxonomy': 'http://localhost:3002',
       '/hashtags': 'http://localhost:3002',
       '/folders': 'http://localhost:3002',

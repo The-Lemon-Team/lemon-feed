@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
-import { useUpdateNote } from '../api/queries';
+import { useUpdateNote, useFeedSources, queryKeys } from '../api/queries';
 import { resolveMediaUrl, feedApi } from '../api/client';
 import { extractCleanSnippet, NoteImage } from '@lenta/shared';
 import dayjs from 'dayjs';
@@ -25,6 +26,7 @@ import {
   Globe,
   Terminal,
   ShieldCheck,
+  Radio,
 } from 'lucide-react';
 import { FEED_IT_WORKFLOW_TEMPLATES } from './cover-studio/feedCoverStudio.constants';
 import { FeedItEditAssistant } from './cover-studio/FeedItEditAssistant';
@@ -40,6 +42,8 @@ export interface FeedEditNoteModalProps {
   onDeleted?: () => void;
 }
 
+const EMPTY_FEEDS: any[] = [];
+
 export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   item,
   onClose,
@@ -48,6 +52,8 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   onSaved,
   onDeleted,
 }) => {
+  const queryClient = useQueryClient();
+  const { data: feeds = EMPTY_FEEDS } = useFeedSources();
   const { backdropProps } = useModalBackdrop(onClose);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -58,6 +64,10 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   const [eventDate, setEventDate] = useState('');
   const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>('private');
   const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>('DRAFT');
+  const [feedId, setFeedId] = useState<string>(() => {
+    const raw = (item?.rawPayload as any) || {};
+    return raw.feedId || raw.feed?.id || '';
+  });
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [existingImages, setExistingImages] = useState<NoteImage[]>(() => {
     return (item?.rawPayload?.images as NoteImage[]) || [];
@@ -74,6 +84,15 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       setSourceLink(item.sourceLink || '');
       setHashtagsStr(item.hashtags?.map((h) => `#${h.replace(/^#/, '')}`).join(' ') || '');
       const raw = (item.rawPayload as any) || {};
+      const directFeedId = raw.feedId || raw.feed?.id || '';
+      if (directFeedId) {
+        setFeedId(directFeedId);
+      } else if (item.feedSlug && feeds.length > 0) {
+        const matched = feeds.find((f) => f.slug === item.feedSlug);
+        setFeedId(matched ? matched.id : '');
+      } else {
+        setFeedId('');
+      }
       setEventDate(
         raw.startDate
           ? dayjs(raw.startDate).format('YYYY-MM-DD')
@@ -94,7 +113,24 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       const refreshed = await feedApi.getNoteById(item.id);
       if (refreshed?.images) {
         setExistingImages(refreshed.images);
+        queryClient.setQueriesData<any>({ queryKey: ['feed', 'stream'] }, (oldData: any) => {
+          if (!oldData || !Array.isArray(oldData.pages)) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: any) => ({
+              ...page,
+              items: (page.items || []).map((n: any) =>
+                n.id === item.id ? { ...n, images: refreshed.images } : n
+              ),
+            })),
+          };
+        });
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] }),
+        queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(item.id) }),
+      ]);
       onSaved?.();
     } catch {
       // fallback
@@ -141,6 +177,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
         eventDate,
         targetPrivacy,
         targetStatus,
+        feedId,
       });
 
       await updateNoteMutation.mutateAsync({
@@ -263,85 +300,116 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
             </div>
           </div>
 
-          {/* Publication Stage Switcher & Date Picker */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923]">
-            {/* Stage Selector */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[#2481cc]" />
-                <span>Этап публикации (Контур)</span>
-              </label>
-              <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetPrivacy('private');
-                    setTargetStatus('DRAFT');
-                  }}
-                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                    targetPrivacy === 'private'
-                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold'
-                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
-                  }`}
-                  title="Приватный рабочий контур"
-                >
-                  <div>💻 Dev</div>
-                  <div className="text-[9px] opacity-70">Черновик</div>
-                </button>
+          {/* Publication Stage Switcher, Date & Feed Settings */}
+          <div className="p-3 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-[#121923] space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Stage Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-[#2481cc]" />
+                  <span>Этап публикации (Контур)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetPrivacy('private');
+                      setTargetStatus('DRAFT');
+                    }}
+                    className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                      targetPrivacy === 'private'
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 font-bold'
+                        : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                    }`}
+                    title="Приватный рабочий контур"
+                  >
+                    <div>💻 Dev</div>
+                    <div className="text-[9px] opacity-70">Черновик</div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetPrivacy('public');
-                    setTargetStatus('DRAFT');
-                  }}
-                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                    targetPrivacy === 'public' && targetStatus !== 'PUBLISHED'
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
-                  }`}
-                  title="Хаб публикаций (стейджинг)"
-                >
-                  <div>🛡️ Staging</div>
-                  <div className="text-[9px] opacity-70">Премодер</div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetPrivacy('public');
+                      setTargetStatus('DRAFT');
+                    }}
+                    className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                      targetPrivacy === 'public' && targetStatus !== 'PUBLISHED'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                    }`}
+                    title="Хаб публикаций (стейджинг)"
+                  >
+                    <div>🛡️ Staging</div>
+                    <div className="text-[9px] opacity-70">Премодер</div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetPrivacy('public');
-                    setTargetStatus('PUBLISHED');
-                  }}
-                  className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                    targetPrivacy === 'public' && targetStatus === 'PUBLISHED'
-                      ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300 font-bold'
-                      : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
-                  }`}
-                  title="Опубликовано в паблике"
-                >
-                  <div>🌐 Public</div>
-                  <div className="text-[9px] opacity-70">Паблик</div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetPrivacy('public');
+                      setTargetStatus('PUBLISHED');
+                    }}
+                    className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                      targetPrivacy === 'public' && targetStatus === 'PUBLISHED'
+                        ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300 font-bold'
+                        : 'border-slate-200 dark:border-white/10 text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                    }`}
+                    title="Опубликовано в паблике"
+                  >
+                    <div>🌐 Public</div>
+                    <div className="text-[9px] opacity-70">Паблик</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Event Date Picker (Retroactive & Abstract Dates Support) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#2481cc]" />
+                    <span>Дата заметки / новости</span>
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                    Заднее число ✓
+                  </span>
+                </div>
+                <input
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+                />
               </div>
             </div>
 
-            {/* Event Date Picker (Retroactive & Abstract Dates Support) */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#2481cc]" />
-                  <span>Дата заметки / новости</span>
-                </label>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
-                  Заднее число ✓
-                </span>
-              </div>
-              <input
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
-              />
+            {/* Feed / Stream Selector */}
+            <div className="pt-2.5 border-t border-slate-200/60 dark:border-white/5">
+              <label
+                htmlFor="feed-select"
+                className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5 flex items-center gap-1.5"
+              >
+                <Radio className="w-3.5 h-3.5 text-[#2481cc]" />
+                <span>Лента / Поток</span>
+              </label>
+              <select
+                id="feed-select"
+                aria-label="Лента / Поток"
+                value={feedId}
+                onChange={(e) => setFeedId(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+              >
+                <option value="">Без ленты (общий поток)</option>
+                {feeds.map((f) => {
+                  const isLigature = f.icon && /^[a-z0-9_-]+$/i.test(f.icon.trim());
+                  const displayIcon = !f.icon || isLigature ? (f.privacy === 'private' ? '🔒' : '📁') : f.icon;
+                  return (
+                    <option key={f.id} value={f.id}>
+                      {displayIcon} {f.title} ({f.slug})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
           </div>
 

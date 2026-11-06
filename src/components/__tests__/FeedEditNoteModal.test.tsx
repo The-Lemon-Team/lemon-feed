@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { makeFeedItem } from '../../test/fixtures';
+import { makeFeed, makeFeedItem } from '../../test/fixtures';
 import { FeedEditNoteModal } from '../FeedEditNoteModal';
 
 type Body = Record<string, any>;
@@ -28,6 +28,7 @@ const titleInput = () => screen.getByPlaceholderText(/Название ново�
 const descInput = () => screen.getByPlaceholderText(/Текст новости/);
 const tagsInput = () => screen.getByPlaceholderText('#ai #podcast #changelog #security');
 const dateInput = () => document.querySelector('input[type="date"]') as HTMLInputElement;
+const feedSelect = () => screen.getByRole('combobox', { name: /Лента \/ Поток/i });
 const STAGE_TITLES = {
   dev: 'Приватный рабочий контур',
   staging: 'Хаб публикаций (стейджинг)',
@@ -199,6 +200,67 @@ describe('FeedEditNoteModal', () => {
       await userEvent.click(presets[0]);
       expect(onOpenAiCover).toHaveBeenCalledWith(item, expect.any(String));
     });
+
+    it('prefills feedId from rawPayload.feedId and allows changing the feed', async () => {
+      server.use(
+        http.get('*/feeds', () =>
+          HttpResponse.json([
+            makeFeed({ id: 'feed-tech', title: 'Tech News', slug: 'tech' }),
+            makeFeed({ id: 'feed-science', title: 'Science', slug: 'science' }),
+          ])
+        )
+      );
+
+      const api = mockPatch();
+      const itemWithFeed = makeFeedItem({
+        rawPayload: {
+          feedId: 'feed-tech',
+        },
+      });
+
+      renderWithProviders(<FeedEditNoteModal item={itemWithFeed} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(feedSelect()).toHaveValue('feed-tech');
+      });
+
+      await userEvent.selectOptions(feedSelect(), 'feed-science');
+      expect(feedSelect()).toHaveValue('feed-science');
+
+      await userEvent.click(saveBtn());
+      await screen.findByText(/Запись успешно обновлена/);
+      expect(api.body!.feedId).toBe('feed-science');
+    });
+
+    it('allows clearing the feed to "Без ленты"', async () => {
+      server.use(
+        http.get('*/feeds', () =>
+          HttpResponse.json([
+            makeFeed({ id: 'feed-tech', title: 'Tech News', slug: 'tech' }),
+          ])
+        )
+      );
+
+      const api = mockPatch();
+      const itemWithFeed = makeFeedItem({
+        rawPayload: {
+          feedId: 'feed-tech',
+        },
+      });
+
+      renderWithProviders(<FeedEditNoteModal item={itemWithFeed} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(feedSelect()).toHaveValue('feed-tech');
+      });
+
+      await userEvent.selectOptions(feedSelect(), '');
+      expect(feedSelect()).toHaveValue('');
+
+      await userEvent.click(saveBtn());
+      await screen.findByText(/Запись успешно обновлена/);
+      expect(api.body!.feedId).toBe(null);
+    });
   });
 
   describe('Edit › validation and errors', () => {
@@ -254,6 +316,45 @@ describe('FeedEditNoteModal', () => {
       unmount();
       await userEvent.keyboard('{Escape}');
       expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('pressing Enter in Google poster search modal searches images without submitting or closing parent FeedEditNoteModal', async () => {
+      const api = mockPatch();
+      const onClose = vi.fn();
+      let searchQueries: string[] = [];
+
+      server.use(
+        http.get('*/notes/media/search-images', ({ request }) => {
+          const url = new URL(request.url);
+          searchQueries.push(url.searchParams.get('q') || '');
+          return HttpResponse.json([
+            {
+              title: 'Poster 1',
+              imageUrl: 'https://example.com/p1.jpg',
+              thumbnailUrl: 'https://example.com/p1-thumb.jpg',
+              width: 800,
+              height: 1200,
+              source: 'Example',
+            },
+          ]);
+        })
+      );
+
+      renderWithProviders(<FeedEditNoteModal item={makeFeedItem()} onClose={onClose} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /Найти постер \(Google\)/i }));
+      const searchInput = await screen.findByPlaceholderText(/Введите название фильма/i);
+
+      await userEvent.clear(searchInput);
+      await userEvent.type(searchInput, 'Matrix Reloaded{Enter}');
+
+      await waitFor(() => {
+        expect(searchQueries).toContain('Matrix Reloaded');
+      });
+
+      expect(api.calls).toBe(0);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Поиск постеров (Google)')).toBeInTheDocument();
     });
   });
 });

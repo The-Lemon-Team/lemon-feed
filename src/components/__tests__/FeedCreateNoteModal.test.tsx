@@ -224,5 +224,66 @@ describe('FeedCreateNoteModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
       expect(api.calls.count).toBe(0);
     });
+
+    it('attaches Google search posters and passes the updated note with images to onCreated', async () => {
+      mockApi();
+      const onCreated = vi.fn();
+      let attachedForNoteId: string | null = null;
+
+      server.use(
+        http.get('*/notes/media/search-images', () =>
+          HttpResponse.json([
+            {
+              title: 'Dune Poster',
+              imageUrl: 'https://example.com/dune.jpg',
+              thumbnailUrl: 'https://example.com/dune-thumb.jpg',
+              width: 800,
+              height: 1200,
+              source: 'IMDb',
+            },
+          ])
+        ),
+        http.post('*/notes/:id/images/from-urls', async ({ params }) => {
+          attachedForNoteId = String(params.id);
+          return HttpResponse.json([
+            {
+              id: 'img-dune-1',
+              noteId: params.id,
+              url: '/uploads/notes/dune.webp',
+              thumbnailUrl: '/uploads/notes/thumbs/dune.webp',
+              isMain: true,
+              caption: 'Dune Poster',
+              order: 0,
+            },
+          ]);
+        })
+      );
+
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} onCreated={onCreated} />);
+
+      await userEvent.type(titleInput(), 'Dune Part Two');
+      await userEvent.click(screen.getByRole('button', { name: /Найти постер \(Google\)/i }));
+
+      const posterCard = await screen.findByText('Dune Poster');
+      await userEvent.click(posterCard);
+      await userEvent.click(screen.getByRole('button', { name: /Добавить \(1\)/i }));
+
+      await userEvent.click(submit());
+
+      expect(await screen.findByText('Запись успешно создана!')).toBeInTheDocument();
+      expect(attachedForNoteId).toBe('created-1');
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'created-1',
+          images: [
+            expect.objectContaining({
+              id: 'img-dune-1',
+              url: '/uploads/notes/dune.webp',
+              isMain: true,
+            }),
+          ],
+        })
+      );
+    });
   });
 });

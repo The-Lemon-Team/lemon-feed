@@ -218,14 +218,21 @@ export function getPathForFeedSource(
     params.set('embed', 'true');
   }
 
-  // Preserve active appMode across internal feed navigation
+  // Preserve active appMode and notesPrivacy across internal feed navigation
+  const currentSearchParams =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const activeAppMode =
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('appMode') ||
-        localStorage.getItem('lenta_app_mode')
-      : null;
+    currentSearchParams?.get('appMode') ||
+    (typeof window !== 'undefined' ? localStorage.getItem('lenta_app_mode') : null);
   if (activeAppMode) {
     params.set('appMode', activeAppMode);
+  }
+  const activeNotesPrivacy =
+    currentSearchParams?.get('notesPrivacy') ||
+    currentSearchParams?.get('privacy') ||
+    (typeof window !== 'undefined' ? localStorage.getItem('lenta_notes_privacy') : null);
+  if (activeNotesPrivacy && activeNotesPrivacy !== 'all') {
+    params.set('notesPrivacy', activeNotesPrivacy);
   }
 
   const query = params.toString();
@@ -252,12 +259,66 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   const feedSegment = segments[1];
   const subtopicSegment = segments[2];
 
+  const isKnownPreset = Boolean(
+    PATH_TO_SOURCE[primarySegment] ||
+      PATH_TO_SOURCE[primarySegment.replace(/-/g, '_')] ||
+      primarySegment === 'all' ||
+      primarySegment === 'stream'
+  );
+
+  // 1. Check custom source tabs persisted in localStorage
+  if (typeof window !== 'undefined' && !modeParam && segments.length >= 1) {
+    try {
+      const saved = localStorage.getItem('lenta_custom_stream_modes');
+      if (saved) {
+        const parsedModes = JSON.parse(saved);
+        if (Array.isArray(parsedModes)) {
+          const normPrimary = primarySegment.toLowerCase().replace(/-/g, '_');
+          const matchedCustom = parsedModes.find(
+            (m: any) =>
+              m?.id &&
+              (m.id.toLowerCase() === primarySegment.toLowerCase() ||
+                m.id.toLowerCase().replace(/-/g, '_') === normPrimary)
+          );
+          if (matchedCustom) {
+            let customFeedSlug: string | undefined = feedParam || undefined;
+            let customSubtopicSlug: string | undefined;
+            if (feedSegment) {
+              const rawFeed = ALIAS_TO_FEED_SLUG[feedSegment] || feedSegment;
+              if (subtopicSegment) {
+                customFeedSlug = composeFeedSlug(rawFeed, subtopicSegment);
+                customSubtopicSlug = subtopicSegment;
+              } else {
+                customFeedSlug = rawFeed;
+                const decomp = decomposeFeedSlug(customFeedSlug);
+                if (decomp.subtopic) {
+                  customSubtopicSlug = decomp.subtopic;
+                }
+              }
+            }
+            return {
+              streamSource: matchedCustom.id as FeedSourceMode,
+              selectedFeedSlug: customFeedSlug,
+              subtopicSlug: customSubtopicSlug,
+              noteId,
+              layoutMode: layoutParam === 'stream' ? 'stream' : 'split',
+              isEmbed,
+              searchQuery,
+            };
+          }
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
   let streamSource: FeedSourceMode = 'all';
   if (modeParam) {
     const cleanMode = modeParam.toLowerCase().trim();
     streamSource = PATH_TO_SOURCE[cleanMode] || (cleanMode.replace(/-/g, '_') as FeedSourceMode);
-  } else if (primarySegment && PATH_TO_SOURCE[primarySegment]) {
-    streamSource = PATH_TO_SOURCE[primarySegment];
+  } else if (primarySegment && (PATH_TO_SOURCE[primarySegment] || PATH_TO_SOURCE[primarySegment.replace(/-/g, '_')])) {
+    streamSource = PATH_TO_SOURCE[primarySegment] || PATH_TO_SOURCE[primarySegment.replace(/-/g, '_')];
   } else if (segments.length > 1 && primarySegment && primarySegment !== 'all') {
     streamSource = primarySegment.replace(/-/g, '_') as FeedSourceMode;
   }
@@ -277,20 +338,23 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
         subtopicSlug = decomp.subtopic;
       }
     }
-  } else if (
-    !modeParam &&
-    segments.length === 1 &&
-    primarySegment &&
-    primarySegment !== 'all' &&
-    primarySegment !== 'stream' &&
-    !PATH_TO_SOURCE[primarySegment]
-  ) {
-    // Single path segment not matching a known source mode is treated as direct feed slug / alias
-    const rawFeed = ALIAS_TO_FEED_SLUG[primarySegment] || primarySegment;
-    selectedFeedSlug = rawFeed;
-    const decomp = decomposeFeedSlug(selectedFeedSlug);
-    if (decomp.subtopic) {
-      subtopicSlug = decomp.subtopic;
+  } else if (!modeParam && segments.length === 1 && primarySegment && !isKnownPreset) {
+    // Single path segment not matching a known preset:
+    // If known alias in ALIAS_TO_FEED_SLUG or compound prefix, treat as feed slug on 'all'.
+    const isKnownFeedAlias =
+      Boolean(ALIAS_TO_FEED_SLUG[primarySegment]) ||
+      COMPOUND_PREFIXES.some((cp) => primarySegment.startsWith(cp.prefix));
+
+    if (isKnownFeedAlias) {
+      const rawFeed = ALIAS_TO_FEED_SLUG[primarySegment] || primarySegment;
+      selectedFeedSlug = rawFeed;
+      const decomp = decomposeFeedSlug(selectedFeedSlug);
+      if (decomp.subtopic) {
+        subtopicSlug = decomp.subtopic;
+      }
+    } else {
+      // Treat single segment as a custom stream source slug (e.g. /jm-daily -> jm_daily, /code-learning -> code_learning)
+      streamSource = primarySegment.replace(/-/g, '_') as FeedSourceMode;
     }
   }
 

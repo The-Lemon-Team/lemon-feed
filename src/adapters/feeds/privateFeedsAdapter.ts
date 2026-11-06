@@ -17,25 +17,83 @@ export function isPrivateFeedOrNote(note: Note): boolean {
   return false;
 }
 
+export const DEFAULT_PRELOADED_PRIVATE_TABS: Array<{
+  slug: string;
+  title: string;
+  emoji: string;
+  color: string;
+  description: string;
+}> = [
+  {
+    slug: 'private-notes',
+    title: 'Личные заметки',
+    emoji: '🔒',
+    color: '#a855f7',
+    description: 'Личные конфиденциальные заметки и мысли',
+  },
+  {
+    slug: 'work-vault',
+    title: 'Рабочий архив & Проекты',
+    emoji: '💼',
+    color: '#3b82f6',
+    description: 'Закрытые рабочие документы, архитектурные планы и задачи',
+  },
+  {
+    slug: 'diary-logs',
+    title: 'Личный дневник',
+    emoji: '📓',
+    color: '#ec4899',
+    description: 'Ежедневные личные записи и рефлексия',
+  },
+  {
+    slug: 'secure-vault',
+    title: 'Защищенный сейф',
+    emoji: '🛡️',
+    color: '#10b981',
+    description: 'Секреты, ключи, резервные данные и чувствительная информация',
+  },
+];
+
+export function resolvePrivateNoteSlug(note: Note): string {
+  if (note.feed?.slug) return note.feed.slug;
+  const p = (note.folderPath || '').toLowerCase();
+  const tags = (note.hashtags || []).map((h: any) =>
+    (typeof h === 'string' ? h : h?.name || '').toLowerCase()
+  );
+
+  if (p.includes('work') || p.includes('project') || tags.includes('work') || tags.includes('проект')) {
+    return 'work-vault';
+  }
+  if (p.includes('diary') || tags.includes('diary') || tags.includes('дневник')) {
+    return 'diary-logs';
+  }
+  if (p.includes('vault') || p.includes('key') || tags.includes('vault') || tags.includes('сейф') || tags.includes('ключи')) {
+    return 'secure-vault';
+  }
+  return 'private-notes';
+}
+
 export const PrivateFeedsAdapter: FeedAdapter = {
   sourceType: 'private_feeds',
-  label: 'Приватные ленты',
-  shortLabel: 'Private feeds',
+  label: 'Все приватные',
+  shortLabel: 'Все приватные',
   emoji: '🔮',
-  description: 'Приватные ленты, защищенные потоки и внутренние заметки',
+  description: 'Сводный поток всех приватных заметок, защищенных папок и внутренних лент',
 
   getTabs(context: FeedAdapterContext): UnifiedFeedTab[] {
     const countsBySlug: Record<string, number> = {};
     const feedMetaBySlug: Record<
       string,
-      { title: string; emoji: string; color: string; description?: string }
+      { id?: string; title: string; emoji: string; color: string; description?: string }
     > = {};
 
-    // 1. First collect all explicit private feeds
+    // 1. Collect all explicit private feeds from database
     for (const f of context.allFeeds) {
       if (f.privacy === 'private') {
-        countsBySlug[f.slug] = 0;
+        const count = (f as any)._count?.notes || countsBySlug[f.slug] || 0;
+        countsBySlug[f.slug] = count;
         feedMetaBySlug[f.slug] = {
+          id: f.id,
           title: f.title,
           emoji: f.icon || '🔒',
           color: f.color || '#a855f7',
@@ -47,7 +105,7 @@ export const PrivateFeedsAdapter: FeedAdapter = {
     // 2. Count matching notes per feed or private container
     for (const n of context.notes) {
       if (isPrivateFeedOrNote(n)) {
-        const slug = n.feed?.slug || 'private-notes';
+        const slug = n.feed?.slug || resolvePrivateNoteSlug(n);
         countsBySlug[slug] = (countsBySlug[slug] || 0) + 1;
         if (!feedMetaBySlug[slug]) {
           feedMetaBySlug[slug] = {
@@ -60,24 +118,22 @@ export const PrivateFeedsAdapter: FeedAdapter = {
       }
     }
 
-    // 3. Return tabs
-    return Object.entries(feedMetaBySlug)
-      .filter(([slug]) => (countsBySlug[slug] || 0) > 0)
-      .map(([slug, meta]) => ({
-        id: `tab-private-${slug}`,
-        slug,
-        title: meta.title,
-        shortTitle: meta.title.length > 18 ? meta.title.slice(0, 18) + '...' : meta.title,
-        emoji: meta.emoji,
-        category: 'Private',
-        count: countsBySlug[slug] || 0,
-        accentColor: meta.color,
-        badgeBgLight: 'rgba(168, 85, 247, 0.1)',
-        badgeTextLight: '#7e22ce',
-        badgeBgDark: 'rgba(168, 85, 247, 0.25)',
-        badgeTextDark: '#d8b4fe',
-        description: meta.description,
-      }));
+    // 3. Return all DB private tabs and active note tabs
+    return Object.entries(feedMetaBySlug).map(([slug, meta]) => ({
+      id: meta.id || `tab-private-${slug}`,
+      slug,
+      title: meta.title,
+      shortTitle: meta.title.length > 18 ? meta.title.slice(0, 18) + '...' : meta.title,
+      emoji: meta.emoji,
+      category: 'Private',
+      count: countsBySlug[slug] || 0,
+      accentColor: meta.color,
+      badgeBgLight: 'rgba(168, 85, 247, 0.1)',
+      badgeTextLight: '#7e22ce',
+      badgeBgDark: 'rgba(168, 85, 247, 0.25)',
+      badgeTextDark: '#d8b4fe',
+      description: meta.description,
+    }));
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {
@@ -88,7 +144,7 @@ export const PrivateFeedsAdapter: FeedAdapter = {
         if (!isPrivateFeedOrNote(note)) return false;
 
         if (activeFeedSlug) {
-          const slug = note.feed?.slug || 'private-notes';
+          const slug = note.feed?.slug || resolvePrivateNoteSlug(note);
           if (slug !== activeFeedSlug) return false;
         }
 
@@ -106,14 +162,15 @@ export const PrivateFeedsAdapter: FeedAdapter = {
       })
       .map((n) => {
         const cover = extractNoteCoverUrl(n);
+        const slug = n.feed?.slug || resolvePrivateNoteSlug(n);
         const channelTitle = n.feed?.title || 'Приватный контур';
-        const channelHandle = `private/${n.feed?.slug || 'vault'}`;
+        const channelHandle = `private/${slug}`;
         const avatarIcon = n.feed?.icon || '🔒';
 
         return {
           id: n.id,
           sourceType: 'private_feeds',
-          feedSlug: n.feed?.slug || 'private-notes',
+          feedSlug: slug,
           channelTitle,
           channelHandle,
           avatarIcon,
