@@ -39,6 +39,8 @@ export interface FeedModalsProps {
   // Lemon Seasons Modal
   isLemonSeasonsModalOpen: boolean;
   onCloseLemonSeasons: () => void;
+  onSelectFeed?: (slug?: string) => void;
+  onSelectStreamSource?: (streamSource: any) => void;
   // Feed Entity Modal
   editingFeedTab: UnifiedFeedTab | null;
   editingDbFeed: any | null;
@@ -82,6 +84,8 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
   onAiCoverApplied,
   isLemonSeasonsModalOpen,
   onCloseLemonSeasons,
+  onSelectFeed,
+  onSelectStreamSource,
   editingFeedTab,
   editingDbFeed,
   isFeedEntityModalOpen,
@@ -173,6 +177,8 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
         <LemonSeasonsModal
           isOpen={isLemonSeasonsModalOpen}
           onClose={onCloseLemonSeasons}
+          onSelectFeed={onSelectFeed}
+          onSelectStreamSource={onSelectStreamSource}
         />
       )}
 

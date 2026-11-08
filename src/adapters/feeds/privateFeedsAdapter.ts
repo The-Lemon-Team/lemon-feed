@@ -88,10 +88,10 @@ export const PrivateFeedsAdapter: FeedAdapter = {
       { id?: string; title: string; emoji: string; color: string; description?: string }
     > = {};
 
-    // 1. Collect all explicit private feeds from database
+    // 1. Collect all explicit private feeds from database with their persistent note counts
     for (const f of context.allFeeds) {
       if (f.privacy === 'private') {
-        countsBySlug[f.slug] = context.notes && context.notes.length > 0 ? 0 : ((f as any)._count?.notes || 0);
+        countsBySlug[f.slug] = (f as any)._count?.notes || 0;
         feedMetaBySlug[f.slug] = {
           id: f.id,
           title: f.title,

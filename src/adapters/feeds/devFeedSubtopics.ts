@@ -14,7 +14,7 @@ export const KNOWN_CHANGELOG_SUBTOPICS: Array<{
 
 export function buildChangelogSubtopics(
   changelogSubCounts: Record<string, number>,
-  _allFeeds: Array<{ slug: string; _count?: { notes: number } }> = [],
+  allFeeds: Array<{ slug: string; _count?: { notes: number } }> = [],
 ): Array<{
   id: string;
   slug: string;
@@ -25,6 +25,15 @@ export function buildChangelogSubtopics(
   accentColor: string;
 }> {
   const mergedCounts: Record<string, number> = { ...changelogSubCounts };
+
+  for (const f of allFeeds) {
+    if (f.slug && (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-'))) {
+      const sub = f.slug.replace(/^spark-changelogsfeed-|^changelogs-/, '').toLowerCase();
+      if (sub && (f as any)._count?.notes) {
+        mergedCounts[sub] = Math.max(mergedCounts[sub] || 0, (f as any)._count.notes);
+      }
+    }
+  }
 
   const discovered = new Set<string>();
   const subtopics: Array<{

@@ -204,6 +204,15 @@ export const ItDevFeedAdapter: FeedAdapter = {
       }
     }
 
+    for (const f of context.allFeeds || []) {
+      if (f.slug && (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-'))) {
+        const sub = f.slug.replace(/^spark-notebooklmai-|^notebooklm-/, '') as 'regular' | 'telegram';
+        if (sub && (f as any)._count?.notes) {
+          notebooklmSubCounts[sub] = Math.max(notebooklmSubCounts[sub] || 0, (f as any)._count.notes);
+        }
+      }
+    }
+
     const countsByPreset: Record<string, number> = {};
     for (const n of context.notes) {
       if (!isItDevNote(n)) continue;
@@ -230,7 +239,6 @@ export const ItDevFeedAdapter: FeedAdapter = {
     return IT_DEV_PRESETS
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => preset.matchingSlugs.includes(f.slug));
-        const count = countsByPreset[preset.slug] || (dbFeed?._count?.notes ?? 0);
         let subtopics: UnifiedSubtopic[] | undefined;
 
         if (preset.isChangelogs) {
@@ -246,6 +254,9 @@ export const ItDevFeedAdapter: FeedAdapter = {
             accentColor: known.accentColor,
           })).filter((s) => s.count > 0);
         }
+
+        const totalSubCount = subtopics ? subtopics.reduce((sum, s) => sum + s.count, 0) : 0;
+        const count = Math.max(countsByPreset[preset.slug] || 0, dbFeed?._count?.notes ?? 0, totalSubCount);
 
         const resolvedTitle = dbFeed?.title || preset.title;
         const resolvedShortTitle = dbFeed

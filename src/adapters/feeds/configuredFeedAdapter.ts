@@ -4,6 +4,7 @@ import {
   FeedAdapterContext,
   UnifiedFeedItem,
   UnifiedFeedTab,
+  UnifiedSubtopic,
   extractNoteCoverUrl,
   extractNoteAudioFields,
 } from './types';
@@ -342,25 +343,9 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       }
 
       const feedTabs: UnifiedFeedTab[] = Object.entries(feedMetaBySlug)
-        .filter(([slug, meta]) => (countsBySlug[slug] || 0) > 0 || Boolean(meta.id))
         .map(([slug, meta]) => {
-          const tab: UnifiedFeedTab = {
-            id: meta.id || `tab-cfg-${slug}`,
-            slug,
-            title: meta.title,
-            shortTitle: meta.title.length > 18 ? meta.title.slice(0, 18) + '...' : meta.title,
-            emoji: meta.emoji,
-            category: modeOption.label,
-            count: countsBySlug[slug] || 0,
-            accentColor: meta.color,
-            badgeBgLight: 'rgba(36, 129, 204, 0.1)',
-            badgeTextLight: '#1e6cb0',
-            badgeBgDark: 'rgba(36, 129, 204, 0.25)',
-            badgeTextDark: '#93c5fd',
-            description: meta.description,
-          };
-
           // Attach subtopics if applicable:
+          let subtopics: UnifiedSubtopic[] | undefined;
           if (slug.includes('changelog')) {
             const changelogCounts: Record<string, number> = {};
             for (const n of context.notes) {
@@ -369,7 +354,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
                 if (sub) changelogCounts[sub] = (changelogCounts[sub] || 0) + 1;
               }
             }
-            tab.subtopics = buildChangelogSubtopics(changelogCounts, context.allFeeds);
+            subtopics = buildChangelogSubtopics(changelogCounts, context.allFeeds);
           } else if (slug.includes('notebooklm')) {
             const nbCounts: Record<'regular' | 'telegram', number> = { regular: 0, telegram: 0 };
             for (const n of context.notes) {
@@ -378,7 +363,15 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
                 nbCounts[sub] = (nbCounts[sub] || 0) + 1;
               }
             }
-            tab.subtopics = KNOWN_NOTEBOOKLM_SUBTOPICS.map((s) => ({
+            for (const f of context.allFeeds || []) {
+              if (f.slug && (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-'))) {
+                const sub = f.slug.replace(/^spark-notebooklmai-|^notebooklm-/, '') as 'regular' | 'telegram';
+                if (sub && (f as any)._count?.notes) {
+                  nbCounts[sub] = Math.max(nbCounts[sub] || 0, (f as any)._count.notes);
+                }
+              }
+            }
+            subtopics = KNOWN_NOTEBOOKLM_SUBTOPICS.map((s) => ({
               id: `sub-nb-${s.subfolder}`,
               slug: s.subfolder,
               subfolder: s.subfolder,
@@ -386,11 +379,34 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
               emoji: s.emoji,
               accentColor: s.accentColor,
               count: nbCounts[s.subfolder as 'regular' | 'telegram'] || 0,
-            }));
+            })).filter((s) => s.count > 0);
           }
 
+          const matchedDbFeed = context.allFeeds.find((f) => f.slug === slug || f.id === meta.id);
+          const dbFeedCount = (matchedDbFeed as any)?._count?.notes ?? 0;
+          const subtopicsSum = subtopics ? subtopics.reduce((acc, s) => acc + s.count, 0) : 0;
+          const resolvedCount = Math.max(countsBySlug[slug] || 0, dbFeedCount, subtopicsSum);
+
+          const tab: UnifiedFeedTab = {
+            id: meta.id || `tab-cfg-${slug}`,
+            slug,
+            title: meta.title,
+            shortTitle: meta.title.length > 18 ? meta.title.slice(0, 18) + '...' : meta.title,
+            emoji: meta.emoji,
+            category: modeOption.label,
+            count: resolvedCount,
+            accentColor: meta.color,
+            badgeBgLight: 'rgba(36, 129, 204, 0.1)',
+            badgeTextLight: '#1e6cb0',
+            badgeBgDark: 'rgba(36, 129, 204, 0.25)',
+            badgeTextDark: '#93c5fd',
+            description: meta.description,
+            subtopics,
+          };
+
           return tab;
-        });
+        })
+        .filter((tab) => tab.count > 0 || !tab.id.startsWith('tab-cfg-') || (tab.subtopics && tab.subtopics.length > 0));
 
       return [...tabs, ...feedTabs];
     },

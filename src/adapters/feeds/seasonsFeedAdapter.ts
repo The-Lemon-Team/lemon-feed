@@ -116,10 +116,9 @@ export const SeasonsFeedAdapter: FeedAdapter = {
     }
 
     return SEASONS_FEED_PRESETS
-      .filter((preset) => (countsBySlug[preset.slug] || 0) > 0)
       .map((preset) => {
         const dbFeed = context.allFeeds.find((f) => f.slug === preset.slug);
-        const count = countsBySlug[preset.slug] || 0;
+        const count = Math.max(countsBySlug[preset.slug] || 0, dbFeed?._count?.notes ?? 0);
 
         const title = dbFeed?.title || preset.title;
         const cleanTitle = dbFeed?.title
@@ -144,7 +143,8 @@ export const SeasonsFeedAdapter: FeedAdapter = {
           badgeTextDark: preset.badgeTextDark,
           description: dbFeed?.description || preset.description,
         };
-      });
+      })
+      .filter((tab) => tab.count > 0 || Boolean(context.allFeeds.some((f) => f.slug === tab.slug)));
   },
 
   adaptNotes(notes: Note[], activeFeedSlug?: string, searchQuery?: string): UnifiedFeedItem[] {

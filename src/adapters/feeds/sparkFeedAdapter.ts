@@ -69,6 +69,15 @@ export const SparkFeedAdapter: FeedAdapter = {
       }
     }
 
+    for (const f of context.allFeeds || []) {
+      if (f.slug && (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-'))) {
+        const sub = f.slug.replace(/^spark-notebooklmai-|^notebooklm-/, '') as 'regular' | 'telegram';
+        if (sub && (f as any)._count?.notes) {
+          notebooklmSubCounts[sub] = Math.max(notebooklmSubCounts[sub] || 0, (f as any)._count.notes);
+        }
+      }
+    }
+
     return rawSparkFeeds.map((f) => {
       let subtopics: UnifiedSubtopic[] | undefined;
 
@@ -86,6 +95,9 @@ export const SparkFeedAdapter: FeedAdapter = {
         subtopics = buildChangelogSubtopics(changelogSubCounts, context.allFeeds);
       }
 
+      const totalSubCount = subtopics ? subtopics.reduce((sum, s) => sum + s.count, 0) : 0;
+      const count = Math.max(f.notesCount, totalSubCount);
+
       return {
         id: f.id,
         slug: f.slug,
@@ -93,7 +105,7 @@ export const SparkFeedAdapter: FeedAdapter = {
         shortTitle: f.shortTitle,
         emoji: f.emoji,
         category: f.category,
-        count: f.notesCount,
+        count,
         accentColor: f.accentColor,
         badgeBgLight: f.badgeBgLight,
         badgeTextLight: f.badgeTextLight,

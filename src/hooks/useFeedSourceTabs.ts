@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   FEED_ADAPTERS,
   FeedSourceMode,
   UnifiedFeedTab,
+  UnifiedSubtopic,
   createConfiguredFeedAdapter,
 } from '../adapters/feeds';
 import {
@@ -553,11 +554,75 @@ export function useFeedSourceTabs({
     return false;
   };
 
+  // Persistent stream tab telemetry cache (preserves tab counters and subtopics across tab switches)
+  const tabTelemetryRef = useRef<
+    Record<
+      string,
+      {
+        count: number;
+        subtopics?: UnifiedSubtopic[];
+      }
+    >
+  >({});
+
   // Thematic tabs: keep tabs with notes, or actual database feeds (configured for view), or selected feed
   const activeTabs: UnifiedFeedTab[] = useMemo(() => {
     const rawTabs = activeAdapter.getTabs({ allFeeds, notes });
     const currentMode = sourceModes.find((m) => m.id === streamSource);
     const isPrivateStream = streamSource === 'private_feeds' || resolveStreamPrivacy(currentMode || streamSource) === 'private';
+    const currentStream = dbStreams.find((s) => s.slug === streamSource || s.id === streamSource);
+
+    // Synchronize telemetry counters and subtopics:
+    // When a user selects a tab, 'notes' is narrowed by server query to only that tab's notes.
+    // We preserve known counts from dbStreams, allFeeds, child feeds sum, and previously cached telemetry.
+    for (const tab of rawTabs) {
+      const tabKey = tab.slug || tab.id;
+      const matchingStreamFeed = currentStream?.feeds?.find(
+        (f: any) => f.slug === tab.slug || f.id === tab.id
+      );
+      const matchingAllFeed = allFeeds.find(
+        (f: any) => f.slug === tab.slug || f.id === tab.id
+      );
+      const dbCount = Math.max(
+        (matchingStreamFeed as any)?._count?.notes ?? 0,
+        (matchingAllFeed as any)?._count?.notes ?? 0
+      );
+
+      // Child subtopic sum for rolled-up parent tabs (e.g. spark-changelogsfeed, spark-notebooklmai)
+      let childFeedsSum = 0;
+      if (tab.slug.includes('changelog')) {
+        childFeedsSum = allFeeds
+          .filter((f) => f.slug && (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')))
+          .reduce((sum, f) => sum + ((f as any)._count?.notes || 0), 0);
+      } else if (tab.slug.includes('notebooklm')) {
+        childFeedsSum = allFeeds
+          .filter((f) => f.slug && (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-')))
+          .reduce((sum, f) => sum + ((f as any)._count?.notes || 0), 0);
+      }
+
+      const cached = tabTelemetryRef.current[tabKey];
+      const subtopicsSum = tab.subtopics && tab.subtopics.length > 0
+        ? tab.subtopics.reduce((acc, s) => acc + s.count, 0)
+        : cached?.subtopics
+        ? cached.subtopics.reduce((acc, s) => acc + s.count, 0)
+        : 0;
+
+      const resolvedCount = Math.max(tab.count, dbCount, childFeedsSum, subtopicsSum, cached?.count ?? 0);
+      tab.count = resolvedCount;
+
+      // Restore subtopics if tab lost them due to scoped query
+      if ((!tab.subtopics || tab.subtopics.length === 0) && cached?.subtopics && cached.subtopics.length > 0) {
+        tab.subtopics = cached.subtopics;
+      }
+
+      // Record in persistent telemetry cache
+      if (resolvedCount > 0 || (tab.subtopics && tab.subtopics.length > 0)) {
+        tabTelemetryRef.current[tabKey] = {
+          count: resolvedCount,
+          subtopics: tab.subtopics ? [...tab.subtopics] : undefined,
+        };
+      }
+    }
 
     const filtered = rawTabs.filter((t) => {
       if (t.count > 0) return true;
@@ -590,7 +655,6 @@ export function useFeedSourceTabs({
     }
 
     // Apply overlays and deterministic ordering from StreamTab / custom reorder
-    const currentStream = dbStreams.find((s) => s.slug === streamSource || s.id === streamSource);
     const customOrder = customTabOrders[streamSource];
     const streamFeedOrder = currentStream?.feeds?.map((f: any) => f.slug || f.id) || [];
     const orderList = customOrder || (streamFeedOrder.length > 0 ? streamFeedOrder : null);

@@ -277,7 +277,11 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
       const fromLoadedNotes = countsByPreset[slug] || 0;
       const targetSlugs = PRESET_FEED_SLUGS[slug] || [];
       const fromAllFeeds = (context.allFeeds || [])
-        .filter((f) => f.slug && targetSlugs.includes(f.slug.toLowerCase()))
+        .filter((f) => {
+          if (!f.slug) return false;
+          const s = f.slug.toLowerCase();
+          return targetSlugs.some((ts) => s === ts || s.startsWith(`${ts}-`) || s.startsWith(`${ts}_`));
+        })
         .reduce((sum, f) => sum + ((f as any)._count?.notes || 0), 0);
       const dbFeed = context.allFeeds.find((f) => f.slug === slug);
       const fromDbFeed = dbFeed?._count?.notes || 0;

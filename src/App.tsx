@@ -196,7 +196,7 @@ export const App: React.FC = () => {
     promotedPeriods,
     feedItems,
     visibleFeedItems,
-    totalCount,
+    totalCount: pipelineTotalCount,
     upcomingCount,
     availableTags,
     visibleCount,
@@ -222,6 +222,15 @@ export const App: React.FC = () => {
     fetchNextPage,
     totalNotesCount,
   });
+
+  // Preserve stream total count across tab switches so "Все" pill doesn't drop to single tab count
+  const totalCount = useMemo(() => {
+    const tabsSum = activeTabs.reduce((sum, t) => sum + (t.count || 0), 0);
+    if (!selectedFeedSlug) {
+      return Math.max(tabsSum, totalNotesCount, pipelineTotalCount);
+    }
+    return Math.max(tabsSum, pipelineTotalCount);
+  }, [selectedFeedSlug, activeTabs, totalNotesCount, pipelineTotalCount]);
 
   // Modals & Moderation State
   const {
@@ -503,6 +512,8 @@ export const App: React.FC = () => {
         onAiCoverApplied={handleAiCoverApplied}
         isLemonSeasonsModalOpen={isLemonSeasonsModalOpen}
         onCloseLemonSeasons={handleCloseLemonSeasons}
+        onSelectFeed={handleSelectFeed}
+        onSelectStreamSource={handleSelectSource}
         editingFeedTab={editingFeedTab}
         editingDbFeed={editingDbFeed}
         isFeedEntityModalOpen={isFeedEntityModalOpen}
