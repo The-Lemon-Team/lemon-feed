@@ -38,7 +38,13 @@ export function useFeedModalsState({
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
   const [aiCoverItem, setAiCoverItem] = useState<UnifiedFeedItem | null>(null);
   const [aiCoverTemplateId, setAiCoverTemplateId] = useState<string | undefined>(undefined);
-  const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(false);
+  const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('clouds') === 'true' || p.get('modal') === 'clouds' || p.get('modal') === 'seasons';
+    }
+    return false;
+  });
 
   const handleOpenDetail = useCallback(
     (item: UnifiedFeedItem) => {
@@ -138,6 +144,20 @@ export function useFeedModalsState({
 
   const handleCloseLemonSeasons = useCallback(() => {
     setIsLemonSeasonsModalOpen(false);
+    if (typeof window !== 'undefined' && window.history) {
+      const url = new URL(window.location.href);
+      if (
+        url.searchParams.has('clouds') ||
+        url.searchParams.get('modal') === 'clouds' ||
+        url.searchParams.get('modal') === 'seasons'
+      ) {
+        url.searchParams.delete('clouds');
+        if (url.searchParams.get('modal') === 'clouds' || url.searchParams.get('modal') === 'seasons') {
+          url.searchParams.delete('modal');
+        }
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    }
   }, []);
 
   // Live subscription for open note

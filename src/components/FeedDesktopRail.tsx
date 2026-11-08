@@ -343,6 +343,34 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
         </button>
       )}
 
+      {/* Floating Clouds Hub Widget Button */}
+      {onOpenLemonSeasons && (
+        <button
+          type="button"
+          onClick={onOpenLemonSeasons}
+          className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/5 hover:from-amber-500/20 hover:to-amber-500/15 border border-amber-500/30 dark:border-amber-400/25 shadow-soft group transition-all cursor-pointer text-left"
+          title="Открыть живую карту потоков и парящих облачков"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-yellow-400 flex items-center justify-center font-bold shrink-0 group-hover:scale-105 transition-transform text-base">
+              ☁️
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <span>Облака потоков</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-yellow-300 font-mono font-semibold">
+                  Живая карта
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                Stream ← Feeds & Персонажи
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-amber-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </button>
+      )}
+
       {/* 2. Channel Activities / Periods Section */}
       {onSelectPeriod && periods.length > 0 && (
         <FeedActivitiesRailSection
