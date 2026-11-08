@@ -126,7 +126,15 @@ export function useFeedSourceTabs({
   useEffect(() => {
     if (Array.isArray(dbStreams) && dbStreams.length > 0) {
       const mapped: FeedModeOption[] = dbStreams.map((s) => {
-        const feedSlugs = (s.feeds || []).map((f: any) => f.slug);
+        const feedSlugSet = new Set<string>();
+        for (const f of s.feeds || []) {
+          if (f?.slug) feedSlugSet.add(f.slug);
+        }
+        for (const fid of s.feedIds || []) {
+          const matched = allFeeds.find((f: any) => f.id === fid || f.slug === fid);
+          if (matched?.slug) feedSlugSet.add(matched.slug);
+        }
+        const feedSlugs = Array.from(feedSlugSet);
         return {
           id: s.slug,
           label: s.title,
@@ -178,7 +186,7 @@ export function useFeedSourceTabs({
         // ignore
       }
     }
-  }, [dbStreams]);
+  }, [dbStreams, allFeeds]);
 
   // Modal states for tabs and feeds
   const [editingSourceTab, setEditingSourceTab] = useState<FeedModeOption | null>(null);
@@ -204,13 +212,14 @@ export function useFeedSourceTabs({
   }, []);
 
   const handleSaveSourceTab = useCallback(
-    async (tab: FeedModeOption) => {
+    async (tab: FeedModeOption, extraFeed?: { id: string; slug: string }) => {
       // Find matching stream in database
       const existingStream = dbStreams.find((s) => s.slug === tab.id || s.id === tab.id);
       const resolvedFeedIds: string[] = [];
+      const feedCandidates = extraFeed ? [...allFeeds, extraFeed] : allFeeds;
       if (tab.filterConfig?.feedSlugs && tab.filterConfig.feedSlugs.length > 0) {
         for (const slug of tab.filterConfig.feedSlugs) {
-          const matched = allFeeds.find((f) => f.slug === slug || f.id === slug);
+          const matched = feedCandidates.find((f) => f.slug === slug || f.id === slug);
           if (matched && !resolvedFeedIds.includes(matched.id)) {
             resolvedFeedIds.push(matched.id);
           }
@@ -408,12 +417,17 @@ export function useFeedSourceTabs({
       return list;
     }
     if (notesPrivacy === 'public') {
+      const normalizeId = (id: string) => id.toLowerCase().replace(/-/g, '_');
       return sourceModes.filter(
-        (m) => resolveStreamPrivacy(m) === 'public' && (m.id !== 'telegram' || appMode === 'dev')
+        (m) =>
+          (resolveStreamPrivacy(m) === 'public' ||
+            (selectedFeedSlug &&
+              (m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)))) &&
+          (m.id !== 'telegram' || appMode === 'dev')
       );
     }
     return sourceModes;
-  }, [sourceModes, isPublicMode, appMode, notesPrivacy]);
+  }, [sourceModes, isPublicMode, appMode, notesPrivacy, selectedFeedSlug, streamSource]);
 
   // If in public mode or contour changes, synchronize active stream with visible contour
   useEffect(() => {
@@ -478,7 +492,7 @@ export function useFeedSourceTabs({
         setSelectedFeedSlug(undefined);
       }
     } else if (notesPrivacy === 'public') {
-      if (activeStreamPrivacy === 'private') {
+      if (activeStreamPrivacy === 'private' && !selectedFeedSlug) {
         setStreamSource('all');
         setSelectedFeedSlug(undefined);
       }
@@ -488,6 +502,7 @@ export function useFeedSourceTabs({
     appMode,
     notesPrivacy,
     streamSource,
+    selectedFeedSlug,
     sourceModes,
     isStreamsLoading,
     isLoading,

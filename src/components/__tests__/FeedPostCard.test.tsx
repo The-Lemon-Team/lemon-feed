@@ -282,7 +282,9 @@ describe('FeedPostCard', () => {
 
       const playBtn = screen.getByTitle('Слушать подкаст');
       await userEvent.click(playBtn);
-      expect(screen.getByText(/Воспроизведение аудио-выпуска NotebookLM/)).toBeInTheDocument();
+      expect(screen.getByTitle('Пауза')).toBeInTheDocument();
+      // Ensure extra bottom label is omitted to prevent feed reflow / deoptimization
+      expect(screen.queryByText(/Воспроизведение аудио-выпуска NotebookLM/)).toBeNull();
     });
   });
 });

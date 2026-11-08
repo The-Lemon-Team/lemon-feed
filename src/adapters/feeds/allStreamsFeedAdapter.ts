@@ -330,9 +330,10 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
           !(f.folderPaths || []).some((p: string) => p.toLowerCase().startsWith('spark'))
       )
       .map((f) => {
-        const count = context.notes.filter(
+        const fromNotes = context.notes.filter(
           (n) => n.feed?.id === f.id || n.feed?.slug === f.slug
         ).length;
+        const count = Math.max(fromNotes, (f as any)._count?.notes || 0);
         return {
           id: f.id,
           slug: f.slug,
@@ -396,19 +397,36 @@ export const AllStreamsFeedAdapter: FeedAdapter = {
         const targetSub = activeFeedSlug.replace(/^spark-changelogsfeed-/, '').toLowerCase();
         matched = matched.filter((n) => extractChangelogSubfolder(n) === targetSub);
       } else {
+        const normTarget = activeFeedSlug.toLowerCase().replace(/_/g, '-');
+        const normTargetUnderscore = activeFeedSlug.toLowerCase().replace(/-/g, '_');
         matched = matched.filter((n) => {
-          if (n.feed?.slug === activeFeedSlug) return true;
-          const sub = activeFeedSlug.replace(/^spark-/, '').toLowerCase();
+          const noteSlug = (n.feed?.slug || '').toLowerCase();
+          if (noteSlug === normTarget || noteSlug === normTargetUnderscore) return true;
+          const sub = normTarget.replace(/^spark-/, '').toLowerCase();
           const subWithSpaces = sub.replace(/-/g, ' ');
           if (n.folderPath) {
             const fp = n.folderPath.toLowerCase();
-            if (fp.includes(sub) || fp.includes(subWithSpaces)) return true;
+            if (fp.includes(sub) || fp.includes(subWithSpaces) || fp.includes(normTargetUnderscore)) return true;
           }
           if (n.folders && Array.isArray(n.folders)) {
-            return n.folders.some((f) => {
-              const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
-              return p.includes(sub) || p.includes(subWithSpaces);
-            });
+            if (
+              n.folders.some((f) => {
+                const p = (f.folder?.path || f.folder?.name || '').toLowerCase();
+                return p.includes(sub) || p.includes(subWithSpaces) || p.includes(normTargetUnderscore);
+              })
+            ) {
+              return true;
+            }
+          }
+          if (Array.isArray(n.hashtags)) {
+            if (
+              n.hashtags.some((h: any) => {
+                const tag = (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '');
+                return tag === normTarget || tag === normTargetUnderscore || tag === subWithSpaces;
+              })
+            ) {
+              return true;
+            }
           }
           return false;
         });

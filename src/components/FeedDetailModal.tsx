@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Sparkles,
   Edit3,
-  Link2,
   ArrowRight,
   ArrowLeft,
   CornerDownRight,
@@ -22,6 +21,13 @@ import {
 } from 'lucide-react';
 import { SymbolIcon } from './common/SymbolIcon';
 import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
+import { NoteMediaPlayer } from './media/NoteMediaPlayer';
+import { FeedDetailRelatedNotes } from './detail/FeedDetailRelatedNotes';
+import {
+  extractNoteMediaTracks,
+  stripExtractedMediaFromMarkdown,
+  isMediaUrl,
+} from '../utils/noteMedia';
 
 export interface FeedDetailModalProps {
   item: UnifiedFeedItem | null;
@@ -47,6 +53,7 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   const [imageError, setImageError] = useState(false);
   const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [requestedTrackUrl, setRequestedTrackUrl] = useState<string | null>(null);
 
   // In-modal navigation history stack
   const [historyStack, setHistoryStack] = useState<UnifiedFeedItem[]>(() => (item ? [item] : []));
@@ -86,7 +93,14 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
     setImageError(false);
     setSelectedImageIndex(null);
     setZoomedUrl(null);
+    setRequestedTrackUrl(null);
   }, [activeItem?.id]);
+
+  const mediaTracks = useMemo(() => extractNoteMediaTracks(activeItem), [activeItem]);
+  const markdownWithoutMediaLinks = useMemo(
+    () => stripExtractedMediaFromMarkdown(activeItem?.description, mediaTracks),
+    [activeItem?.description, mediaTracks]
+  );
 
   useEffect(() => {
     if (!activeItem) return;
@@ -369,82 +383,49 @@ export const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
             )}
           </div>
 
+          {/* Attached Audio / Video Media Player */}
+          <NoteMediaPlayer
+            item={activeItem}
+            variant="modal"
+            requestedTrackUrl={requestedTrackUrl}
+          />
+
           {/* Full Markdown Text */}
           <div className="feed-prose text-slate-700 dark:text-slate-200 text-sm leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {cleanNoteMarkdown(activeItem.description, { title: activeItem.title })}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ node, href, ...props }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (href && isMediaUrl(href)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setRequestedTrackUrl(href);
+                      }
+                    }}
+                    {...props}
+                  />
+                ),
+              }}
+            >
+              {cleanNoteMarkdown(markdownWithoutMediaLinks, { title: activeItem.title })}
             </ReactMarkdown>
           </div>
 
           {/* Related Notes / Story Links (Jira-style connections) */}
-          {Array.isArray(activeItem.rawPayload?.metadata?.relatedNotes) &&
-            activeItem.rawPayload.metadata.relatedNotes.length > 0 && (
-              <div className="pt-3 border-t border-slate-100 dark:border-white/[0.08] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Link2 className="w-3.5 h-3.5 text-violet-500" />
-                    Связанные записи ({activeItem.rawPayload.metadata.relatedNotes.length})
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {activeItem.rawPayload.metadata.relatedNotes.map((rel: any, idx: number) => {
-                    const isResolved = rel.resolved && rel.targetNoteId;
-                    return (
-                      <div
-                        key={`${rel.targetNoteId || rel.cleanTitle}-${idx}`}
-                        onClick={() => {
-                          if (isResolved && onOpenNoteById) {
-                            setDirection('forward');
-                            onOpenNoteById(rel.targetNoteId);
-                          }
-                        }}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
-                          isResolved
-                            ? 'bg-slate-50 dark:bg-white/[0.03] border-slate-200/80 dark:border-white/10 hover:border-violet-500/50 hover:bg-violet-500/5 cursor-pointer group shadow-2xs hover:shadow-xs'
-                            : 'bg-slate-50/50 dark:bg-white/[0.01] border-slate-200/40 dark:border-white/5 opacity-75'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-sm shrink-0">{rel.targetIcon || '📄'}</span>
-                          {rel.role === 'podcast' ? (
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold">
-                              🎧 Подкаст
-                            </span>
-                          ) : rel.relation ? (
-                            <span
-                              className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold truncate max-w-[120px]"
-                              title={rel.relation}
-                            >
-                              {rel.relation}
-                            </span>
-                          ) : rel.targetType && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold">
-                              {rel.targetType}
-                            </span>
-                          )}
-                          {isResolved && (
-                            <ArrowRight className="w-3 h-3 text-slate-400 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-transform ml-auto" />
-                          )}
-                        </div>
-                        <h6 className="font-medium text-xs text-slate-900 dark:text-white truncate mt-1">
-                          {rel.targetTitle || rel.cleanTitle}
-                        </h6>
-                        {rel.targetDate && (
-                          <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
-                            {new Date(rel.targetDate).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <FeedDetailRelatedNotes
+            relatedNotes={activeItem.rawPayload?.metadata?.relatedNotes}
+            onNavigateRelated={(targetNoteId) => {
+              if (onOpenNoteById) {
+                setDirection('forward');
+                onOpenNoteById(targetNoteId);
+              }
+            }}
+          />
 
           {/* Tags */}
           {activeItem.hashtags && activeItem.hashtags.length > 0 && (

@@ -5,6 +5,7 @@ import { Note, PendingPosterItem } from '@lenta/shared';
 import { useCreateNote, useFeedSources, queryKeys } from '../api/queries';
 import { feedApi } from '../api/client';
 import { FeedAppRuntimeMode } from '../utils/appMode';
+import { FeedModeOption, resolveStreamPrivacy } from './toolbar/types';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import dayjs from 'dayjs';
 import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
@@ -32,8 +33,11 @@ export interface FeedCreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultFeedSlug?: string;
+  activeStreamSource?: string;
+  activeStreamMode?: FeedModeOption | null;
   defaultDate?: string;
   appMode?: FeedAppRuntimeMode;
+  notesPrivacy?: 'all' | 'public' | 'private';
   onCreated?: (newNote: Note) => void;
 }
 
@@ -52,14 +56,33 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   isOpen,
   onClose,
   defaultFeedSlug,
+  activeStreamSource,
+  activeStreamMode,
   defaultDate,
   appMode = 'dev',
+  notesPrivacy,
   onCreated,
 }) => {
   const queryClient = useQueryClient();
   const { data: feeds = EMPTY_FEEDS } = useFeedSources();
   const createNoteMutation = useCreateNote();
   const { backdropProps } = useModalBackdrop(onClose);
+
+  const resolveDefaultPrivacy = (): 'private' | 'public' => {
+    if (appMode === 'staging' || appMode === 'public') return 'public';
+    if (defaultFeedSlug && feeds.length > 0) {
+      const matched = feeds.find((f) => f.slug === defaultFeedSlug);
+      if (matched?.privacy === 'public') return 'public';
+      if (matched?.privacy === 'private') return 'private';
+    }
+    if (activeStreamMode) {
+      const streamPriv = resolveStreamPrivacy(activeStreamMode);
+      if (streamPriv === 'public' && activeStreamMode.id !== 'all') return 'public';
+      if (streamPriv === 'private') return 'private';
+    }
+    if (notesPrivacy === 'public') return 'public';
+    return 'private';
+  };
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -71,9 +94,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const [feedId, setFeedId] = useState<string>('');
   const [startDate, setStartDate] = useState(() => defaultDate || dayjs().format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState('');
-  const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>(() =>
-    appMode === 'staging' ? 'public' : 'private'
-  );
+  const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>(resolveDefaultPrivacy);
   const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>(() =>
     appMode === 'staging' ? 'DRAFT' : 'PUBLISHED'
   );
@@ -92,16 +113,32 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setType('SINGLE');
       setStartDate(defaultDate || dayjs().format('YYYY-MM-DD'));
       setEndDate('');
-      setTargetPrivacy(appMode === 'staging' ? 'public' : 'private');
+      setTargetPrivacy(resolveDefaultPrivacy());
       setTargetStatus(appMode === 'staging' ? 'DRAFT' : 'PUBLISHED');
       setPendingPosters([]);
       setFeedback(null);
 
-      // Pre-select feed if matching defaultFeedSlug
-      if (defaultFeedSlug && feeds.length > 0) {
-        const matched = feeds.find((f) => f.slug === defaultFeedSlug);
+      // Pre-select feed if matching defaultFeedSlug or activeStreamSource / activeStreamMode
+      const normalizeSlug = (s: string) => s.toLowerCase().trim().replace(/-/g, '_');
+      if (feeds.length > 0) {
+        let matched = defaultFeedSlug
+          ? feeds.find((f) => f.slug === defaultFeedSlug || normalizeSlug(f.slug) === normalizeSlug(defaultFeedSlug))
+          : undefined;
+
+        if (!matched && activeStreamSource && activeStreamSource !== 'all' && activeStreamSource !== 'private_feeds' && activeStreamSource !== 'telegram') {
+          matched = feeds.find((f) => normalizeSlug(f.slug) === normalizeSlug(activeStreamSource));
+        }
+
+        if (!matched && activeStreamMode?.filterConfig?.feedSlugs && activeStreamMode.filterConfig.feedSlugs.length === 1) {
+          const singleSlug = activeStreamMode.filterConfig.feedSlugs[0];
+          matched = feeds.find((f) => f.slug === singleSlug || normalizeSlug(f.slug) === normalizeSlug(singleSlug));
+        }
+
         if (matched) {
           setFeedId(matched.id);
+          if (appMode !== 'staging' && appMode !== 'public' && matched.privacy) {
+            setTargetPrivacy(matched.privacy === 'public' ? 'public' : 'private');
+          }
         } else {
           setFeedId('');
         }
@@ -109,7 +146,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         setFeedId('');
       }
     }
-  }, [isOpen, defaultDate, defaultFeedSlug, appMode, feeds]);
+  }, [isOpen, defaultDate, defaultFeedSlug, activeStreamSource, activeStreamMode, appMode, notesPrivacy, feeds]);
 
   // Escape key handler complying with AGENTS.md rule 7
   useEffect(() => {
@@ -140,12 +177,31 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         .map((t) => t.replace(/^#/, '').trim())
         .filter(Boolean);
 
+      // If creating a note inside a custom workspace stream without a dedicated feedId selected,
+      // automatically attach the stream's primary tag or slug so the note appears in the stream immediately
+      if (!feedId && activeStreamMode && !activeStreamMode.isBuiltin) {
+        const cfgTags = activeStreamMode.filterConfig?.tags;
+        const autoTag =
+          cfgTags && cfgTags.length > 0
+            ? cfgTags[0].replace(/^#/, '').trim().toLowerCase()
+            : activeStreamMode.id.toLowerCase().trim();
+        if (autoTag && !hashtags.some((h) => h.toLowerCase() === autoTag)) {
+          hashtags.push(autoTag);
+        }
+      }
+
+      const resolvedFolderPath =
+        !feedId && activeStreamMode?.filterConfig?.folderPaths && activeStreamMode.filterConfig.folderPaths.length > 0
+          ? activeStreamMode.filterConfig.folderPaths[0]
+          : undefined;
+
       const newNote = await createNoteMutation.mutateAsync({
         title: title.trim(),
         description: description.trim() || undefined,
         summary: summary.trim() || undefined,
         type,
         feedId: feedId || undefined,
+        folderPath: resolvedFolderPath,
         startDate: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
         endDate: type === 'PERIOD' && endDate ? new Date(endDate).toISOString() : undefined,
         privacy: targetPrivacy,
@@ -323,7 +379,16 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
               </label>
               <select
                 value={feedId}
-                onChange={(e) => setFeedId(e.target.value)}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setFeedId(nextId);
+                  if (nextId && appMode !== 'staging' && appMode !== 'public') {
+                    const selectedFeed = feeds.find((f) => f.id === nextId);
+                    if (selectedFeed?.privacy) {
+                      setTargetPrivacy(selectedFeed.privacy === 'public' ? 'public' : 'private');
+                    }
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
               >
                 <option value="">Без ленты (общий поток)</option>

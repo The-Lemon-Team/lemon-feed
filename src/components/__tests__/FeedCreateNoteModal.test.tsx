@@ -67,6 +67,67 @@ describe('FeedCreateNoteModal', () => {
       expect(selects()[feedSelect]).toHaveValue('');
     });
 
+    it('preselects the feed matching activeStreamSource (e.g. jm_daily -> jm-daily) and syncs public privacy when defaultFeedSlug is undefined', async () => {
+      mockApi({
+        feeds: [
+          makeFeed({ id: 'feed-jm', slug: 'jm-daily', title: 'Jm Daily', privacy: 'public' }),
+        ],
+      });
+      const api = mockApi({
+        feeds: [
+          makeFeed({ id: 'feed-jm', slug: 'jm-daily', title: 'Jm Daily', privacy: 'public' }),
+        ],
+      });
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          activeStreamSource="jm_daily"
+          activeStreamMode={{
+            id: 'jm_daily',
+            label: 'Jm Daily',
+            emoji: '📰',
+            privacy: 'public',
+          }}
+        />
+      );
+      await waitFor(() => expect(selects()[feedSelect]).toHaveValue('feed-jm'));
+      await userEvent.type(titleInput(), 'Note in Jm Daily');
+      await userEvent.click(submit());
+      await screen.findByText('Запись успешно создана!');
+      expect(api.getBody()).toMatchObject({
+        title: 'Note in Jm Daily',
+        feedId: 'feed-jm',
+        privacy: 'public',
+      });
+    });
+
+    it('auto-tags note with custom stream slug when created inside a custom workspace stream without a dedicated feed', async () => {
+      const api = mockApi({ feeds: [] });
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          activeStreamSource="jm_daily"
+          activeStreamMode={{
+            id: 'jm_daily',
+            label: 'Jm Daily',
+            emoji: '📰',
+            privacy: 'public',
+            filterConfig: { privacy: 'public' },
+          }}
+        />
+      );
+      await userEvent.type(titleInput(), 'Workspace Note');
+      await userEvent.click(submit());
+      await screen.findByText('Запись успешно создана!');
+      expect(api.getBody()).toMatchObject({
+        title: 'Workspace Note',
+        privacy: 'public',
+        hashtags: ['jm_daily'],
+      });
+    });
+
     it('lists feeds with an emoji fallback for ligature-style icons', async () => {
       mockApi();
       renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);

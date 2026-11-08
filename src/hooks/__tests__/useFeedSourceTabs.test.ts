@@ -204,6 +204,40 @@ describe('useFeedSourceTabs', () => {
       expect(setSelectedFeedSlug).toHaveBeenCalledWith(undefined);
     });
 
+    it('does not redirect away from private stream/feed when notesPrivacy switches to "public" and selectedFeedSlug is active', () => {
+      const setStreamSource = vi.fn();
+      const setSelectedFeedSlug = vi.fn();
+
+      localStorage.setItem(
+        'lenta_custom_stream_modes',
+        JSON.stringify([
+          { id: 'all', label: 'Все ленты', emoji: '🌐', privacy: 'public', isBuiltin: true },
+          { id: 'code_learning', label: 'Code Learning', emoji: '💻', privacy: 'private' },
+        ])
+      );
+
+      const { result } = renderHook(
+        () =>
+          useFeedSourceTabs({
+            streamSource: 'code_learning' as any,
+            setStreamSource,
+            selectedFeedSlug: 'javascript-questions',
+            setSelectedFeedSlug,
+            isPublicMode: false,
+            appMode: 'dev',
+            notesPrivacy: 'public',
+            allFeeds: mockAllFeeds,
+            notes: mockNotes,
+            isLoading: false,
+          }),
+        { wrapper: createWrapper() }
+      );
+
+      expect(setStreamSource).not.toHaveBeenCalledWith('all');
+      expect(setSelectedFeedSlug).not.toHaveBeenCalledWith(undefined);
+      expect(result.current.visibleSourceModes.some((m) => m.id === 'code_learning')).toBe(true);
+    });
+
     it('preserves custom private stream (e.g. /jm-daily) on startup when notesPrivacy is "private" and dbStreams are loading or loaded', () => {
       const setStreamSource = vi.fn();
       const setSelectedFeedSlug = vi.fn();

@@ -25,8 +25,10 @@ export interface FeedModalsProps {
   isCreateNoteOpen: boolean;
   onCloseCreateNote: () => void;
   selectedFeedSlug?: string;
+  activeStreamSource?: string;
   defaultDate: string;
   appMode: FeedAppRuntimeMode;
+  notesPrivacy?: 'all' | 'public' | 'private';
   isPublicMode: boolean;
   // AI Cover Modal
   aiCoverItem: UnifiedFeedItem | null;
@@ -68,8 +70,10 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
   isCreateNoteOpen,
   onCloseCreateNote,
   selectedFeedSlug,
+  activeStreamSource,
   defaultDate,
   appMode,
+  notesPrivacy,
   isPublicMode,
   aiCoverItem,
   aiCoverTemplateId,
@@ -147,8 +151,11 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           isOpen={isCreateNoteOpen}
           onClose={onCloseCreateNote}
           defaultFeedSlug={selectedFeedSlug}
+          activeStreamSource={activeStreamSource}
+          activeStreamMode={currentSourceMode}
           defaultDate={defaultDate}
           appMode={appMode}
+          notesPrivacy={notesPrivacy}
           onCreated={onRefetch}
         />
       )}

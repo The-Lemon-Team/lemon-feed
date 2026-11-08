@@ -15,19 +15,26 @@ import {
 } from '@lenta/shared';
 import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
 
+const DOCKER_PROD_PORTS = new Set(['5173', '5174', '5175', '8080', '80', '443', '']);
+
 function resolveApiBaseUrl(): string {
-  // When running in a browser accessed remotely (Tailscale LAN, Funnel, Magic URL),
-  // always use relative URL ('') so Vite's proxy forwards requests to backend seamlessly,
-  // preventing mobile "localhost" resolution errors and HTTPS mixed-content blocks.
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
-  ) {
-    return '';
+  // 1. Remote access (Tailscale LAN, Funnel, Magic URL) OR Docker nginx production ports
+  // always use relative URL ('') so nginx/Vite proxy forwards requests seamlessly.
+  if (typeof window !== 'undefined') {
+    const { hostname, port } = window.location;
+    if (
+      (hostname !== 'localhost' && hostname !== '127.0.0.1') ||
+      DOCKER_PROD_PORTS.has(port)
+    ) {
+      return '';
+    }
   }
 
   if (import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== '') {
+    // In production build, never point to local dev port 3002
+    if (import.meta.env.PROD && import.meta.env.VITE_API_URL.includes(':3002')) {
+      return '';
+    }
     return import.meta.env.VITE_API_URL;
   }
 
@@ -67,16 +74,12 @@ export const getFeedUserKey = () => currentFeedUserKey;
 
 export const resolveMediaUrl = (url?: string | null): string => {
   if (!url) return '';
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
-  ) {
-    if (url.includes('localhost:') || url.includes('127.0.0.1:')) {
-      const uploadIdx = url.indexOf('/uploads/');
-      if (uploadIdx !== -1) {
-        return url.slice(uploadIdx);
-      }
+  if (url.includes('localhost:') || url.includes('127.0.0.1:')) {
+    const uploadIdx = url.indexOf('/uploads/');
+    if (uploadIdx !== -1) {
+      const relativeUpload = url.slice(uploadIdx);
+      const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002');
+      return `${base.replace(/\/$/, '')}${relativeUpload}`;
     }
   }
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {

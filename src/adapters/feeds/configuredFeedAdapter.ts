@@ -5,6 +5,7 @@ import {
   UnifiedFeedItem,
   UnifiedFeedTab,
   extractNoteCoverUrl,
+  extractNoteAudioFields,
 } from './types';
 import { FeedModeOption } from '../../components/toolbar/types';
 import {
@@ -33,8 +34,21 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       ? filterConfig.folderPaths.map((f) => f.toLowerCase().trim())
       : null;
 
+  const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
+  const hasTags = Boolean(targetTags && targetTags.length > 0);
+  const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
+
   const matchesPrivacy = (note: Note): boolean => {
     if (targetPrivacy === 'private') {
+      // If the note belongs to an explicitly attached feed in this stream, allow it
+      const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
+      const isExplicitlyAttachedFeed = Boolean(
+        hasSlugs && (targetSlugs!.has(noteFeedSlug) || (note.feed?.id && targetSlugs!.has(note.feed.id.toLowerCase())))
+      );
+      if (isExplicitlyAttachedFeed) {
+        return true;
+      }
+
       // Notes attached to public feeds are NEVER part of the private contour
       if (note.feed && note.feed.privacy === 'public') {
         return false;
@@ -58,10 +72,6 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
   };
 
   const matchesSourceCriteria = (note: Note): boolean => {
-    const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
-    const hasTags = Boolean(targetTags && targetTags.length > 0);
-    const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
-
     // If explicit criteria are configured, match by them:
     if (hasSlugs || hasTags || hasFolders) {
       // 1. Attached candidate feed slug match
@@ -111,6 +121,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     // It only matches notes that were explicitly authored for or tagged with this tab:
     const normTabId = modeOption.id.toLowerCase().trim();
     const normTabHyphen = normTabId.replace(/_/g, '-');
+    const normTabUnderscore = normTabId.replace(/-/g, '_');
     const normLabel = modeOption.label.toLowerCase().trim();
 
     const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
@@ -118,6 +129,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       noteFeedSlug &&
       (noteFeedSlug === normTabId ||
         noteFeedSlug === normTabHyphen ||
+        noteFeedSlug === normTabUnderscore ||
         noteFeedSlug.endsWith(`/${normTabId}`) ||
         noteFeedSlug.endsWith(`/${normTabHyphen}`))
     ) {
@@ -129,8 +141,13 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       noteFolder &&
       (noteFolder.includes(`/${normTabId}/`) ||
         noteFolder.startsWith(`${normTabId}/`) ||
+        noteFolder === normTabId ||
         noteFolder.includes(`/${normTabHyphen}/`) ||
         noteFolder.startsWith(`${normTabHyphen}/`) ||
+        noteFolder === normTabHyphen ||
+        noteFolder.includes(`/${normTabUnderscore}/`) ||
+        noteFolder.startsWith(`${normTabUnderscore}/`) ||
+        noteFolder === normTabUnderscore ||
         noteFolder.includes(`/${normLabel}/`) ||
         noteFolder.startsWith(`${normLabel}/`))
     ) {
@@ -143,6 +160,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     if (
       noteTags.includes(normTabId) ||
       noteTags.includes(normTabHyphen) ||
+      noteTags.includes(normTabUnderscore) ||
       noteTags.includes(normLabel)
     ) {
       return true;
@@ -203,10 +221,6 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
         { id?: string; title: string; emoji: string; color: string; description?: string }
       > = {};
 
-      const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
-      const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
-      const hasTags = Boolean(targetTags && targetTags.length > 0);
-
       const feedMatchesFilter = (f: { slug: string; folderPaths?: string[]; hashtags?: string[] }): boolean => {
         const slug = f.slug.toLowerCase();
         if (hasSlugs) {
@@ -231,14 +245,20 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       };
 
       for (const f of context.allFeeds) {
-        if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
-        if (targetPrivacy !== 'private' && f.privacy === 'private') continue;
+        const isExplicitlySelected = Boolean(
+          hasSlugs && (targetSlugs!.has(f.slug.toLowerCase()) || targetSlugs!.has(f.id.toLowerCase()))
+        );
+
+        if (!isExplicitlySelected) {
+          if (targetPrivacy === 'private' && f.privacy !== 'private') continue;
+          if (targetPrivacy !== 'private' && f.privacy === 'private') continue;
+        }
 
         // Child subtopics of changelogs/notebooklm roll up into their parent tabs
         if (f.slug.startsWith('spark-changelogsfeed-') || f.slug.startsWith('changelogs-')) continue;
         if (f.slug.startsWith('spark-notebooklmai-') || f.slug.startsWith('notebooklm-')) continue;
 
-        if (!feedMatchesFilter(f)) continue;
+        if (!isExplicitlySelected && !feedMatchesFilter(f)) continue;
 
         countsBySlug[f.slug] = 0;
         feedMetaBySlug[f.slug] = {
@@ -438,10 +458,27 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
               const slug = (note.feed?.slug || '').toLowerCase();
               const folder = (note.folderPath || '').toLowerCase();
               const target = activeFeedSlug.toLowerCase();
-              const matchesCurrentFeed =
-                Boolean(slug && (slug === target || slug.includes(target) || target.includes(slug))) ||
-                Boolean(folder && folder.includes(target));
-              if (!matchesCurrentFeed) return false;
+              const targetHyphen = target.replace(/_/g, '-');
+              const targetUnderscore = target.replace(/-/g, '_');
+              const matchesSlug = Boolean(
+                slug &&
+                  (slug === target ||
+                    slug === targetHyphen ||
+                    slug === targetUnderscore ||
+                    slug.includes(targetHyphen) ||
+                    targetHyphen.includes(slug))
+              );
+              const matchesFolder = Boolean(
+                folder && (folder.includes(targetHyphen) || folder.includes(targetUnderscore))
+              );
+              const matchesTag = Boolean(
+                Array.isArray(note.hashtags) &&
+                  note.hashtags.some((h: any) => {
+                    const t = (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '');
+                    return t === target || t === targetHyphen || t === targetUnderscore;
+                  })
+              );
+              if (!matchesSlug && !matchesFolder && !matchesTag) return false;
             }
           } else {
             // Overview: must match source criteria (feed slugs, folders or tags)
@@ -517,7 +554,9 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
             summary: (n as any).summary || null,
             publishedAt: n.startDate ? new Date(n.startDate).toISOString() : new Date().toISOString(),
             updatedAt: n.updatedAt ? new Date(n.updatedAt).toISOString() : null,
+            resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
             sourceLink: n.sourceLink,
+            ...extractNoteAudioFields(n),
             status: n.status,
             author: n.author || null,
             curator: n.curator || modeOption.label,

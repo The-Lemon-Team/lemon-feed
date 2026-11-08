@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { StagingCardModerationBar } from './StagingCardModerationBar';
@@ -9,6 +9,12 @@ import remarkGfm from 'remark-gfm';
 import { PeriodItem } from '../utils/periods';
 import { NotePinButton } from './workspace/NotePinButton';
 import { SymbolIcon } from './common/SymbolIcon';
+import { NoteMediaPlayer } from './media/NoteMediaPlayer';
+import {
+  extractNoteMediaTracks,
+  stripExtractedMediaFromMarkdown,
+  isMediaUrl,
+} from '../utils/noteMedia';
 import {
   Clock,
   Flame,
@@ -20,9 +26,6 @@ import {
   Check,
   Folder,
   ArrowRight,
-  Headphones,
-  Play,
-  Pause,
   Edit3,
   Lock,
   Globe,
@@ -64,40 +67,14 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [requestedTrackUrl, setRequestedTrackUrl] = useState<string | null>(null);
 
-  const handleToggleAudio = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (audioRef.current && item.audioUrl) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined && typeof playPromise.then === 'function') {
-          playPromise
-            .then(() => {
-              setIsPlaying(true);
-            })
-            .catch((err) => {
-              console.warn('Audio play notice:', err);
-              setIsPlaying(true);
-              setTimeout(() => setIsPlaying(false), 5000);
-            });
-        } else {
-          setIsPlaying(true);
-          setTimeout(() => setIsPlaying(false), 5000);
-        }
-      }
-    } else {
-      setIsPlaying((prev) => !prev);
-      if (!isPlaying) {
-        setTimeout(() => setIsPlaying(false), 5000);
-      }
-    }
-  };
+  const mediaTracks = useMemo(() => extractNoteMediaTracks(item), [item]);
+  const markdownWithoutMediaLinks = useMemo(
+    () => stripExtractedMediaFromMarkdown(item.description, mediaTracks),
+    [item.description, mediaTracks]
+  );
 
   const formattedDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -124,19 +101,24 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 
   const summaryText = item.summary || (item.rawPayload as any)?.summary;
 
-  const cleanedFullMarkdown = useMemo(() => {
-    return cleanNoteMarkdown(item.description, { title: item.title });
-  }, [item.description, item.title]);
-
   const cleanPreview = useMemo(() => {
-    return extractCleanSnippet(item.description, 240, {
+    return extractCleanSnippet(markdownWithoutMediaLinks, 240, {
       summary: summaryText,
       title: item.title,
     });
-  }, [item.description, summaryText, item.title]);
+  }, [markdownWithoutMediaLinks, summaryText, item.title]);
 
-  const isLongText = cleanedFullMarkdown.length > 220;
-  const displayText = isExpanded ? cleanedFullMarkdown : cleanPreview;
+  const isLongText = useMemo(() => {
+    if (!markdownWithoutMediaLinks || markdownWithoutMediaLinks.length <= 220) return false;
+    if (markdownWithoutMediaLinks.length > 450) return true;
+    return cleanNoteMarkdown(markdownWithoutMediaLinks, { title: item.title }).length > 220;
+  }, [markdownWithoutMediaLinks, item.title]);
+
+  const cleanedFullMarkdown = useMemo(() => {
+    if (!isExpanded) return '';
+    return cleanNoteMarkdown(markdownWithoutMediaLinks, { title: item.title });
+  }, [isExpanded, markdownWithoutMediaLinks, item.title]);
+
   const isHighResonance = typeof item.resonanceScore === 'number' && item.resonanceScore >= 80;
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -302,12 +284,19 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
                 strong: ({ node, ...props }) => (
                   <strong className="font-semibold text-slate-900 dark:text-white" {...props} />
                 ),
-                a: ({ node, ...props }) => (
+                a: ({ node, href, ...props }) => (
                   <a
+                    href={href}
                     className="text-[#2481cc] dark:text-[#64b5f6] hover:underline font-medium"
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (href && isMediaUrl(href)) {
+                        e.preventDefault();
+                        setRequestedTrackUrl(href);
+                      }
+                    }}
                     {...props}
                   />
                 ),
@@ -357,61 +346,14 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
         </div>
       )}
 
-      {/* 3.5 Audio Podcast Player for NotebookLM or audio posts */}
-      {(item.audioUrl || item.feedSlug === 'notebooklm-ai') && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="mb-3 p-3 rounded-xl bg-purple-500/10 dark:bg-purple-950/30 border border-purple-500/30 dark:border-purple-400/20 flex flex-col gap-2 transition-all shadow-xs"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-9 h-9 rounded-full bg-purple-600/20 text-purple-600 dark:text-purple-300 flex items-center justify-center shrink-0">
-                <Headphones className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                  <span className="truncate">NotebookLM AI Podcast</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300 font-mono font-medium">
-                    {item.audioDuration ? `${Math.round(item.audioDuration / 60)} мин` : 'Брифинг'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-purple-200/70 truncate">
-                  Ежедневный синтезированный аудио-обзор выпуска
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleToggleAudio}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-105 shadow-sm shrink-0 ${
-                isPlaying
-                  ? 'bg-amber-500 text-white animate-pulse'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
-              title={isPlaying ? 'Пауза' : 'Слушать подкаст'}
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 translate-x-0.5" />}
-            </button>
-          </div>
-
-          {item.audioUrl && (
-            <audio
-              ref={audioRef}
-              src={item.audioUrl}
-              onEnded={() => setIsPlaying(false)}
-              onPause={() => setIsPlaying(false)}
-              className="hidden"
-            />
-          )}
-
-          {isPlaying && (
-            <div className="flex items-center gap-2 text-[10px] font-mono text-purple-600 dark:text-purple-300 pt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-              <span>Воспроизведение аудио-выпуска NotebookLM...</span>
-            </div>
-          )}
-        </div>
+      {/* 3.5 Audio / Video Media Player for attached media files or NotebookLM posts */}
+      {(mediaTracks.length > 0 || item.feedSlug === 'notebooklm-ai') && (
+        <NoteMediaPlayer
+          item={item}
+          tracks={mediaTracks}
+          variant="card"
+          requestedTrackUrl={requestedTrackUrl}
+        />
       )}
 
       {/* 4. Footer: Metrics, Share, Tags */}

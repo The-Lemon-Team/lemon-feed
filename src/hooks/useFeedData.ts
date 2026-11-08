@@ -6,6 +6,7 @@ import { PeriodItem } from '../utils/periods';
 
 const EMPTY_FEEDS: any[] = [];
 const EMPTY_PERIODS: PeriodItem[] = [];
+const VIRTUAL_TAG_SLUG_PREFIX = 'tag-';
 
 export interface UseFeedDataOptions {
   appMode: FeedAppRuntimeMode;
@@ -26,6 +27,11 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
   const startDateFrom = typeof options === 'object' ? options.startDateFrom : undefined;
   const startDateTo = typeof options === 'object' ? options.startDateTo : undefined;
 
+  const serverFeedSlug =
+    selectedFeedSlug && !selectedFeedSlug.startsWith(VIRTUAL_TAG_SLUG_PREFIX)
+      ? selectedFeedSlug
+      : undefined;
+
   const notesQueryParams = useMemo(
     () => ({
       ...(appMode === 'public'
@@ -37,13 +43,16 @@ export function useFeedData(options: FeedAppRuntimeMode | UseFeedDataOptions) {
             privacy: notesPrivacy && notesPrivacy !== 'all' ? notesPrivacy : ('all' as const),
           }),
       streamSource,
-      feedSlug: selectedFeedSlug || undefined,
-      selectedFeedSlug,
+      // Virtual hashtag chips ('tag-react') are not real feeds: filtering the server query by them
+      // returns zero notes, which empties the tab list and kicks the user out of the chip.
+      // They are narrowed client-side by the stream adapter instead.
+      feedSlug: serverFeedSlug,
+      selectedFeedSlug: serverFeedSlug,
       search: search && search.trim() ? search.trim() : undefined,
       startDateFrom,
       startDateTo,
     }),
-    [appMode, notesPrivacy, streamSource, selectedFeedSlug, search, startDateFrom, startDateTo]
+    [appMode, notesPrivacy, streamSource, serverFeedSlug, search, startDateFrom, startDateTo]
   );
 
   const {

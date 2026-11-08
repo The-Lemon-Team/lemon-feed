@@ -48,6 +48,7 @@ export interface UnifiedFeedItem {
   sourceLink?: string | null;
   audioUrl?: string | null;
   audioDuration?: number | null;
+  audios?: Array<{ url: string; title?: string; duration?: number | null; mimeType?: string }>;
   status?: string | null;
   author?: string | null;
   curator?: string | null;
@@ -57,6 +58,13 @@ export interface UnifiedFeedItem {
   rawPayload: Note | any;
 }
 
+export interface NoteAudioAttachment {
+  url: string;
+  title?: string;
+  duration?: number | null;
+  mimeType?: string;
+}
+
 export function extractNoteCoverUrl(note: any): string | null {
   if (!note) return null;
   if (Array.isArray(note.images) && note.images.length > 0) {
@@ -64,6 +72,38 @@ export function extractNoteCoverUrl(note: any): string | null {
     return mainImg?.url || note.images[0]?.url || null;
   }
   return null;
+}
+
+export function extractNoteAudioFields(note: any): {
+  audioUrl: string | null;
+  audioDuration: number | null;
+  audios?: NoteAudioAttachment[];
+} {
+  if (!note) {
+    return { audioUrl: null, audioDuration: null };
+  }
+  const meta = (note.metadata as any) || {};
+  const rawAudios = Array.isArray(meta.audios)
+    ? meta.audios.filter((a: any) => a && typeof a.url === 'string' && a.url.trim().length > 0)
+    : undefined;
+  const primaryUrl =
+    meta.audioUrl ||
+    meta.podcast?.audioUrl ||
+    note.audioUrl ||
+    (rawAudios && rawAudios.length > 0 ? rawAudios[0].url : null) ||
+    null;
+  const duration =
+    meta.audioDuration ??
+    meta.podcast?.duration ??
+    note.audioDuration ??
+    (rawAudios && rawAudios.length > 0 ? rawAudios[0].duration ?? null : null) ??
+    null;
+
+  return {
+    audioUrl: primaryUrl,
+    audioDuration: typeof duration === 'number' ? duration : null,
+    ...(rawAudios && rawAudios.length > 0 ? { audios: rawAudios } : {}),
+  };
 }
 
 export interface UnifiedSubtopic {

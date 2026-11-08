@@ -5,6 +5,7 @@ import {
   UnifiedFeedItem,
   UnifiedFeedTab,
   extractNoteCoverUrl,
+  extractNoteAudioFields,
 } from './types';
 
 export function isPrivateFeedOrNote(note: Note): boolean {
@@ -90,8 +91,7 @@ export const PrivateFeedsAdapter: FeedAdapter = {
     // 1. Collect all explicit private feeds from database
     for (const f of context.allFeeds) {
       if (f.privacy === 'private') {
-        const count = (f as any)._count?.notes || countsBySlug[f.slug] || 0;
-        countsBySlug[f.slug] = count;
+        countsBySlug[f.slug] = context.notes && context.notes.length > 0 ? 0 : ((f as any)._count?.notes || 0);
         feedMetaBySlug[f.slug] = {
           id: f.id,
           title: f.title,
@@ -144,8 +144,25 @@ export const PrivateFeedsAdapter: FeedAdapter = {
         if (!isPrivateFeedOrNote(note)) return false;
 
         if (activeFeedSlug) {
-          const slug = note.feed?.slug || resolvePrivateNoteSlug(note);
-          if (slug !== activeFeedSlug) return false;
+          const slug = (note.feed?.slug || resolvePrivateNoteSlug(note)).toLowerCase();
+          const normActive = activeFeedSlug.toLowerCase();
+          const normActiveHyphen = normActive.replace(/_/g, '-');
+          const normActiveUnderscore = normActive.replace(/-/g, '_');
+          const matchesSlug =
+            slug === normActive || slug === normActiveHyphen || slug === normActiveUnderscore;
+          const matchesFolder = Boolean(
+            note.folderPath &&
+              (note.folderPath.toLowerCase().includes(normActiveHyphen) ||
+                note.folderPath.toLowerCase().includes(normActiveUnderscore))
+          );
+          const matchesTag = Boolean(
+            Array.isArray(note.hashtags) &&
+              note.hashtags.some((h: any) => {
+                const t = (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '');
+                return t === normActive || t === normActiveHyphen || t === normActiveUnderscore;
+              })
+          );
+          if (!matchesSlug && !matchesFolder && !matchesTag) return false;
         }
 
         if (query) {
@@ -184,7 +201,9 @@ export const PrivateFeedsAdapter: FeedAdapter = {
           summary: (n as any).summary || null,
           publishedAt: n.startDate ? new Date(n.startDate).toISOString() : new Date().toISOString(),
           updatedAt: n.updatedAt ? new Date(n.updatedAt).toISOString() : null,
+          resonanceScore: (n.metadata as any)?.resonanceScore ?? (n as any).resonanceScore,
           sourceLink: n.sourceLink,
+          ...extractNoteAudioFields(n),
           status: n.status,
           author: n.author || null,
           curator: n.curator || 'Private Vault',

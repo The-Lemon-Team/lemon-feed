@@ -43,6 +43,7 @@ export const SOURCE_TO_PATH: Record<string, string> = {
   dev: '/it-dev',
   classic: '/holidays',
   general: '/all',
+  code_learning: '/code-learning',
 };
 
 export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
@@ -62,6 +63,8 @@ export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
   js_interview: 'js_interview',
   js: 'js_interview',
   interview: 'js_interview',
+  'code-learning': 'code_learning',
+  code_learning: 'code_learning',
   holidays: 'holidays',
   classic: 'holidays',
   general: 'all',

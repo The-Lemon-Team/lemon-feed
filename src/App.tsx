@@ -106,7 +106,7 @@ export const App: React.FC = () => {
     notes,
     allFeeds,
     isLoading,
-    refetch: refetchStream,
+    refetch,
     isRefetching,
     fetchNextPage,
     hasNextPage,
@@ -122,9 +122,9 @@ export const App: React.FC = () => {
     startDateTo,
   });
 
-  const refetch = useCallback(async () => {
-    await Promise.all([refetchStream(), refetchPeriods()]);
-  }, [refetchStream, refetchPeriods]);
+  const handleNoteDeleted = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   // Live SSE stream & channel-grouped real-time updates
   const {
@@ -284,7 +284,7 @@ export const App: React.FC = () => {
                   feedSlugs: [...currentSlugs, savedFeed.slug],
                 },
               };
-              handleSaveSourceTab(updatedMode);
+              handleSaveSourceTab(updatedMode, savedFeed);
             }
           }
         }
@@ -424,7 +424,7 @@ export const App: React.FC = () => {
             onSelectTag={handleSelectTag}
             onCreateNote={!isPublicOnly ? handleOpenCreateNote : undefined}
             onEditNote={!isPublicOnly ? handleOpenEdit : undefined}
-            onDeleteNote={!isPublicOnly ? () => refetch() : undefined}
+            onDeleteNote={!isPublicOnly ? handleNoteDeleted : undefined}
             onAiCover={!isPublicOnly ? handleOpenAiCover : undefined}
             visibleCount={visibleCount}
             loadMoreRef={loadMoreRef}
@@ -491,8 +491,10 @@ export const App: React.FC = () => {
         isCreateNoteOpen={isCreateNoteOpen}
         onCloseCreateNote={handleCloseCreateNote}
         selectedFeedSlug={selectedFeedSlug}
+        activeStreamSource={streamSource}
         defaultDate={isMonthFilterActive ? selectedMonth.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')}
         appMode={appMode}
+        notesPrivacy={notesPrivacy}
         isPublicMode={isPublicMode}
         aiCoverItem={aiCoverItem}
         aiCoverTemplateId={aiCoverTemplateId}

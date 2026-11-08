@@ -201,9 +201,17 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   // Filtered feeds list
   const filteredFeeds = useMemo(() => {
     return allFeeds.filter((feed) => {
-      // 1. Privacy filter
-      if (privacyContour === 'private' && feed.privacy !== 'private') return false;
+      // 0. Selected feeds are always kept in the list
+      if (selectedFeedSlugs.includes(feed.slug) || selectedFeedSlugs.includes(feed.id)) {
+        return true;
+      }
+
+      // 1. Privacy filter: public streams cannot include private feeds
       if (privacyContour === 'public' && feed.privacy === 'private') return false;
+      // In private streams, if user explicitly filtered by 'private' tab, hide public feeds
+      if (privacyContour === 'private' && feedCategoryFilter === 'private' && feed.privacy !== 'private') {
+        return false;
+      }
 
       // 2. Category tab
       if (feedCategoryFilter === 'private' && feed.privacy !== 'private') return false;
@@ -214,7 +222,9 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           feed.slug.includes('habr') ||
           feed.slug.includes('dev') ||
           feed.slug.includes('cyber') ||
-          feed.slug.includes('changelog');
+          feed.slug.includes('changelog') ||
+          feed.slug.includes('javascript') ||
+          feed.slug.includes('js');
         if (!isTech) return false;
       }
       if (feedCategoryFilter === 'media') {
