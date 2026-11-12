@@ -11,6 +11,7 @@ import {
   Pencil,
   Check,
   Plus,
+  Shield,
 } from 'lucide-react';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import { LemonLogo } from '../LemonLogo';
@@ -40,6 +41,7 @@ export interface FeedToolbarHeaderProps {
   onNavigateToTimeline?: () => void;
   onNavigateToCalendar?: () => void;
   onOpenLemonSeasons?: () => void;
+  onOpenFeedBus?: () => void;
 }
 
 export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
@@ -60,6 +62,7 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
   onNavigateToTimeline,
   onNavigateToCalendar,
   onOpenLemonSeasons,
+  onOpenFeedBus,
 }) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">
@@ -218,6 +221,19 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
             aria-label="Режим редактирования"
           >
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Lemon-Bus Moderation Button */}
+        {!isPublicMode && onOpenFeedBus && (
+          <button
+            type="button"
+            onClick={onOpenFeedBus}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg sm:rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[11px] sm:text-xs font-mono font-medium transition-all cursor-pointer"
+            title="Перейти в режим модерации заметок Lemon-Bus (feed-bus)"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Feed-Bus</span>
           </button>
         )}
 

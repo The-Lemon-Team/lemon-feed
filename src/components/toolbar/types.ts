@@ -195,6 +195,7 @@ export interface FeedToolbarProps {
   onOpenLemonSeasons?: () => void;
   onNavigateToCalendar?: () => void;
   onNavigateToTimeline?: () => void;
+  onOpenFeedBus?: () => void;
 
   layoutMode?: 'split' | 'stream';
   onToggleLayoutMode?: () => void;

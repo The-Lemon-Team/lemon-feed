@@ -39,6 +39,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   onOpenLemonSeasons,
   onNavigateToCalendar,
   onNavigateToTimeline,
+  onOpenFeedBus,
   layoutMode = 'split',
   onToggleLayoutMode,
   appMode = 'dev',
@@ -81,6 +82,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         onNavigateToTimeline={onNavigateToTimeline}
         onNavigateToCalendar={onNavigateToCalendar}
         onOpenLemonSeasons={onOpenLemonSeasons}
+        onOpenFeedBus={onOpenFeedBus}
       />
 
       {/* 2. Stream Mode Switcher Row (All, IT & Dev, Seasons, Entertainment, Holidays, TG Live) */}

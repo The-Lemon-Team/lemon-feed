@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@lenta/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@lenta/lemon-bus': path.resolve(__dirname, '../../packages/lemon-bus/dist'),
+      '@lenta/seasons-neurons': path.resolve(__dirname, '../../packages/seasons-neurons/dist'),
     },
     dedupe: ['react', 'react-dom'],
   },
@@ -38,6 +40,10 @@ export default defineConfig(({ mode }) => {
     proxy: {
       '/api/external': {
         target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/moderation': {
+        target: 'http://127.0.0.1:3030',
         changeOrigin: true,
       },
       '/notes': 'http://localhost:3002',
