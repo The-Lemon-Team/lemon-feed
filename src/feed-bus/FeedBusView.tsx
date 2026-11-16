@@ -2,6 +2,7 @@ import React from 'react';
 import { useFeedBusState } from './hooks/useFeedBusState';
 import { FeedBusHeader } from './components/FeedBusHeader';
 import { FeedBusSidebar } from './components/FeedBusSidebar';
+import { FeedBusWorkspaceToolbar } from './components/FeedBusWorkspaceToolbar';
 import { FeedBusCard } from './components/FeedBusCard';
 import { FeedBusRejectModal } from './components/FeedBusRejectModal';
 import { FeedBusEditModal } from './components/FeedBusEditModal';
@@ -56,17 +57,12 @@ export const FeedBusView: React.FC<FeedBusViewProps> = ({
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col font-sans">
-      {/* 1. Header with Stats, Search and Profile Exit */}
+      {/* 1. Header with Branding, Live Stats and Theme Toggle */}
       <FeedBusHeader
         stats={stats}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onRefresh={refresh}
-        onImportWatchers={() => handleImportWatchers(50)}
         onExitFeedBus={onExitFeedBus}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
-        isLoading={isLoading}
       />
 
       {/* 2. Main Workspace Layout: Sidebar + Card Stream */}
@@ -80,8 +76,16 @@ export const FeedBusView: React.FC<FeedBusViewProps> = ({
           pendingCount={stats?.pendingCount}
         />
 
-        {/* Center: Cards Feed Stream */}
+        {/* Center: Workspace Controls & Cards Feed Stream */}
         <main className="flex-1 min-w-0 space-y-3.5 pb-20">
+          <FeedBusWorkspaceToolbar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onRefresh={refresh}
+            onImportWatchers={() => handleImportWatchers(50)}
+            isLoading={isLoading}
+          />
+
           {/* Active section indicator */}
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-medium px-1">
             <div className="flex items-center gap-1.5">

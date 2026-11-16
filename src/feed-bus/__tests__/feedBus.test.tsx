@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FeedBusView } from '../FeedBusView';
+import { FeedBusSidebar } from '../components/FeedBusSidebar';
 import { feedBusApi } from '../api/feedBusApi';
 import { LemonModerationItem } from '@lenta/lemon-bus';
 
@@ -172,5 +173,90 @@ describe('FeedBusView (Dedicated Lemon-Bus Moderation Mode)', () => {
     fireEvent.click(exitBtn);
 
     expect(handleExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches status and category items smoothly in FeedBusSidebar', () => {
+    const onStatusChange = vi.fn();
+    const onCategoryChange = vi.fn();
+
+    const { rerender } = render(
+      <FeedBusSidebar
+        selectedStatus="PENDING"
+        onStatusChange={onStatusChange}
+        selectedCategory="ALL"
+        onCategoryChange={onCategoryChange}
+        pendingCount={12}
+      />
+    );
+
+    const pendingBtn = screen.getByRole('button', { name: /На модерации/i });
+    const approvedBtn = screen.getByRole('button', { name: /Одобренные/i });
+    const allCatBtn = screen.getByRole('button', { name: /Все категории/i });
+    const aiCatBtn = screen.getByRole('button', { name: /AI & Нейросети/i });
+
+    expect(pendingBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(approvedBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(allCatBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(aiCatBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('12')).toBeInTheDocument();
+
+    fireEvent.click(approvedBtn);
+    expect(onStatusChange).toHaveBeenCalledWith('APPROVED');
+
+    fireEvent.click(aiCatBtn);
+    expect(onCategoryChange).toHaveBeenCalledWith('ai');
+
+    rerender(
+      <FeedBusSidebar
+        selectedStatus="APPROVED"
+        onStatusChange={onStatusChange}
+        selectedCategory="ai"
+        onCategoryChange={onCategoryChange}
+        pendingCount={12}
+      />
+    );
+
+    expect(pendingBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(approvedBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(allCatBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(aiCatBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders workspace toolbar controls (search, import watchers, refresh) and handles interactions', async () => {
+    vi.mocked(feedBusApi.importWatcherItems).mockResolvedValue({
+      ok: true,
+      imported: 5,
+      skipped: 0,
+    });
+
+    render(
+      <FeedBusView
+        onExitFeedBus={vi.fn()}
+        isDarkMode={false}
+        toggleTheme={vi.fn()}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Поиск по заметкам...');
+    fireEvent.change(searchInput, { target: { value: 'DeepMind' } });
+    expect(searchInput).toHaveValue('DeepMind');
+
+    const clearBtn = screen.getByRole('button', { name: 'Очистить поиск' });
+    fireEvent.click(clearBtn);
+    expect(searchInput).toHaveValue('');
+
+    const importBtn = screen.getByRole('button', { name: /Импорт вотчеров/i });
+    fireEvent.click(importBtn);
+
+    await waitFor(() => {
+      expect(feedBusApi.importWatcherItems).toHaveBeenCalledWith(50);
+    });
+
+    const refreshBtn = screen.getByRole('button', { name: /Обновить список/i });
+    fireEvent.click(refreshBtn);
+
+    await waitFor(() => {
+      expect(feedBusApi.queryItems).toHaveBeenCalled();
+    });
   });
 });

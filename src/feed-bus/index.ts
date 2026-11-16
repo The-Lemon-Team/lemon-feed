@@ -4,6 +4,7 @@ export * from './hooks/useFeedBusState';
 export * from './hooks/useFeedBusLiveSse';
 export * from './components/FeedBusHeader';
 export * from './components/FeedBusSidebar';
+export * from './components/FeedBusWorkspaceToolbar';
 export * from './components/FeedBusCard';
 export * from './components/FeedBusRejectModal';
 export * from './components/FeedBusEditModal';

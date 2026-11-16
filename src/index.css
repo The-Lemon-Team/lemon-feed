@@ -9,6 +9,27 @@
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
     --sal: env(safe-area-inset-left);
+    --feed-bg: 248 250 252;
+    --surface-container: 255 255 255;
+    --surface-container-highest: 241 245 249;
+    --surface-variant: 226 232 240;
+    --on-surface: 15 23 42;
+    --on-surface-variant: 71 85 105;
+    --outline: 100 116 139;
+    --outline-variant: 148 163 184;
+    --on-primary: 255 255 255;
+  }
+
+  .dark {
+    --feed-bg: 14 22 33;
+    --surface-container: 24 34 45;
+    --surface-container-highest: 31 43 56;
+    --surface-variant: 39 53 68;
+    --on-surface: 226 232 240;
+    --on-surface-variant: 148 163 184;
+    --outline: 130 146 162;
+    --outline-variant: 71 85 105;
+    --on-primary: 255 255 255;
   }
 
   html,
