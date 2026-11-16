@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { FeedSourceMode } from '../adapters/feeds/types';
 import { LemonLogo } from './LemonLogo';
+import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
 
 export interface FeedTopBarProps {
   streamSource: FeedSourceMode;
@@ -159,7 +160,7 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
 
             {/* Акцентная кнопка в стиле Lemon Seasons с логотипом */}
             <a
-              href="http://localhost:5174/"
+              href={`${getCalendarAppBaseUrl()}/`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => {

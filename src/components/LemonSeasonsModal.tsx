@@ -20,6 +20,7 @@ import {
 import { LemonLogo } from './LemonLogo';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import { feedApi } from '../api/client';
+import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
 
 export interface LemonSeasonsModalProps {
   isOpen: boolean;
@@ -347,7 +348,7 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({
       }
     }
     // Fallback: open calendar host URL
-    window.open(`http://localhost:5174/?feed=${encodeURIComponent(cloud.slug)}`, '_blank');
+    window.open(`${getCalendarAppBaseUrl()}/?feed=${encodeURIComponent(cloud.slug)}`, '_blank');
   };
 
   const handleAddDialogueTurn = (e: React.FormEvent) => {
@@ -807,7 +808,7 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({
 
               <div className="pt-2">
                 <a
-                  href="http://localhost:5174/timeline"
+                  href={`${getCalendarAppBaseUrl()}/timeline`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-medium transition-colors"
@@ -859,7 +860,7 @@ export const LemonSeasonsModal: React.FC<LemonSeasonsModalProps> = ({
                 <span className="text-slate-400 text-[11px]">Работает на порту 5174</span>
               </div>
               <a
-                href="http://localhost:5174/"
+                href={`${getCalendarAppBaseUrl()}/`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-colors"

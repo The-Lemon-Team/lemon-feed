@@ -14,6 +14,7 @@ import { LemonLogo } from './LemonLogo';
 import { PeriodItem } from '../utils/periods';
 import { FeedActivitiesRailSection } from './activities/FeedActivitiesRailSection';
 import { StreamPrivacyBadge } from './common/StreamPrivacyBadge';
+import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
 
 export interface FeedDesktopRailProps {
   sourceType: FeedSourceMode;
@@ -506,7 +507,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
             Просматривайте эти же даты, распределенные по дням в <span className="font-semibold">{currentMonthName}</span>.
           </p>
           <a
-            href="http://localhost:5174/calendar"
+            href={`${getCalendarAppBaseUrl()}/calendar`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => {

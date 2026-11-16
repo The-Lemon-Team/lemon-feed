@@ -7,6 +7,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { LemonLogo } from './LemonLogo';
+import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
 
 export interface FeedBottomNavProps {
   activeTab: 'stream' | 'categories' | 'search';
@@ -99,7 +100,7 @@ export const FeedBottomNav: React.FC<FeedBottomNavProps> = ({
 
         {/* 4. Lemon Seasons (Кнопка в фирменном стиле с логотипом) */}
         <a
-          href="http://localhost:5174/"
+          href={`${getCalendarAppBaseUrl()}/`}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => {

@@ -12,36 +12,14 @@ import {
   Stream,
   CreateStreamPayload,
   UpdateStreamPayload,
+  resolveClientApiBaseUrl,
 } from '@lenta/shared';
 import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
 
-const DOCKER_PROD_PORTS = new Set(['5173', '5174', '5175', '8080', '80', '443', '']);
-
-function resolveApiBaseUrl(): string {
-  // 1. Remote access (Tailscale LAN, Funnel, Magic URL) OR Docker nginx production ports
-  // always use relative URL ('') so nginx/Vite proxy forwards requests seamlessly.
-  if (typeof window !== 'undefined') {
-    const { hostname, port } = window.location;
-    if (
-      (hostname !== 'localhost' && hostname !== '127.0.0.1') ||
-      DOCKER_PROD_PORTS.has(port)
-    ) {
-      return '';
-    }
-  }
-
-  if (import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== '') {
-    // In production build, never point to local dev port 3002
-    if (import.meta.env.PROD && import.meta.env.VITE_API_URL.includes(':3002')) {
-      return '';
-    }
-    return import.meta.env.VITE_API_URL;
-  }
-
-  return import.meta.env.PROD ? '' : 'http://localhost:3002';
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+const API_BASE_URL = resolveClientApiBaseUrl(
+  import.meta.env.VITE_API_URL,
+  import.meta.env.PROD,
+);
 
 export const DEFAULT_ADMIN_TOKEN =
   import.meta.env.VITE_ADMIN_TOKEN || 'lenta_adm_master_permanent_7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c';

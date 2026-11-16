@@ -38,6 +38,11 @@ export default defineConfig(({ mode }) => {
     host: true,
     allowedHosts: true,
     proxy: {
+      '/_api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/_api/, ''),
+      },
       '/api/external': {
         target: 'http://localhost:4000',
         changeOrigin: true,
