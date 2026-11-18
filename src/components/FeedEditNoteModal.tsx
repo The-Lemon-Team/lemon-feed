@@ -4,8 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { useUpdateNote, useFeedSources, queryKeys } from '../api/queries';
 import { resolveMediaUrl, feedApi } from '../api/client';
-import { extractCleanSnippet, NoteImage } from '@lenta/shared';
-import dayjs from 'dayjs';
+import { extractCleanSnippet, NoteImage, toDateTimeLocalInput } from '@lenta/shared';
 import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import { NotePosterPicker } from './notes/NotePosterPicker';
@@ -94,11 +93,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
         setFeedId('');
       }
       setEventDate(
-        raw.startDate
-          ? dayjs(raw.startDate).format('YYYY-MM-DD')
-          : item.publishedAt
-          ? dayjs(item.publishedAt).format('YYYY-MM-DD')
-          : ''
+        toDateTimeLocalInput(raw.startDate || item.publishedAt)
       );
       setTargetPrivacy(raw.privacy === 'public' ? 'public' : 'private');
       setTargetStatus(raw.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT');
@@ -363,22 +358,22 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
                 </div>
               </div>
 
-              {/* Event Date Picker (Retroactive & Abstract Dates Support) */}
+              {/* Event Date & Time Picker (Retroactive & Abstract Dates Support) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-[#2481cc]" />
-                    <span>Дата заметки / новости</span>
+                    <span>Дата и время заметки</span>
                   </label>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
                     Заднее число ✓
                   </span>
                 </div>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc] [color-scheme:light] dark:[color-scheme:dark]"
                 />
               </div>
             </div>

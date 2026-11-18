@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --sat: env(safe-area-inset-top);
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
@@ -21,6 +21,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --feed-bg: 14 22 33;
     --surface-container: 24 34 45;
     --surface-container-highest: 31 43 56;
@@ -32,10 +33,14 @@
     --on-primary: 255 255 255;
   }
 
+  html {
+    scrollbar-gutter: stable;
+  }
+
   html,
   body {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   body {

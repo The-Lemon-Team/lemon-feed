@@ -2,6 +2,51 @@ import { Note } from '@lenta/shared';
 
 export type FeedAppRuntimeMode = 'dev' | 'staging' | 'public';
 export type FeedAppProfile = 'standard' | 'feed-bus';
+export type FeedAppEnvironment = 'notes' | 'watchers';
+
+/**
+ * Determines whether the app is running in the Watchers Pre-Moderation environment:
+ * - Vite build/dev mode `watchers` or `VITE_FEED_ENV=watchers`
+ * - Port 5182 or 5177
+ * - URL param ?env=watchers or pathname /watchers
+ */
+export function isWatchersEnvironment(): boolean {
+  const envVal = (
+    import.meta.env.VITE_FEED_ENV ||
+    import.meta.env.MODE ||
+    ''
+  ).toLowerCase();
+
+  if (typeof window !== 'undefined') {
+    const sp = new URLSearchParams(window.location.search);
+    const paramEnv = (sp.get('env') || '').toLowerCase();
+    if (paramEnv === 'watchers') return true;
+    if (paramEnv === 'notes') return false;
+    if (window.location.pathname === '/watchers' || window.location.pathname.startsWith('/watchers/')) {
+      return true;
+    }
+    if (window.location.port === '5182' || window.location.port === '5177') {
+      return true;
+    }
+  }
+
+  return envVal === 'watchers';
+}
+
+export function resolveFeedEnvironment(): FeedAppEnvironment {
+  return isWatchersEnvironment() ? 'watchers' : 'notes';
+}
+
+export function setFeedEnvironment(env: FeedAppEnvironment): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('env', env);
+    window.history.replaceState({}, '', url.toString());
+  } catch (err) {
+    console.warn('Failed to set feed environment:', err);
+  }
+}
 
 /**
  * Determines whether the app is running in Feed-Bus (Lemon-Bus moderation) mode:

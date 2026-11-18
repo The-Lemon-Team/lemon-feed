@@ -2,7 +2,8 @@ import React from 'react';
 import { FeedCategoriesSheet } from './navigation/FeedCategoriesSheet';
 import { FeedBottomNav } from './FeedBottomNav';
 import { FeedPeriodEndingSoonToast } from './notifications/FeedPeriodEndingSoonToast';
-import { PinnedNotesDock } from './workspace/PinnedNotesDock';
+// Workspaces UI temporarily disabled on UI — kept intact for upcoming redesign
+// import { PinnedNotesDock } from './workspace/PinnedNotesDock';
 
 export interface FeedOverlaysClusterProps {
   activeMobileNav: 'stream' | 'categories' | 'search';
@@ -72,12 +73,13 @@ export const FeedOverlaysCluster: React.FC<FeedOverlaysClusterProps> = ({
         onSelectPeriod={onSelectPeriod}
       />
 
-      {/* Floating Workspace Pinned Notes & Period Tracker Dock */}
+      {/* Workspaces UI temporarily disabled on UI — kept intact for upcoming redesign
       <PinnedNotesDock
         onOpenNoteDetail={onOpenNoteById}
         onSelectPeriod={onSelectPeriod}
         disableEscClose={disableEscClose}
       />
+      */}
     </>
   );
 };

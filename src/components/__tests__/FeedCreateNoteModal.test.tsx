@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
@@ -48,10 +48,24 @@ describe('FeedCreateNoteModal', () => {
       expect(selects()[statusSelect]).toHaveValue('DRAFT');
     });
 
-    it('uses defaultDate for the event date', () => {
+    it('uses defaultDate paired with current local time for the event datetime', () => {
       mockApi();
       renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} defaultDate="2026-12-24" />);
-      expect(document.querySelector('input[type="date"]')).toHaveValue('2026-12-24');
+      const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+      expect(input).not.toBeNull();
+      expect(input.value).toMatch(/^2026-12-24T\d{2}:\d{2}$/);
+    });
+
+    it('defaults to current local date and time when defaultDate is omitted', () => {
+      mockApi();
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const expectedPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T`;
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);
+      const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+      expect(input).not.toBeNull();
+      expect(input.value.startsWith(expectedPrefix)).toBe(true);
+      expect(input.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     });
 
     it('preselects the feed matching defaultFeedSlug once feeds load', async () => {
@@ -138,10 +152,13 @@ describe('FeedCreateNoteModal', () => {
   });
 
   describe('Create › with no errors', () => {
-    it('sends a minimal note and reports success', async () => {
+    it('sends a minimal note with default current time and reports success', async () => {
       const api = mockApi();
       const onCreated = vi.fn();
       renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} onCreated={onCreated} defaultDate="2026-10-31" />);
+
+      const dateTimeInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+      const expectedIso = new Date(dateTimeInput.value).toISOString();
 
       await userEvent.type(titleInput(), '  Hello world  ');
       await userEvent.click(submit());
@@ -151,7 +168,7 @@ describe('FeedCreateNoteModal', () => {
       expect(body).toMatchObject({
         title: 'Hello world',
         type: 'SINGLE',
-        startDate: '2026-10-31T00:00:00.000Z',
+        startDate: expectedIso,
         privacy: 'private',
         status: 'PUBLISHED',
         author: 'Admin',
@@ -166,6 +183,19 @@ describe('FeedCreateNoteModal', () => {
       expect(body.feedId).toBeUndefined();
       expect(body.endDate).toBeUndefined();
       expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 'created-1' }));
+    });
+
+    it('sends exact user-selected date and time in ISO UTC', async () => {
+      const api = mockApi();
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);
+
+      const dateTimeInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+      fireEvent.change(dateTimeInput, { target: { value: '2026-11-18T14:45' } });
+      await userEvent.type(titleInput(), 'Timed Note');
+      await userEvent.click(submit());
+
+      expect(await screen.findByText('Запись успешно создана!')).toBeInTheDocument();
+      expect(api.getBody()!.startDate).toBe(new Date('2026-11-18T14:45').toISOString());
     });
 
     it('closes itself shortly after a successful save', async () => {

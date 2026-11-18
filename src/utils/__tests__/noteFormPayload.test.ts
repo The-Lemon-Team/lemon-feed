@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { toDateTimeLocalInput } from '@lenta/shared';
 import { buildSafeNoteUpdatePayload, type NoteFormValues } from '../noteFormPayload';
 import type { UnifiedFeedItem } from '../../adapters/feeds/types';
 
@@ -167,5 +168,36 @@ describe('buildSafeNoteUpdatePayload', () => {
     const payloadUntouched = buildSafeNoteUpdatePayload(mockBaseItem, baseValues);
     expect(payloadUntouched.feedId).toBeUndefined();
     expect(payloadUntouched.publicFeedId).toBeUndefined();
+  });
+
+  it('preserves original ISO timestamp with seconds when datetime-local eventDate is unchanged', () => {
+    const itemWithSeconds: UnifiedFeedItem = {
+      ...mockBaseItem,
+      rawPayload: {
+        ...mockBaseItem.rawPayload,
+        startDate: '2026-10-31T18:00:45.123Z',
+      },
+    };
+    const payload = buildSafeNoteUpdatePayload(itemWithSeconds, {
+      title: 'Title',
+      description: 'Desc',
+      hashtagsStr: '',
+      eventDate: toDateTimeLocalInput('2026-10-31T18:00:45.123Z'),
+      targetPrivacy: 'public',
+      targetStatus: 'PUBLISHED',
+    });
+    expect(payload.startDate).toBe('2026-10-31T18:00:45.123Z');
+  });
+
+  it('updates startDate to exact new time when datetime-local eventDate is edited', () => {
+    const payload = buildSafeNoteUpdatePayload(mockBaseItem, {
+      title: 'Title',
+      description: 'Desc',
+      hashtagsStr: '',
+      eventDate: '2026-10-31T08:45',
+      targetPrivacy: 'public',
+      targetStatus: 'PUBLISHED',
+    });
+    expect(payload.startDate).toBe(new Date('2026-10-31T08:45').toISOString());
   });
 });

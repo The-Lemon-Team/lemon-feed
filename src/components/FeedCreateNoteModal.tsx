@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Note, PendingPosterItem } from '@lenta/shared';
+import {
+  Note,
+  PendingPosterItem,
+  getDefaultDateTimeLocal,
+  fromDateTimeLocalInput,
+} from '@lenta/shared';
 import { useCreateNote, useFeedSources, queryKeys } from '../api/queries';
 import { feedApi } from '../api/client';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { FeedModeOption, resolveStreamPrivacy } from './toolbar/types';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
-import dayjs from 'dayjs';
 import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
 import { NotePosterPicker } from './notes/NotePosterPicker';
 import {
@@ -92,7 +96,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const [hashtagsStr, setHashtagsStr] = useState('');
   const [type, setType] = useState<'SINGLE' | 'PERIOD' | 'EVENT' | 'FILM_RELEASE' | 'MENTION' | 'DONE'>('SINGLE');
   const [feedId, setFeedId] = useState<string>('');
-  const [startDate, setStartDate] = useState(() => defaultDate || dayjs().format('YYYY-MM-DD'));
+  const [startDate, setStartDate] = useState(() => getDefaultDateTimeLocal(defaultDate));
   const [endDate, setEndDate] = useState('');
   const [targetPrivacy, setTargetPrivacy] = useState<'private' | 'public'>(resolveDefaultPrivacy);
   const [targetStatus, setTargetStatus] = useState<'DRAFT' | 'PUBLISHED'>(() =>
@@ -111,7 +115,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setSourceLink('');
       setHashtagsStr('');
       setType('SINGLE');
-      setStartDate(defaultDate || dayjs().format('YYYY-MM-DD'));
+      setStartDate(getDefaultDateTimeLocal(defaultDate));
       setEndDate('');
       setTargetPrivacy(resolveDefaultPrivacy());
       setTargetStatus(appMode === 'staging' ? 'DRAFT' : 'PUBLISHED');
@@ -202,8 +206,8 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         type,
         feedId: feedId || undefined,
         folderPath: resolvedFolderPath,
-        startDate: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
-        endDate: type === 'PERIOD' && endDate ? new Date(endDate).toISOString() : undefined,
+        startDate: fromDateTimeLocalInput(startDate, true)!,
+        endDate: type === 'PERIOD' && endDate ? fromDateTimeLocalInput(endDate) : undefined,
         privacy: targetPrivacy,
         status: targetStatus,
         author: author.trim() || undefined,
@@ -406,18 +410,18 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
           </div>
 
           {/* Date & Privacy Settings */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1.25fr_1fr_1fr] gap-3">
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                <span>Дата события</span>
+                <span>Дата и время события</span>
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                className="w-full min-w-0 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 [color-scheme:light] dark:[color-scheme:dark]"
               />
             </div>
 

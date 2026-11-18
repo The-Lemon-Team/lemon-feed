@@ -14,7 +14,13 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@feed-core": ["./src/core/index.ts"],
+      "@feed-core/*": ["./src/core/*"],
+      "@feed-watchers/*": ["../feed-watchers/src/*"]
+    }
   },
   "include": ["src"]
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toDateTimeLocalInput } from '@lenta/shared';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
 import { renderWithProviders } from '../../test/renderWithProviders';
@@ -27,7 +28,7 @@ const saveBtn = () => screen.getByRole('button', { name: /Сохранить п�
 const titleInput = () => screen.getByPlaceholderText(/Название новости/);
 const descInput = () => screen.getByPlaceholderText(/Текст новости/);
 const tagsInput = () => screen.getByPlaceholderText('#ai #podcast #changelog #security');
-const dateInput = () => document.querySelector('input[type="date"]') as HTMLInputElement;
+const dateInput = () => document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
 const feedSelect = () => screen.getByRole('combobox', { name: /Лента \/ Поток/i });
 const STAGE_TITLES = {
   dev: 'Приватный рабочий контур',
@@ -65,16 +66,16 @@ describe('FeedEditNoteModal', () => {
       expect(screen.getByPlaceholderText(/Краткое содержание/)).toHaveValue('raw summary');
     });
 
-    it('prefills the event date from rawPayload.startDate, else publishedAt', () => {
+    it('prefills the event datetime from rawPayload.startDate, else publishedAt', () => {
       const { unmount } = renderWithProviders(
         <FeedEditNoteModal item={makeFeedItem({ rawPayload: { startDate: '2026-05-05T12:00:00.000Z' } })} onClose={vi.fn()} />
       );
-      expect(dateInput()).toHaveValue('2026-05-05');
+      expect(dateInput()).toHaveValue(toDateTimeLocalInput('2026-05-05T12:00:00.000Z'));
       unmount();
 
       const noStart = makeFeedItem({ publishedAt: '2026-06-06T12:00:00.000Z', rawPayload: { startDate: null } });
       renderWithProviders(<FeedEditNoteModal item={noStart} onClose={vi.fn()} />);
-      expect(dateInput()).toHaveValue('2026-06-06');
+      expect(dateInput()).toHaveValue(toDateTimeLocalInput('2026-06-06T12:00:00.000Z'));
     });
 
     it('shows the cover state and wires the AI cover button', async () => {
@@ -133,6 +134,15 @@ describe('FeedEditNoteModal', () => {
       await userEvent.click(saveBtn());
       await screen.findByText(/Запись успешно обновлена/);
       expect(api.body!.startDate).toBe('2026-10-31T18:00:00.000Z');
+    });
+
+    it('updates startDate with exact edited time when datetime-local input changes', async () => {
+      const api = mockPatch();
+      renderWithProviders(<FeedEditNoteModal item={makeFeedItem()} onClose={vi.fn()} />);
+      fireEvent.change(dateInput(), { target: { value: '2026-10-31T09:15' } });
+      await userEvent.click(saveBtn());
+      await screen.findByText(/Запись успешно обновлена/);
+      expect(api.body!.startDate).toBe(new Date('2026-10-31T09:15').toISOString());
     });
 
     it('normalises edited hashtags', async () => {

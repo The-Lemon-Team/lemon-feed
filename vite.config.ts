@@ -4,14 +4,19 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const isPublicMode = mode === 'public' || process.env.VITE_FEED_APP_MODE === 'public';
-  const defaultPort = isPublicMode ? 5181 : 5180;
+  const isWatchersMode = mode === 'watchers' || process.env.VITE_FEED_ENV === 'watchers';
+  const defaultPort = isWatchersMode ? 5182 : isPublicMode ? 5181 : 5180;
   const port = Number(process.env.VITE_PORT || process.env.PORT || defaultPort);
+  const outDir = isWatchersMode ? 'dist-watchers' : isPublicMode ? 'dist-public' : 'dist';
+  const watchersTarget = process.env.VITE_WATCHERS_PROXY_TARGET || 'http://127.0.0.1:3040';
   return {
   envDir: path.resolve(__dirname, '../../'),
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@feed-core': path.resolve(__dirname, './src/core'),
+      '@feed-watchers': path.resolve(__dirname, '../feed-watchers/src'),
       '@lenta/shared': path.resolve(__dirname, '../../packages/shared/src'),
       '@lenta/lemon-bus': path.resolve(__dirname, '../../packages/lemon-bus/dist'),
       '@lenta/seasons-neurons': path.resolve(__dirname, '../../packages/seasons-neurons/dist'),
@@ -37,7 +42,15 @@ export default defineConfig(({ mode }) => {
     port,
     host: true,
     allowedHosts: true,
+    fs: {
+      allow: [path.resolve(__dirname, '../..')],
+    },
     proxy: {
+      '/watchers-api': {
+        target: watchersTarget,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/watchers-api/, ''),
+      },
       '/_api': {
         target: 'http://localhost:3002',
         changeOrigin: true,
@@ -71,6 +84,8 @@ export default defineConfig(({ mode }) => {
     },
   },
   build: {
+    outDir,
+    emptyOutDir: true,
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {

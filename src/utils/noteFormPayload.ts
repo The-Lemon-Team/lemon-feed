@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { toDateTimeLocalInput, fromDateTimeLocalInput } from '@lenta/shared';
 import type { UnifiedFeedItem } from '../adapters/feeds/types';
 import type { UpdateNotePayload } from '../api/client';
 
@@ -10,7 +11,7 @@ export interface NoteFormValues {
   curator?: string;
   sourceLink?: string;
   hashtagsStr: string;
-  eventDate: string; // 'YYYY-MM-DD'
+  eventDate: string; // 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:mm'
   targetPrivacy: 'private' | 'public';
   targetStatus: 'DRAFT' | 'PUBLISHED';
   feedId?: string | null;
@@ -40,15 +41,26 @@ export function buildSafeNoteUpdatePayload(
   const originalFormattedDate = originalStartDate
     ? dayjs(originalStartDate).format('YYYY-MM-DD')
     : '';
+  const originalFormattedDateTime = originalStartDate
+    ? toDateTimeLocalInput(originalStartDate)
+    : '';
 
   let startDate: string | undefined;
   if (!values.eventDate) {
     startDate = undefined;
+  } else if (values.eventDate.includes('T')) {
+    if (values.eventDate === originalFormattedDateTime && originalStartDate) {
+      // Untouched datetime-local: strictly keep existing ISO string (including seconds/ms)
+      startDate = originalStartDate;
+    } else {
+      // User explicitly edited date or time
+      startDate = fromDateTimeLocalInput(values.eventDate);
+    }
   } else if (values.eventDate === originalFormattedDate && originalStartDate) {
     // Untouched date: strictly keep existing ISO string with full time precision
     startDate = originalStartDate;
   } else {
-    // User explicitly picked a different date
+    // User explicitly picked a different date-only value
     if (originalStartDate) {
       const origDayjs = dayjs(originalStartDate);
       const [y, m, d] = values.eventDate.split('-').map(Number);

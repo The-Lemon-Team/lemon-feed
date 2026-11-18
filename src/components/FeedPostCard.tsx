@@ -1,36 +1,27 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { StagingCardModerationBar } from './StagingCardModerationBar';
 import { resolveMediaUrl } from '../api/client';
 import { cleanNoteMarkdown, extractCleanSnippet } from '@lenta/shared';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { PeriodItem } from '../utils/periods';
-import { NotePinButton } from './workspace/NotePinButton';
-import { SymbolIcon } from './common/SymbolIcon';
+// Workspaces UI temporarily disabled on UI — kept intact for upcoming redesign
+// import { NotePinButton } from './workspace/NotePinButton';
 import { NoteMediaPlayer } from './media/NoteMediaPlayer';
 import {
   extractNoteMediaTracks,
   stripExtractedMediaFromMarkdown,
   isMediaUrl,
 } from '../utils/noteMedia';
-import {
-  Clock,
-  Flame,
-  ExternalLink,
-  Share2,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Check,
-  Folder,
-  ArrowRight,
-  Edit3,
-  Lock,
-  Globe,
-} from 'lucide-react';
+import { Sparkles, Folder, Edit3 } from 'lucide-react';
 import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
+import {
+  CoreFeedCard,
+  FeedCardSlots,
+  FeedEntry,
+  NoteFeedEntryMeta,
+  unifiedItemToFeedEntry,
+} from '../core';
 
 export interface FeedPostCardProps {
   item: UnifiedFeedItem;
@@ -61,13 +52,7 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
   onUnpublishToStaging,
   onReturnToPrivate,
   isMutating,
-  allPeriods,
-  selectedPeriodId,
-  onSelectPeriod,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const [requestedTrackUrl, setRequestedTrackUrl] = useState<string | null>(null);
 
   const mediaTracks = useMemo(() => extractNoteMediaTracks(item), [item]);
@@ -76,334 +61,77 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
     [item.description, mediaTracks]
   );
 
-  const formattedDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const entry = useMemo<FeedEntry<NoteFeedEntryMeta>>(() => {
+    const base = unifiedItemToFeedEntry(item, appMode);
+    return {
+      ...base,
+      bodyMarkdown: markdownWithoutMediaLinks,
+    };
+  }, [item, appMode, markdownWithoutMediaLinks]);
 
-  const coverUrl =
-    item.coverUrl ||
-    (item.rawPayload?.images?.find((img: any) => img.isMain)?.url) ||
-    item.rawPayload?.images?.[0]?.url ||
-    null;
-
-  useEffect(() => {
-    setImageError(false);
-  }, [coverUrl]);
-
-  const isUpdated = Boolean(
-    item.updatedAt &&
-    item.publishedAt &&
-    Math.abs(new Date(item.updatedAt).getTime() - new Date(item.publishedAt).getTime()) > 60000
+  const formatSnippet = useCallback(
+    (md: string, currentEntry: FeedEntry<NoteFeedEntryMeta>) =>
+      extractCleanSnippet(md, 240, {
+        summary: currentEntry.excerpt,
+        title: currentEntry.title,
+      }),
+    []
   );
 
-  const summaryText = item.summary || (item.rawPayload as any)?.summary;
+  const formatMarkdown = useCallback(
+    (md: string, currentEntry: FeedEntry<NoteFeedEntryMeta>) =>
+      cleanNoteMarkdown(md, { title: currentEntry.title }),
+    []
+  );
 
-  const cleanPreview = useMemo(() => {
-    return extractCleanSnippet(markdownWithoutMediaLinks, 240, {
-      summary: summaryText,
-      title: item.title,
-    });
-  }, [markdownWithoutMediaLinks, summaryText, item.title]);
-
-  const isLongText = useMemo(() => {
-    if (!markdownWithoutMediaLinks || markdownWithoutMediaLinks.length <= 220) return false;
-    if (markdownWithoutMediaLinks.length > 450) return true;
-    return cleanNoteMarkdown(markdownWithoutMediaLinks, { title: item.title }).length > 220;
-  }, [markdownWithoutMediaLinks, item.title]);
-
-  const cleanedFullMarkdown = useMemo(() => {
-    if (!isExpanded) return '';
-    return cleanNoteMarkdown(markdownWithoutMediaLinks, { title: item.title });
-  }, [isExpanded, markdownWithoutMediaLinks, item.title]);
-
-  const isHighResonance = typeof item.resonanceScore === 'number' && item.resonanceScore >= 80;
-
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const shareUrl = item.sourceLink || window.location.href;
-    const shareData = {
-      title: item.title,
-      text: item.title,
-      url: shareUrl,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch {
-        // Fallback to clipboard
-      }
+  const handleMarkdownLinkClick = useCallback((href: string) => {
+    if (isMediaUrl(href)) {
+      setRequestedTrackUrl(href);
+      return true;
     }
+    return false;
+  }, []);
 
-    try {
-      await navigator.clipboard.writeText(`${item.title}\n${shareUrl}`);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.warn('Copy failed', err);
-    }
-  };
-
-  return (
-    <article
-      onClick={() => onOpenDetail?.(item)}
-      className="relative rounded-2xl border bg-white dark:bg-[#17212b] border-slate-200 dark:border-white/[0.08] hover:border-[#2481cc]/50 dark:hover:border-[#3390ec]/50 shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.04)] hover:shadow-md p-4 sm:p-5 select-none cursor-pointer transition-all duration-200 animate-fade-in group max-w-full z-0"
-    >
-      {/* 1. Card Header */}
-      {appMode === 'staging' && (
-        <StagingCardModerationBar
-          item={item}
-          onApprovePublish={onApprovePublish}
-          onUnpublishToStaging={onUnpublishToStaging}
-          onReturnToPrivate={onReturnToPrivate}
-          isMutating={isMutating}
-        />
-      )}
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 bg-gradient-to-br from-blue-500/10 via-sky-500/15 to-indigo-500/20 border border-slate-200 dark:border-white/10 flex items-center justify-center text-sm font-bold text-[#2481cc] dark:text-[#64b5f6] overflow-hidden">
-            <SymbolIcon icon={item.avatarIcon} fallback="✨" className="text-base" />
-          </div>
-
-          <div className="min-w-0 leading-tight">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-xs sm:text-[13px] text-slate-900 dark:text-white truncate">
-                {item.channelTitle}
-              </span>
-              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                @{item.channelHandle.replace(/^@+/, '')}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 dark:text-[#8292a2]">
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <Clock className="w-3 h-3 opacity-75 shrink-0" />
-                <span>{formattedDate}</span>
-              </span>
-              {isUpdated && (
-                <span
-                  className="text-[10px] text-slate-400 dark:text-slate-500 font-mono"
-                  title={`Обновлено: ${new Date(item.updatedAt!).toLocaleString('ru-RU')}`}
-                >
-                  (ред.)
-                </span>
-              )}
-              {item.timeSlot && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-white/10 font-mono">
-                  {item.timeSlot === 'MORNING' ? 'Утро' : item.timeSlot === 'AFTERNOON' ? 'День' : 'Вечер'}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Category badge, Note Privacy Badge, Pin Button & External link */}
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-          {item.category.label.trim().toLowerCase() !== 'private' &&
-            item.category.label.trim().toLowerCase() !== 'public' && (
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${item.category.colorClass}`}>
-                {item.category.emoji} {item.category.label}
-              </span>
-            )}
-          {item.rawPayload?.privacy === 'private' ||
-          item.sourceType === 'private_feeds' ||
-          item.rawPayload?.feed?.privacy === 'private' ? (
-            <span
-              data-testid="note-privacy-badge-private"
-              className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-flex items-center gap-1 shrink-0"
-              title="Приватная заметка (Private)"
-            >
-              <Lock className="w-2.5 h-2.5 text-purple-500 dark:text-purple-400" />
-              <span>Private</span>
-            </span>
-          ) : (
-            <span
-              data-testid="note-privacy-badge-public"
-              className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 inline-flex items-center gap-1 shrink-0"
-              title="Публичная заметка (Public)"
-            >
-              <Globe className="w-2.5 h-2.5 text-sky-500 dark:text-sky-400" />
-              <span>Public</span>
-            </span>
-          )}
-          <NotePinButton noteId={item.id} />
-          {item.sourceLink && (
-            <a
-              href={item.sourceLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors shrink-0"
-              title="Открыть источник"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Title */}
-      <h3 className="text-sm sm:text-[15px] font-bold text-slate-900 dark:text-white leading-snug tracking-[-0.01em] mb-2 group-hover:text-[#2481cc] dark:group-hover:text-[#64b5f6] transition-colors break-words">
-        {item.title}
-      </h3>
-
-      {/* 2.5 Cover image banner */}
-      {coverUrl && !imageError && (
-        <div className="relative w-full h-52 sm:h-64 overflow-hidden rounded-xl mb-3 bg-slate-900/40 dark:bg-black/60 border border-slate-200/60 dark:border-white/10 flex items-center justify-center">
-          {/* Ambient Blurred Backdrop */}
-          <div
-            className="absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 opacity-35 dark:opacity-45 pointer-events-none"
-            style={{ backgroundImage: `url("${resolveMediaUrl(coverUrl)}")` }}
-            aria-hidden="true"
+  const slots = useMemo<FeedCardSlots<FeedEntry<NoteFeedEntryMeta>>>(
+    () => ({
+      renderTopBar: () =>
+        appMode === 'staging' ? (
+          <StagingCardModerationBar
+            item={item}
+            onApprovePublish={onApprovePublish}
+            onUnpublishToStaging={onUnpublishToStaging}
+            onReturnToPrivate={onReturnToPrivate}
+            isMutating={isMutating}
           />
-          <div className="absolute inset-0 bg-black/15 dark:bg-black/35 pointer-events-none" aria-hidden="true" />
+        ) : null,
 
-          {/* Foreground Image: Full, Uncropped */}
-          <img
-            src={resolveMediaUrl(coverUrl)}
-            alt={item.title}
-            loading="lazy"
-            onError={() => setImageError(true)}
-            className="relative z-10 max-h-full max-w-full w-auto h-auto object-contain drop-shadow-md group-hover:scale-[1.01] transition-transform duration-300"
+      /* Workspaces UI temporarily disabled on UI — kept intact for upcoming redesign
+      renderHeaderActions: () => <NotePinButton noteId={item.id} />,
+      */
+
+      renderBodyExtras: () =>
+        mediaTracks.length > 0 || item.feedSlug === 'notebooklm-ai' ? (
+          <NoteMediaPlayer
+            item={item}
+            tracks={mediaTracks}
+            variant="card"
+            requestedTrackUrl={requestedTrackUrl}
           />
-        </div>
-      )}
+        ) : null,
 
-      {/* 3. Markdown snippet body */}
-      {item.description && (
-        <div className="text-[13.5px] sm:text-[14px] text-slate-700 dark:text-slate-200 leading-relaxed mb-3 break-words">
-          {isExpanded ? (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                p: ({ node, ...props }) => <p className="mb-2 last:mb-0 text-slate-700 dark:text-slate-200" {...props} />,
-                strong: ({ node, ...props }) => (
-                  <strong className="font-semibold text-slate-900 dark:text-white" {...props} />
-                ),
-                a: ({ node, href, ...props }) => (
-                  <a
-                    href={href}
-                    className="text-[#2481cc] dark:text-[#64b5f6] hover:underline font-medium"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (href && isMediaUrl(href)) {
-                        e.preventDefault();
-                        setRequestedTrackUrl(href);
-                      }
-                    }}
-                    {...props}
-                  />
-                ),
-                ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1 text-slate-700 dark:text-slate-200" {...props} />,
-                ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1 text-slate-700 dark:text-slate-200" {...props} />,
-                blockquote: ({ node, ...props }) => (
-                  <blockquote
-                    className="border-l-2 border-[#2481cc]/40 pl-3 my-2 text-slate-600 dark:text-slate-300 italic text-[12.5px]"
-                    {...props}
-                  />
-                ),
-                code: ({ node, inline, ...props }: any) =>
-                  inline ? (
-                    <code
-                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 font-mono text-[11.5px] text-slate-800 dark:text-slate-200 font-medium"
-                      {...props}
-                    />
-                  ) : (
-                    <code
-                      className="block p-2 rounded-lg bg-slate-100 dark:bg-black/30 font-mono text-[11px] text-slate-800 dark:text-slate-200 overflow-x-auto my-1 border border-slate-200/50 dark:border-white/10"
-                      {...props}
-                    />
-                  ),
-              }}
-            >
-              {cleanedFullMarkdown}
-            </ReactMarkdown>
-          ) : (
-            <p className="line-clamp-4 leading-relaxed text-slate-700 dark:text-slate-200">
-              {cleanPreview}
-            </p>
-          )}
+      renderFooterLeft: (currentEntry) => {
+        const folderPath = currentEntry.meta?.folderPath;
+        if (appMode !== 'staging' || !folderPath) return null;
+        return (
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
+            <Folder className="w-3 h-3 text-[#2481cc]" />
+            <span>{folderPath}</span>
+          </span>
+        );
+      },
 
-          {isLongText && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded((prev) => !prev);
-              }}
-              className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-[#2481cc] dark:text-[#64b5f6] hover:underline"
-            >
-              <span>{isExpanded ? 'Свернуть' : 'Читать далее'}</span>
-              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* 3.5 Audio / Video Media Player for attached media files or NotebookLM posts */}
-      {(mediaTracks.length > 0 || item.feedSlug === 'notebooklm-ai') && (
-        <NoteMediaPlayer
-          item={item}
-          tracks={mediaTracks}
-          variant="card"
-          requestedTrackUrl={requestedTrackUrl}
-        />
-      )}
-
-      {/* 4. Footer: Metrics, Share, Tags */}
-      <div className="pt-2.5 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-[#708499]">
-        {/* Left: Resonance, Author, Tags */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {isHighResonance && (
-            <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold text-[10px] bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-300/70 dark:border-amber-800/40">
-              <Flame className="w-3 h-3 fill-current" />
-              <span>Резонанс {item.resonanceScore}%</span>
-            </div>
-          )}
-
-          {item.curator && item.curator !== 'auto' && (
-            <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              <Sparkles className="w-3 h-3 text-[#2481cc]" />
-              <span>{item.curator}</span>
-            </div>
-          )}
-
-          {/* Folder Path badge (only shown in staging mode) */}
-          {appMode === 'staging' && (item.rawPayload as any)?.folderPath && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
-              <Folder className="w-3 h-3 text-[#2481cc]" />
-              <span>{(item.rawPayload as any).folderPath}</span>
-            </span>
-          )}
-
-          {/* Hashtags */}
-          {item.hashtags && item.hashtags.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {item.hashtags.slice(0, 3).map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectTag?.(h);
-                  }}
-                  className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200/50 dark:border-white/5 transition-colors"
-                >
-                  #{h.replace(/^#/, '')}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Actions (Share, Edit, AI Cover, Open Prompt) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+      renderFooterActions: () => (
+        <>
           {onAiCover && (
             <button
               type="button"
@@ -441,22 +169,34 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
               onDeleted={() => onDeleteNote(item)}
             />
           )}
+        </>
+      ),
+    }),
+    [
+      appMode,
+      item,
+      onApprovePublish,
+      onUnpublishToStaging,
+      onReturnToPrivate,
+      isMutating,
+      mediaTracks,
+      requestedTrackUrl,
+      onAiCover,
+      onEditNote,
+      onDeleteNote,
+    ]
+  );
 
-          <button
-            type="button"
-            onClick={handleShare}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-            title="Поделиться"
-          >
-            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5" />}
-          </button>
-
-          <span className="hidden sm:inline-flex text-[11px] font-semibold text-[#2481cc] dark:text-[#64b5f6] opacity-0 group-hover:opacity-100 transition-opacity items-center gap-0.5">
-            <span>Читать</span>
-            <ArrowRight className="w-3 h-3" />
-          </span>
-        </div>
-      </div>
-    </article>
+  return (
+    <CoreFeedCard
+      entry={entry}
+      slots={slots}
+      onOpenDetail={onOpenDetail ? () => onOpenDetail(item) : undefined}
+      onSelectTag={onSelectTag}
+      resolveImageUrl={resolveMediaUrl}
+      formatSnippet={formatSnippet}
+      formatMarkdown={formatMarkdown}
+      onMarkdownLinkClick={handleMarkdownLinkClick}
+    />
   );
 });

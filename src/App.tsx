@@ -1,20 +1,31 @@
-import React, { useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback } from 'react';
 import { useFeedTheme } from './hooks/useFeedTheme';
 import { FeedBusView } from './feed-bus';
 import { FeedStandardView } from './views/FeedStandardView';
-import { isFeedBusEnvironment, setFeedBusProfile } from './utils/appMode';
+import {
+  FeedAppEnvironment,
+  isFeedBusEnvironment,
+  resolveFeedEnvironment,
+  setFeedBusProfile,
+  setFeedEnvironment,
+} from './utils/appMode';
+
+const FeedWatchersView = lazy(() =>
+  import('@feed-watchers/FeedWatchersView').then((m) => ({ default: m.FeedWatchersView }))
+);
 
 /**
  * Root Application Component.
- * Acts as an orchestrator / profile router between:
- *  - Standard Feed View (`FeedStandardView`)
- *  - Lemon-Bus Moderation View (`FeedBusView`)
+ * Routes between isolated environments & profiles:
+ *  - `watchers` environment -> `FeedWatchersView` (lightweight SSE pre-moderation feed)
+ *  - `notes` environment:
+ *      - Standard Notes Feed View (`FeedStandardView`)
+ *      - Lemon-Bus Moderation View (`FeedBusView`)
  */
 export const App: React.FC = () => {
-  // Global theme synchronization
   const { isDarkMode, toggleTheme } = useFeedTheme();
 
-  // Feed-Bus Mode state (Dedicated Lemon-Bus moderation profile)
+  const [feedEnv, setFeedEnv] = useState<FeedAppEnvironment>(() => resolveFeedEnvironment());
   const [isFeedBusMode, setIsFeedBusMode] = useState<boolean>(() => isFeedBusEnvironment());
 
   const handleToggleFeedBus = useCallback((active?: boolean) => {
@@ -25,7 +36,34 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // Dedicated Feed-Bus Mode Profile (Moderation gateway for Lemon-Bus)
+  const handleSwitchEnvironment = useCallback((target: FeedAppEnvironment) => {
+    setFeedEnvironment(target);
+    setFeedEnv(target);
+  }, []);
+
+  if (feedEnv === 'watchers') {
+    const isDedicatedWatchersBuild =
+      (import.meta.env.VITE_FEED_ENV || import.meta.env.MODE || '').toLowerCase() === 'watchers';
+
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] dark:bg-[#0e1621] text-slate-500 text-xs font-mono">
+            Загрузка ленты Lemon Watchers...
+          </div>
+        }
+      >
+        <FeedWatchersView
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleTheme}
+          onSwitchToNotesEnv={
+            isDedicatedWatchersBuild ? undefined : () => handleSwitchEnvironment('notes')
+          }
+        />
+      </Suspense>
+    );
+  }
+
   if (isFeedBusMode) {
     return (
       <FeedBusView
@@ -36,7 +74,6 @@ export const App: React.FC = () => {
     );
   }
 
-  // Standard Feed Application Profile
   return (
     <FeedStandardView
       isDarkMode={isDarkMode}

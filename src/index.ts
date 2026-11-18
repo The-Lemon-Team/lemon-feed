@@ -1,3 +1,4 @@
+export * from './core';
 export * from './components/FeedStreamView';
 export * from './components/FeedPostCard';
 export * from './components/FeedToolbar';
