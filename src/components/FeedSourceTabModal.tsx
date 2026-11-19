@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { FeedModeOption } from './toolbar/types';
+import { FeedModeOption, resolveStreamPrivacy } from './toolbar/types';
 import { FeedTabFilterConfig, FeedPrivacyFilter } from '../adapters/feeds/types';
 import { SymbolIcon } from './common/SymbolIcon';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
+import { wouldCreateStreamCycle } from '../utils/streamHierarchy';
 import {
   X,
   Save,
@@ -20,6 +21,7 @@ import {
   Folder,
   Layers,
   Wand2,
+  GitBranch,
 } from 'lucide-react';
 
 export interface FeedSourceTabModalProps {
@@ -37,6 +39,7 @@ export interface FeedSourceTabModalProps {
     color?: string | null;
     count?: number;
   }>;
+  availableStreams?: FeedModeOption[];
   availableHashtags?: Array<{ name: string; count: number }>;
 }
 
@@ -68,6 +71,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   onSave,
   onDelete,
   allFeeds = [],
+  availableStreams = [],
   availableHashtags = [],
 }) => {
   const { backdropProps } = useModalBackdrop(onClose);
@@ -80,6 +84,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
   const [description, setDescription] = useState('');
   const [privacyContour, setPrivacyContour] = useState<FeedPrivacyFilter>('all');
   const [selectedFeedSlugs, setSelectedFeedSlugs] = useState<string[]>([]);
+  const [selectedChildStreamSlugs, setSelectedChildStreamSlugs] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [folderPrefixes, setFolderPrefixes] = useState('');
@@ -100,6 +105,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           tab.filterConfig?.privacy || (tab.id === 'private_feeds' ? 'private' : 'all')
         );
         setSelectedFeedSlugs(tab.filterConfig?.feedSlugs || []);
+        setSelectedChildStreamSlugs(tab.filterConfig?.childStreamSlugs || []);
         setSelectedTags(tab.filterConfig?.tags || []);
         setFolderPrefixes((tab.filterConfig?.folderPaths || []).join(', '));
       } else {
@@ -110,6 +116,7 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
         setDescription('');
         setPrivacyContour('all');
         setSelectedFeedSlugs([]);
+        setSelectedChildStreamSlugs([]);
         setSelectedTags([]);
         setFolderPrefixes('');
       }
@@ -257,6 +264,19 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
     });
   }, [allFeeds, privacyContour, feedCategoryFilter, feedSearchQuery]);
 
+  // Candidate nested child streams (excluding builtins, self, cycles, and private streams in public contour)
+  const candidateChildStreams = useMemo(() => {
+    const SYSTEM_BUILTIN_IDS = new Set(['all', 'telegram', 'watchers', 'private_feeds']);
+    const currentSlug = id || tab?.id;
+    return availableStreams.filter((s) => {
+      if (SYSTEM_BUILTIN_IDS.has(s.id) || s.isBuiltin) return false;
+      if (currentSlug && s.id === currentSlug) return false;
+      if (privacyContour === 'public' && resolveStreamPrivacy(s) === 'private') return false;
+      if (wouldCreateStreamCycle(currentSlug, s.id, availableStreams)) return false;
+      return true;
+    });
+  }, [availableStreams, id, tab?.id, privacyContour]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!label.trim()) {
@@ -270,9 +290,18 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const validChildSlugs =
+      privacyContour === 'public'
+        ? selectedChildStreamSlugs.filter((slugItem) => {
+            const match = availableStreams.find((s) => s.id === slugItem);
+            return !match || resolveStreamPrivacy(match) !== 'private';
+          })
+        : selectedChildStreamSlugs;
+
     const filterConfig: FeedTabFilterConfig = {
       privacy: privacyContour,
       feedSlugs: selectedFeedSlugs.length > 0 ? selectedFeedSlugs : undefined,
+      childStreamSlugs: validChildSlugs.length > 0 ? validChildSlugs : undefined,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
       folderPaths: folderPathsArray.length > 0 ? folderPathsArray : undefined,
     };
@@ -626,6 +655,81 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
             </div>
           </div>
 
+          {/* Section 2.5: NESTED CHILD STREAMS (КОМПОЗИЦИЯ ИЗ ДРУГИХ СТРИМОВ) */}
+          {candidateChildStreams.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-[#121921]/90 border border-slate-200/80 dark:border-white/10 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-200/50 dark:border-white/5">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-indigo-500" />
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">
+                    Вложенные стримы (Nested Streams)
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 font-semibold">
+                    {selectedChildStreamSlugs.length > 0
+                      ? `${selectedChildStreamSlugs.length} выбрано`
+                      : 'Без вложенных'}
+                  </span>
+                </div>
+                {selectedChildStreamSlugs.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChildStreamSlugs([])}
+                    className="text-[10px] text-rose-500 hover:underline cursor-pointer"
+                  >
+                    Сбросить
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                Включите другие стримы внутрь этого — их ленты, фильтры и заметки будут рекурсивно объединены в общий поток.
+              </p>
+
+              <div className="max-h-32 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5 custom-scrollbar p-1 rounded-xl bg-white/60 dark:bg-black/20 border border-slate-200/60 dark:border-white/5">
+                {candidateChildStreams.map((cs) => {
+                  const isSelected = selectedChildStreamSlugs.includes(cs.id);
+                  const isPriv = resolveStreamPrivacy(cs) === 'private';
+                  return (
+                    <button
+                      key={cs.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedChildStreamSlugs((prev) =>
+                          isSelected ? prev.filter((s) => s !== cs.id) : [...prev, cs.id]
+                        );
+                      }}
+                      className={`flex items-center justify-between gap-2 p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-indigo-500/15 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-semibold shadow-2xs'
+                          : 'bg-white dark:bg-[#18222d] border-slate-200/80 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <SymbolIcon icon={cs.emoji} fallback="📁" className="text-base shrink-0" />
+                        <div className="min-w-0">
+                          <div className="truncate text-[11px] leading-tight font-medium flex items-center gap-1">
+                            <span className="truncate">{cs.label}</span>
+                            {isPriv && <Lock className="w-2.5 h-2.5 text-purple-400 shrink-0" />}
+                          </div>
+                          <div className="truncate text-[10px] text-slate-400 font-mono">{cs.id}</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-500 border-indigo-500 text-white'
+                            : 'border-slate-300 dark:border-white/20'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Section 3: DATA SOURCE 2 — HASHTAGS SOURCE (КАК ПРИ СОЗДАНИИ FEED) */}
           <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-[#121921]/90 border border-slate-200/80 dark:border-white/10 space-y-2.5">
             <div className="flex items-center justify-between pb-1 border-b border-slate-200/50 dark:border-white/5">
@@ -799,7 +903,10 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
           </div>
 
           {/* Mode Indicator Callout */}
-          {selectedFeedSlugs.length === 0 && selectedTags.length === 0 && !folderPrefixes.trim() ? (
+          {selectedFeedSlugs.length === 0 &&
+          selectedChildStreamSlugs.length === 0 &&
+          selectedTags.length === 0 &&
+          !folderPrefixes.trim() ? (
             <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-[11px] flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
               <span>
@@ -810,7 +917,16 @@ export const FeedSourceTabModal: React.FC<FeedSourceTabModalProps> = ({
             <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-200 text-[11px] flex items-center gap-2">
               <Filter className="w-4 h-4 text-[#2481cc] shrink-0" />
               <span>
-                <strong>Смарт-лента:</strong> в этот таб будут попадать публикации по выбранным источникам ({selectedFeedSlugs.length ? `${selectedFeedSlugs.length} лент` : ''}{selectedTags.length ? `${selectedFeedSlugs.length ? ', ' : ''}${selectedTags.length} тегов` : ''}{folderPrefixes.trim() ? ', папки' : ''}).
+                <strong>Смарт-лента:</strong> в этот таб будут попадать публикации по выбранным источникам (
+                {[
+                  selectedFeedSlugs.length ? `${selectedFeedSlugs.length} лент` : '',
+                  selectedChildStreamSlugs.length ? `${selectedChildStreamSlugs.length} стримов` : '',
+                  selectedTags.length ? `${selectedTags.length} тегов` : '',
+                  folderPrefixes.trim() ? 'папки' : '',
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+                ).
               </span>
             </div>
           )}

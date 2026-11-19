@@ -35,9 +35,61 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       ? filterConfig.folderPaths.map((f) => f.toLowerCase().trim())
       : null;
 
+  const fallbackStreams =
+    filterConfig.fallbackStreams && filterConfig.fallbackStreams.length > 0
+      ? filterConfig.fallbackStreams
+      : null;
+
   const hasSlugs = Boolean(targetSlugs && targetSlugs.size > 0);
   const hasTags = Boolean(targetTags && targetTags.length > 0);
   const hasFolders = Boolean(targetFolders && targetFolders.length > 0);
+  const hasFallbackStreams = Boolean(fallbackStreams && fallbackStreams.length > 0);
+
+  const matchesImplicitTarget = (note: Note, rawSlug: string, rawLabel: string): boolean => {
+    const normTabId = rawSlug.toLowerCase().trim();
+    const normTabHyphen = normTabId.replace(/_/g, '-');
+    const normTabUnderscore = normTabId.replace(/-/g, '_');
+    const normLabel = rawLabel.toLowerCase().trim();
+
+    const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
+    if (
+      noteFeedSlug &&
+      (noteFeedSlug === normTabId ||
+        noteFeedSlug === normTabHyphen ||
+        noteFeedSlug === normTabUnderscore ||
+        noteFeedSlug.endsWith(`/${normTabId}`) ||
+        noteFeedSlug.endsWith(`/${normTabHyphen}`))
+    ) {
+      return true;
+    }
+
+    const noteFolder = (note.folderPath || '').toLowerCase();
+    if (
+      noteFolder &&
+      (noteFolder.includes(`/${normTabId}/`) ||
+        noteFolder.startsWith(`${normTabId}/`) ||
+        noteFolder === normTabId ||
+        noteFolder.includes(`/${normTabHyphen}/`) ||
+        noteFolder.startsWith(`${normTabHyphen}/`) ||
+        noteFolder === normTabHyphen ||
+        noteFolder.includes(`/${normTabUnderscore}/`) ||
+        noteFolder.startsWith(`${normTabUnderscore}/`) ||
+        noteFolder === normTabUnderscore ||
+        (normLabel && (noteFolder.includes(`/${normLabel}/`) || noteFolder.startsWith(`${normLabel}/`))))
+    ) {
+      return true;
+    }
+
+    const noteTags = (note.hashtags || []).map((h: any) =>
+      (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
+    );
+    return (
+      noteTags.includes(normTabId) ||
+      noteTags.includes(normTabHyphen) ||
+      noteTags.includes(normTabUnderscore) ||
+      (Boolean(normLabel) && noteTags.includes(normLabel))
+    );
+  };
 
   const matchesPrivacy = (note: Note): boolean => {
     if (targetPrivacy === 'private') {
@@ -73,8 +125,8 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
   };
 
   const matchesSourceCriteria = (note: Note): boolean => {
-    // If explicit criteria are configured, match by them:
-    if (hasSlugs || hasTags || hasFolders) {
+    // If explicit criteria (or nested child streams) are configured, match by them:
+    if (hasSlugs || hasTags || hasFolders || hasFallbackStreams) {
       // 1. Attached candidate feed slug match
       if (hasSlugs) {
         const slug = (note.feed?.slug || '').toLowerCase();
@@ -109,6 +161,11 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
         }
       }
 
+      // 4. Implicit nested child streams without explicit feeds/tags/folders
+      if (hasFallbackStreams && fallbackStreams!.some((fb) => matchesImplicitTarget(note, fb.slug, fb.title))) {
+        return true;
+      }
+
       return false;
     }
 
@@ -120,55 +177,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     // Clean Slate by Default:
     // If NO criteria are configured, the tab is a clean workspace!
     // It only matches notes that were explicitly authored for or tagged with this tab:
-    const normTabId = modeOption.id.toLowerCase().trim();
-    const normTabHyphen = normTabId.replace(/_/g, '-');
-    const normTabUnderscore = normTabId.replace(/-/g, '_');
-    const normLabel = modeOption.label.toLowerCase().trim();
-
-    const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
-    if (
-      noteFeedSlug &&
-      (noteFeedSlug === normTabId ||
-        noteFeedSlug === normTabHyphen ||
-        noteFeedSlug === normTabUnderscore ||
-        noteFeedSlug.endsWith(`/${normTabId}`) ||
-        noteFeedSlug.endsWith(`/${normTabHyphen}`))
-    ) {
-      return true;
-    }
-
-    const noteFolder = (note.folderPath || '').toLowerCase();
-    if (
-      noteFolder &&
-      (noteFolder.includes(`/${normTabId}/`) ||
-        noteFolder.startsWith(`${normTabId}/`) ||
-        noteFolder === normTabId ||
-        noteFolder.includes(`/${normTabHyphen}/`) ||
-        noteFolder.startsWith(`${normTabHyphen}/`) ||
-        noteFolder === normTabHyphen ||
-        noteFolder.includes(`/${normTabUnderscore}/`) ||
-        noteFolder.startsWith(`${normTabUnderscore}/`) ||
-        noteFolder === normTabUnderscore ||
-        noteFolder.includes(`/${normLabel}/`) ||
-        noteFolder.startsWith(`${normLabel}/`))
-    ) {
-      return true;
-    }
-
-    const noteTags = (note.hashtags || []).map((h: any) =>
-      (typeof h === 'string' ? h : h?.name || '').toLowerCase().replace(/^#/, '').trim()
-    );
-    if (
-      noteTags.includes(normTabId) ||
-      noteTags.includes(normTabHyphen) ||
-      noteTags.includes(normTabUnderscore) ||
-      noteTags.includes(normLabel)
-    ) {
-      return true;
-    }
-
-    // Default: Clean empty tab (0 notes)
-    return false;
+    return matchesImplicitTarget(note, modeOption.id, modeOption.label);
   };
 
   return {

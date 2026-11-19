@@ -5,6 +5,8 @@ export type FeedPrivacyFilter = 'all' | 'public' | 'private';
 export interface FeedTabFilterConfig {
   privacy?: FeedPrivacyFilter;
   feedSlugs?: string[];
+  childStreamSlugs?: string[];
+  fallbackStreams?: Array<{ slug: string; title: string }>;
   folderPaths?: string[];
   categories?: string[];
   tags?: string[];
@@ -17,6 +19,7 @@ export type FeedSourceMode =
   | 'entertainment'
   | 'holidays'
   | 'telegram'
+  | 'watchers'
   | 'private_feeds'
   | 'spark'
   | 'dev'

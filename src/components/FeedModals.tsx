@@ -202,6 +202,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           onSave={onSaveSourceTab}
           onDelete={onDeleteSourceTab}
           allFeeds={allAvailableFeeds}
+          availableStreams={availableSourceModes}
           availableHashtags={allAvailableHashtags}
         />
       )}

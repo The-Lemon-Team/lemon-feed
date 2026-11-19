@@ -14,6 +14,7 @@ import {
   resolveStreamPrivacy,
 } from '../components/toolbar/types';
 import { FeedAppRuntimeMode } from '../utils/appMode';
+import { resolveEffectiveStreamMode } from '../utils/streamHierarchy';
 import {
   useStreams,
   useCreateStream,
@@ -82,6 +83,10 @@ export function useFeedSourceTabs({
               const tgDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'telegram');
               if (tgDef) list.push(tgDef);
             }
+            if (!list.some((m: any) => m.id === 'watchers')) {
+              const watchersDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'watchers');
+              if (watchersDef) list.push(watchersDef);
+            }
             if (!list.some((m: any) => m.id === 'private_feeds')) {
               const privAllDef = PRIVATE_STREAM_PRESETS.find((m) => m.id === 'private_feeds');
               if (privAllDef) list.push(privAllDef);
@@ -136,6 +141,16 @@ export function useFeedSourceTabs({
           if (matched?.slug) feedSlugSet.add(matched.slug);
         }
         const feedSlugs = Array.from(feedSlugSet);
+        const childSlugSet = new Set<string>();
+        for (const cs of s.childStreams || []) {
+          if (cs?.slug) childSlugSet.add(cs.slug);
+        }
+        for (const cid of s.childStreamIds || []) {
+          const matched = dbStreams.find((ds) => ds.id === cid || ds.slug === cid);
+          if (matched?.slug) childSlugSet.add(matched.slug);
+        }
+        const childStreamSlugs = Array.from(childSlugSet);
+
         return {
           id: s.slug,
           label: s.title,
@@ -147,6 +162,7 @@ export function useFeedSourceTabs({
           filterConfig: {
             privacy: s.privacy,
             feedSlugs: feedSlugs.length > 0 ? feedSlugs : undefined,
+            childStreamSlugs: childStreamSlugs.length > 0 ? childStreamSlugs : undefined,
             tags: s.tags?.length > 0 ? s.tags : undefined,
             folderPaths: s.folderPaths?.length > 0 ? s.folderPaths : undefined,
           },
@@ -162,6 +178,10 @@ export function useFeedSourceTabs({
       if (!list.some((m) => m.id === 'telegram')) {
         const tgDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'telegram');
         if (tgDef) list.push(tgDef);
+      }
+      if (!list.some((m) => m.id === 'watchers')) {
+        const watchersDef = PUBLIC_STREAM_PRESETS.find((m) => m.id === 'watchers');
+        if (watchersDef) list.push(watchersDef);
       }
       if (!list.some((m) => m.id === 'private_feeds')) {
         const privAllDef = PRIVATE_STREAM_PRESETS.find((m) => m.id === 'private_feeds');
@@ -227,6 +247,16 @@ export function useFeedSourceTabs({
         }
       }
 
+      const resolvedChildStreamIds: string[] = [];
+      if (tab.filterConfig?.childStreamSlugs && tab.filterConfig.childStreamSlugs.length > 0) {
+        for (const cslug of tab.filterConfig.childStreamSlugs) {
+          const matched = dbStreams.find((ds) => ds.slug === cslug || ds.id === cslug);
+          if (matched && !resolvedChildStreamIds.includes(matched.id)) {
+            resolvedChildStreamIds.push(matched.id);
+          }
+        }
+      }
+
       const payload = {
         slug: tab.id,
         title: tab.label,
@@ -235,6 +265,7 @@ export function useFeedSourceTabs({
         description: tab.description,
         privacy: tab.filterConfig?.privacy === 'private' ? ('private' as const) : ('public' as const),
         feedIds: resolvedFeedIds,
+        childStreamIds: resolvedChildStreamIds,
         tags: tab.filterConfig?.tags,
         folderPaths: tab.filterConfig?.folderPaths,
       };
@@ -403,7 +434,7 @@ export function useFeedSourceTabs({
   const visibleSourceModes = useMemo(() => {
     if (isPublicMode || appMode === 'public') {
       return sourceModes.filter(
-        (m) => m.id !== 'telegram' && resolveStreamPrivacy(m) !== 'private'
+        (m) => m.id !== 'telegram' && m.id !== 'watchers' && resolveStreamPrivacy(m) !== 'private'
       );
     }
     if (notesPrivacy === 'private') {
@@ -424,7 +455,7 @@ export function useFeedSourceTabs({
           (resolveStreamPrivacy(m) === 'public' ||
             (selectedFeedSlug &&
               (m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)))) &&
-          (m.id !== 'telegram' || appMode === 'dev')
+          (m.id !== 'telegram' && m.id !== 'watchers' || appMode === 'dev')
       );
     }
     return sourceModes;
@@ -473,7 +504,7 @@ export function useFeedSourceTabs({
     // Resolve privacy via the actual mode definition (custom DB streams like code-learning or jm-daily are not in presets)
     const activeStreamPrivacy = resolveStreamPrivacy(matchedMode || streamSource);
     if (isPublicMode || appMode === 'public') {
-      if (streamSource === 'telegram' || activeStreamPrivacy === 'private') {
+      if (streamSource === 'telegram' || streamSource === 'watchers' || activeStreamPrivacy === 'private') {
         setStreamSource('all');
         try {
           const url = new URL(window.location.href);
@@ -529,7 +560,7 @@ export function useFeedSourceTabs({
       (m) => m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)
     );
     if (customMode) {
-      return createConfiguredFeedAdapter(customMode);
+      return createConfiguredFeedAdapter(resolveEffectiveStreamMode(customMode, sourceModes));
     }
 
     if (FEED_ADAPTERS[streamSource]) {
@@ -697,6 +728,7 @@ export function useFeedSourceTabs({
 
   // Reset selectedFeedSlug if the selected tab becomes empty/unavailable
   useEffect(() => {
+    if (streamSource === 'watchers' || streamSource === 'telegram') return;
     if (!selectedFeedSlug || isLoading || activeTabs.length === 0) return;
     const stillExists = activeTabs.some((t) => matchesTabOrSubtopic(t, selectedFeedSlug));
     if (!stillExists) {
