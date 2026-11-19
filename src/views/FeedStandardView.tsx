@@ -1,5 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import dayjs from 'dayjs';
+import { useQueryClient } from '@tanstack/react-query';
+import { FeedAccountInfo, feedApi, setFeedAuthToken } from '../api/client';
+import { AccountAccessModal } from '../components/AccountAccessModal';
 import { useFeedRouter } from '../utils/feedRouter';
 import { useFeedAuthSync } from '../hooks/useFeedAuthSync';
 import { useFeedAppModeSync } from '../hooks/useFeedAppModeSync';
@@ -185,6 +188,37 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
   // Mobile navigation active tab
   const [activeMobileNav, setActiveMobileNav] = useState<'stream' | 'categories' | 'search'>('stream');
 
+  // Multi-account & agent private contour state
+  const queryClient = useQueryClient();
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [currentAccount, setCurrentAccount] = useState<FeedAccountInfo | undefined>(undefined);
+
+  const refreshAccountInfo = useCallback(async () => {
+    try {
+      const me = await feedApi.getWhoAmI();
+      setCurrentAccount(me);
+    } catch {
+      setCurrentAccount(undefined);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAccountInfo();
+  }, [refreshAccountInfo]);
+
+  const handleApplyAccountToken = useCallback(
+    async (token: string) => {
+      setFeedAuthToken(token);
+      if (!token.trim()) {
+        handleSetNotesPrivacy('all');
+      }
+      await refreshAccountInfo();
+      await queryClient.invalidateQueries();
+      refetch();
+    },
+    [handleSetNotesPrivacy, queryClient, refetch, refreshAccountInfo]
+  );
+
   // Feed Items Pipeline (Adaptation, Filtering, Pagination, Tag & Feed Aggregation)
   const {
     allAvailableFeeds,
@@ -351,6 +385,8 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
           onSetAppMode={handleSetAppMode}
           notesPrivacy={notesPrivacy}
           onSetNotesPrivacy={handleContourPrivacyChange}
+          currentAccount={currentAccount}
+          onOpenAccountModal={() => setIsAccountModalOpen(true)}
           isPublicMode={isPublicMode}
           filterUnassigned={filterUnassignedOnly}
           onToggleFilterUnassigned={() => setFilterUnassignedOnly((prev) => !prev)}
@@ -524,7 +560,14 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
         selectedPeriodId={selectedPeriodId}
         onSelectPeriod={handleSelectPeriod}
         onOpenNoteById={handleOpenNoteById}
-        disableEscClose={isAnyModalOpen}
+        disableEscClose={isAnyModalOpen || isAccountModalOpen}
+      />
+
+      <AccountAccessModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        currentAccount={currentAccount}
+        onApplyToken={handleApplyAccountToken}
       />
     </div>
   );

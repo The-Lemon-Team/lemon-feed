@@ -7,7 +7,11 @@ import {
   Moon,
   ExternalLink,
   RotateCw,
+  Lock,
+  Bot,
+  Globe,
 } from 'lucide-react';
+import { FeedAccountInfo } from '../api/client';
 import { FeedSourceMode } from '../adapters/feeds/types';
 import { LemonLogo } from './LemonLogo';
 import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
@@ -24,6 +28,8 @@ export interface FeedTopBarProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onOpenLemonSeasons?: () => void;
+  currentAccount?: FeedAccountInfo;
+  onOpenAccountModal?: () => void;
 }
 
 interface FeedModeOption {
@@ -54,6 +60,8 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
   onRefresh,
   isRefreshing,
   onOpenLemonSeasons,
+  currentAccount,
+  onOpenAccountModal,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full max-w-full bg-white/90 dark:bg-[#18222d]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-white/[0.08] transition-colors pt-[max(0.5rem,var(--sat))]">
@@ -131,6 +139,34 @@ export const FeedTopBar: React.FC<FeedTopBarProps> = ({
                 aria-label="Обновить ленту"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#2481cc]' : ''}`} />
+              </button>
+            )}
+
+            {onOpenAccountModal && (
+              <button
+                type="button"
+                onClick={onOpenAccountModal}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer ${
+                  currentAccount && currentAccount.role !== 'guest'
+                    ? currentAccount.role === 'agent'
+                      ? 'bg-violet-500/15 border-violet-500/35 text-violet-700 dark:text-violet-300'
+                      : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-700 dark:text-emerald-300'
+                    : 'border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Переключить аккаунт / приватный контур"
+              >
+                {currentAccount?.role === 'agent' ? (
+                  <Bot className="w-3.5 h-3.5" />
+                ) : currentAccount && currentAccount.role !== 'guest' ? (
+                  <Lock className="w-3.5 h-3.5" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden md:inline max-w-28 truncate">
+                  {currentAccount && currentAccount.role !== 'guest'
+                    ? currentAccount.name || currentAccount.role
+                    : 'Публичная'}
+                </span>
               </button>
             )}
 

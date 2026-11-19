@@ -9,11 +9,12 @@ import { PeriodItem } from '../utils/periods';
 // import { NotePinButton } from './workspace/NotePinButton';
 import { NoteMediaPlayer } from './media/NoteMediaPlayer';
 import {
+import {
   extractNoteMediaTracks,
   stripExtractedMediaFromMarkdown,
   isMediaUrl,
 } from '../utils/noteMedia';
-import { Sparkles, Folder, Edit3 } from 'lucide-react';
+import { Sparkles, Folder, Edit3, Users } from 'lucide-react';
 import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
 import {
   CoreFeedCard,
@@ -121,12 +122,23 @@ export const FeedPostCard = React.memo<FeedPostCardProps>(({
 
       renderFooterLeft: (currentEntry) => {
         const folderPath = currentEntry.meta?.folderPath;
-        if (appMode !== 'staging' || !folderPath) return null;
+        const isShared = Array.isArray((item.rawPayload as any)?.shares) && (item.rawPayload as any).shares.length > 0;
+        if ((appMode !== 'staging' || !folderPath) && !isShared) return null;
         return (
-          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
-            <Folder className="w-3 h-3 text-[#2481cc]" />
-            <span>{folderPath}</span>
-          </span>
+          <div className="flex items-center gap-1.5">
+            {isShared && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/30">
+                <Users className="w-2.5 h-2.5" />
+                <span>Shared</span>
+              </span>
+            )}
+            {appMode === 'staging' && folderPath && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full border border-slate-200/50 dark:border-white/5">
+                <Folder className="w-3 h-3 text-[#2481cc]" />
+                <span>{folderPath}</span>
+              </span>
+            )}
+          </div>
         );
       },
 

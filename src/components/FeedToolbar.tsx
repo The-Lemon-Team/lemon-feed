@@ -48,6 +48,8 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   isPublicMode = false,
   notesPrivacy,
   onSetNotesPrivacy,
+  currentAccount,
+  onOpenAccountModal,
   filterUnassigned = false,
   onToggleFilterUnassigned,
 
@@ -71,6 +73,8 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         isPublicMode={isPublicMode}
         notesPrivacy={notesPrivacy}
         onSetNotesPrivacy={onSetNotesPrivacy}
+        currentAccount={currentAccount}
+        onOpenAccountModal={onOpenAccountModal}
         isEditMode={isEditMode}
         onToggleEditMode={onToggleEditMode}
         onCreateNote={onCreateNote}

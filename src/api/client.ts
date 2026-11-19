@@ -24,6 +24,65 @@ const API_BASE_URL = resolveClientApiBaseUrl(
 export const DEFAULT_ADMIN_TOKEN =
   import.meta.env.VITE_ADMIN_TOKEN || 'lenta_adm_master_permanent_7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c';
 
+const AUTH_TOKEN_KEY = 'lenta_feed_auth_token';
+const SAVED_ACCOUNTS_KEY = 'lenta_feed_saved_accounts';
+
+export interface FeedAccountInfo {
+  id: string;
+  role: 'admin' | 'user' | 'agent' | 'guest';
+  isAdmin: boolean;
+  name?: string;
+}
+
+export interface SavedFeedAccountPreset {
+  id: string;
+  label: string;
+  token: string;
+  kind: 'HUMAN' | 'AGENT';
+}
+
+export function getStoredFeedAuthToken(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+export function getSavedAccountPresets(): SavedFeedAccountPreset[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SAVED_ACCOUNTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+export function saveAccountPreset(preset: SavedFeedAccountPreset): SavedFeedAccountPreset[] {
+  const existing = getSavedAccountPresets().filter((p) => p.id !== preset.id && p.token !== preset.token);
+  const next = [preset, ...existing].slice(0, 10);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+    } catch {}
+  }
+  return next;
+}
+
+export function removeAccountPreset(id: string): SavedFeedAccountPreset[] {
+  const next = getSavedAccountPresets().filter((p) => p.id !== id);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+    } catch {}
+  }
+  return next;
+}
+
+export function resolveFeedMediaUrl(url: string): string {
+  return resolveMediaUrl(url);
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -32,13 +91,21 @@ export const apiClient = axios.create({
   timeout: 30000,
 });
 
-let currentFeedAuthToken: string | null = null;
+let currentFeedAuthToken: string | null = getStoredFeedAuthToken() || null;
 let currentFeedUserKey: string | null = null;
 let currentFeedAppMode: FeedAppRuntimeMode = resolveFeedAppMode();
 
 export const setFeedAuthToken = (token: string | null, userKey?: string | null) => {
-  currentFeedAuthToken = token;
+  const clean = token ? token.trim() : '';
+  currentFeedAuthToken = clean || null;
   currentFeedUserKey = userKey || null;
+  if (typeof window !== 'undefined') {
+    if (clean) {
+      localStorage.setItem(AUTH_TOKEN_KEY, clean);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  }
 };
 
 export const setFeedAppMode = (mode: FeedAppRuntimeMode) => {
@@ -68,12 +135,13 @@ export const resolveMediaUrl = (url?: string | null): string => {
 };
 
 apiClient.interceptors.request.use((config) => {
-  const token = currentFeedAuthToken || DEFAULT_ADMIN_TOKEN;
+  const token = currentFeedAuthToken || getStoredFeedAuthToken() || DEFAULT_ADMIN_TOKEN;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  if (currentFeedUserKey) {
-    config.headers['x-user-key'] = currentFeedUserKey;
+  const userKey = currentFeedUserKey || (currentFeedAuthToken && currentFeedAuthToken !== DEFAULT_ADMIN_TOKEN ? currentFeedAuthToken : null);
+  if (userKey) {
+    config.headers['x-user-key'] = userKey;
   }
   if (currentFeedAppMode) {
     config.headers['x-app-mode'] = currentFeedAppMode;
@@ -173,6 +241,11 @@ export interface GeneratedBatchResult {
 }
 
 export const feedApi = {
+  getWhoAmI: async (): Promise<FeedAccountInfo> => {
+    const res = await apiClient.get<FeedAccountInfo>('/auth/me');
+    return res.data;
+  },
+
   getNotes: async (params?: QueryNotesParams): Promise<NotesResponse> => {
     const res = await apiClient.get<NotesResponse>('/notes', {
       params: {

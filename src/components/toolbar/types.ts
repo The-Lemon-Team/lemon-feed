@@ -217,6 +217,10 @@ export interface FeedToolbarProps {
   notesPrivacy?: 'all' | 'public' | 'private';
   onSetNotesPrivacy?: (privacy: 'all' | 'public' | 'private') => void;
 
+  // Multi-account & Agent Private Contour Switcher
+  currentAccount?: import('../../api/client').FeedAccountInfo;
+  onOpenAccountModal?: () => void;
+
   filterUnassigned?: boolean;
   onToggleFilterUnassigned?: () => void;
 
