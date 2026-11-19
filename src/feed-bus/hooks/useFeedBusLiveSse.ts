@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import { LemonModerationItem } from '@lenta/lemon-bus';
+import { useCoreLiveStream } from '../../core';
 
 export interface FeedBusLiveEvent {
   type: string;
@@ -18,42 +19,23 @@ export interface UseFeedBusLiveSseOptions {
 export function useFeedBusLiveSse(options: UseFeedBusLiveSseOptions = {}) {
   const { enabled = true, onEvent } = options;
 
-  useEffect(() => {
-    if (!enabled || typeof window === 'undefined' || typeof EventSource === 'undefined') {
-      return;
-    }
-
+  const sseUrl = useMemo(() => {
     const customUrl = (import.meta as any).env?.VITE_LEMON_BUS_URL;
     const base = customUrl ? customUrl.replace(/\/+$/, '') : '';
-    // Use /events/stream via proxy or direct URL
-    const sseUrl = `${base}/events/stream`;
+    return `${base}/events/stream`;
+  }, []);
 
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource(sseUrl);
+  const handleCoreEvent = useCallback(
+    (_eventName: string, parsed: FeedBusLiveEvent) => {
+      onEvent?.(parsed);
+    },
+    [onEvent]
+  );
 
-      es.addEventListener('moderation', (ev: MessageEvent) => {
-        try {
-          const parsed: FeedBusLiveEvent = JSON.parse(ev.data);
-          if (onEvent) {
-            onEvent(parsed);
-          }
-        } catch {
-          // Ignore malformed frame
-        }
-      });
-
-      es.onerror = () => {
-        // EventSource will auto-reconnect
-      };
-    } catch (err) {
-      console.warn('[FeedBus] SSE connection error:', err);
-    }
-
-    return () => {
-      if (es) {
-        es.close();
-      }
-    };
-  }, [enabled, onEvent]);
+  return useCoreLiveStream<FeedBusLiveEvent>({
+    url: sseUrl,
+    enabled: enabled && typeof window !== 'undefined',
+    eventNames: ['moderation'],
+    onEvent: handleCoreEvent,
+  });
 }

@@ -12,6 +12,7 @@ import {
   Check,
   Plus,
   Shield,
+  Newspaper,
 } from 'lucide-react';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import { LemonLogo } from '../LemonLogo';
@@ -42,6 +43,7 @@ export interface FeedToolbarHeaderProps {
   onNavigateToCalendar?: () => void;
   onOpenLemonSeasons?: () => void;
   onOpenFeedBus?: () => void;
+  onOpenWatchers?: () => void;
 }
 
 export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
@@ -63,6 +65,7 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
   onNavigateToCalendar,
   onOpenLemonSeasons,
   onOpenFeedBus,
+  onOpenWatchers,
 }) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 dark:border-white/[0.06]">
@@ -221,6 +224,19 @@ export const FeedToolbarHeader: React.FC<FeedToolbarHeaderProps> = ({
             aria-label="Режим редактирования"
           >
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Lemon Watchers Pre-Moderation & Source Control Button */}
+        {!isPublicMode && onOpenWatchers && (
+          <button
+            type="button"
+            onClick={onOpenWatchers}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg sm:rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-mono font-medium transition-all cursor-pointer"
+            title="Перейти в поток Lemon Watchers (премодерация и управление источниками)"
+          >
+            <Newspaper className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Watchers</span>
           </button>
         )}
 

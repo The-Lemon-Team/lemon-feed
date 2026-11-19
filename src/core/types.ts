@@ -1,4 +1,5 @@
 import React from 'react';
+import type { WatcherStreamItem, WatcherStreamStatus } from '@lenta/seasons-neurons';
 
 export type FeedBadgeTone =
   | 'neutral'
@@ -104,29 +105,6 @@ export interface FeedDetailSlots<TEntry extends FeedEntry<any> = FeedEntry> {
   renderFooterRight?: (entry: TEntry) => React.ReactNode;
 }
 
-export type CoreWatcherStreamStatus =
-  | 'NEW'
-  | 'CONVERTING'
-  | 'PROMOTED'
-  | 'DISMISSED'
-  | 'FAILED';
+export type CoreWatcherStreamStatus = WatcherStreamStatus;
 
-export interface CoreWatcherStreamItem {
-  id: string;
-  watcherId: string;
-  watcherSlug: string;
-  watcherTitle: string;
-  category: string;
-  feedSlug: string;
-  guid: string;
-  url: string;
-  title: string;
-  teaser: string;
-  imageUrl?: string | null;
-  author: string;
-  pubDate: string;
-  categories: string[];
-  status: CoreWatcherStreamStatus;
-  noteId?: string | null;
-  createdAt: string;
-}
+export type CoreWatcherStreamItem = WatcherStreamItem;

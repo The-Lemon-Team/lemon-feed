@@ -1,16 +1,18 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig(({ mode }) => {
-  const isPublicMode = mode === 'public' || process.env.VITE_FEED_APP_MODE === 'public';
-  const isWatchersMode = mode === 'watchers' || process.env.VITE_FEED_ENV === 'watchers';
+  const envDir = path.resolve(__dirname, '../../');
+  const env = { ...loadEnv(mode, envDir, ''), ...(process.env as Record<string, string>) };
+  const isPublicMode = mode === 'public' || env.VITE_FEED_APP_MODE === 'public';
+  const isWatchersMode = mode === 'watchers' || env.VITE_FEED_ENV === 'watchers';
   const defaultPort = isWatchersMode ? 5182 : isPublicMode ? 5181 : 5180;
   const port = Number(process.env.VITE_PORT || process.env.PORT || defaultPort);
   const outDir = isWatchersMode ? 'dist-watchers' : isPublicMode ? 'dist-public' : 'dist';
-  const watchersTarget = process.env.VITE_WATCHERS_PROXY_TARGET || 'http://127.0.0.1:3040';
+  const watchersTarget = env.VITE_WATCHERS_PROXY_TARGET || 'http://127.0.0.1:3040';
   return {
-  envDir: path.resolve(__dirname, '../../'),
+  envDir,
   plugins: [react()],
   resolve: {
     alias: {

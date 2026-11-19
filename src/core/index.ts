@@ -2,6 +2,7 @@ export * from './types';
 export * from './hooks/useCoreLiveStream';
 export * from './hooks/useCoreFeedSelection';
 export * from './components/CoreLiveUpdatesBanner';
+export * from './components/CoreChipBar';
 export * from './components/CoreFeedCard';
 export * from './components/CoreFeedStream';
 export * from './components/CoreFeedDetailModal';

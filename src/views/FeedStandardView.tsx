@@ -23,12 +23,14 @@ export interface FeedStandardViewProps {
   isDarkMode: boolean;
   toggleTheme: () => void;
   onOpenFeedBus: () => void;
+  onOpenWatchers?: () => void;
 }
 
 export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
   isDarkMode,
   toggleTheme,
   onOpenFeedBus,
+  onOpenWatchers,
 }) => {
   const {
     streamSource,
@@ -341,6 +343,7 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
           onNavigateToCalendar={() => navigateToHostCalendar(isEmbed)}
           onNavigateToTimeline={() => navigateToHostTimeline(isEmbed)}
           onOpenFeedBus={onOpenFeedBus}
+          onOpenWatchers={onOpenWatchers || (() => handleSelectSource('watchers'))}
           onCreateNote={!isPublicOnly ? handleOpenCreateNote : undefined}
           layoutMode={layoutMode}
           onToggleLayoutMode={toggleLayoutMode}
@@ -386,7 +389,9 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
         {/* Responsive Body: Stream-only or Split layout with desktop rail */}
         <div
           className={`flex flex-col ${
-            layoutMode === 'split' ? 'md:flex-row gap-5 items-start' : 'gap-4 items-center'
+            layoutMode === 'split' && streamSource !== 'watchers'
+              ? 'md:flex-row gap-5 items-start'
+              : 'gap-4 items-center'
           } w-full`}
         >
           {/* Feed Stream Component */}
@@ -414,7 +419,7 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
             loadMoreRef={loadMoreRef}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
-            layoutMode={layoutMode}
+            layoutMode={streamSource === 'watchers' ? 'stream' : layoutMode}
             appMode={appMode}
             onApprovePublish={!isPublicOnly ? handleApprovePublish : undefined}
             onUnpublishToStaging={!isPublicOnly ? handleUnpublishToStaging : undefined}
@@ -423,10 +428,12 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
             allPeriods={allPeriods}
             selectedPeriodId={selectedPeriodId}
             onSelectPeriod={handleSelectPeriod}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleTheme}
           />
 
           {/* Right Desktop Rail */}
-          {layoutMode === 'split' && (
+          {layoutMode === 'split' && streamSource !== 'watchers' && (
             <FeedDesktopRail
               sourceType={streamSource}
               activeMode={visibleSourceModes.find((m) => m.id === streamSource)}

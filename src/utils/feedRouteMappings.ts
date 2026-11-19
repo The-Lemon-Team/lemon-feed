@@ -38,6 +38,7 @@ export const SOURCE_TO_PATH: Record<string, string> = {
   entertainment: '/entertainment',
   holidays: '/holidays',
   telegram: '/tg',
+  watchers: '/watchers',
   private_feeds: '/private',
   spark: '/all',
   dev: '/it-dev',
@@ -70,6 +71,8 @@ export const PATH_TO_SOURCE: Record<string, FeedSourceMode> = {
   general: 'all',
   tg: 'telegram',
   telegram: 'telegram',
+  watchers: 'watchers',
+  watcher: 'watchers',
   private: 'private_feeds',
   'private-feeds': 'private_feeds',
   private_feeds: 'private_feeds',
@@ -198,7 +201,10 @@ export function getPathForFeedSource(
 
   const pathSegments = [basePath];
   if (feedSlug && feedSlug.trim()) {
-    const cleanAlias = FEED_SLUG_TO_ALIAS[feedSlug.trim()] || feedSlug.trim();
+    const cleanAlias =
+      source === 'watchers'
+        ? feedSlug.trim()
+        : FEED_SLUG_TO_ALIAS[feedSlug.trim()] || feedSlug.trim();
     pathSegments.push(encodeURIComponent(cleanAlias));
     if (subtopic && subtopic.trim()) {
       pathSegments.push(encodeURIComponent(subtopic.trim()));
@@ -330,7 +336,10 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
   let subtopicSlug: string | undefined;
 
   if (feedSegment) {
-    const rawFeed = ALIAS_TO_FEED_SLUG[feedSegment] || feedSegment;
+    const rawFeed =
+      streamSource === 'watchers'
+        ? feedSegment
+        : ALIAS_TO_FEED_SLUG[feedSegment] || feedSegment;
     if (subtopicSegment) {
       selectedFeedSlug = composeFeedSlug(rawFeed, subtopicSegment);
       subtopicSlug = subtopicSegment;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Globe, Lock } from 'lucide-react';
+import type { LemonModerationItem } from '@lenta/lemon-bus';
 import { UnifiedFeedItem } from '../../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
 import {
@@ -21,6 +22,14 @@ export interface WatcherFeedEntryMeta {
   watcherSlug: string;
   feedSlug: string;
   noteId?: string | null;
+}
+
+export interface ModerationFeedEntryMeta {
+  moderationItem: LemonModerationItem;
+  feedSlug?: string | null;
+  streamSlug?: string | null;
+  privacy: 'public' | 'private';
+  rejectReason?: string | null;
 }
 
 const WATCHER_CATEGORY_META: Record<
@@ -236,6 +245,99 @@ export function watcherStreamItemToFeedEntry(
       watcherSlug: item.watcherSlug,
       feedSlug: item.feedSlug,
       noteId: item.noteId,
+    },
+  };
+}
+
+export const moderationScenarioAdapter: FeedScenarioAdapter<
+  LemonModerationItem,
+  ModerationFeedEntryMeta
+> = {
+  scenarioId: 'moderation',
+  label: 'Lemon-Bus Moderation',
+  mapItem: moderationItemToFeedEntry,
+  mapItems: (items) => items.map(moderationItemToFeedEntry),
+};
+
+export function moderationItemToFeedEntry(
+  item: LemonModerationItem
+): FeedEntry<ModerationFeedEntryMeta> {
+  const catKey = (item.category || '').toLowerCase();
+  const catMeta = WATCHER_CATEGORY_META[catKey] || {
+    label: item.category || 'Шина',
+    emoji: item.icon || '📰',
+    colorClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20',
+  };
+
+  const badges: FeedEntryBadge[] = [];
+  if (item.status === 'APPROVED') {
+    badges.push({
+      id: 'status',
+      label: 'Одобрено',
+      tone: 'success',
+      title: 'Заметка одобрена и отправлена в боевую ленту',
+    });
+  } else if (item.status === 'REJECTED') {
+    badges.push({
+      id: 'status',
+      label: 'Отклонено',
+      tone: 'danger',
+      title: item.rejectReason || 'Заметка отклонена модератором',
+    });
+  } else {
+    badges.push({
+      id: 'status',
+      label: 'На модерации',
+      tone: 'warning',
+    });
+  }
+
+  badges.push(
+    item.privacy === 'private'
+      ? {
+          id: 'privacy',
+          label: 'Private',
+          tone: 'purple',
+          icon: React.createElement(Lock, {
+            className: 'w-2.5 h-2.5 text-purple-500 dark:text-purple-400',
+          }),
+        }
+      : {
+          id: 'privacy',
+          label: 'Public',
+          tone: 'info',
+          icon: React.createElement(Globe, {
+            className: 'w-2.5 h-2.5 text-sky-500 dark:text-sky-400',
+          }),
+        }
+  );
+
+  return {
+    id: item.id,
+    title: item.title,
+    excerpt: item.summary || item.description || null,
+    bodyMarkdown: item.rawContent || item.description || item.summary || null,
+    publishedAt: item.startDate || item.createdAt,
+    updatedAt: item.updatedAt,
+    url: item.sourceLink || null,
+    source: {
+      id: item.feedSlug || item.sourceType || 'lemon-bus',
+      title: item.author || item.sourceType || 'Вотчер',
+      handle: item.feedSlug || undefined,
+      avatarIcon: item.icon || catMeta.emoji,
+    },
+    category: catMeta,
+    tags: item.hashtags || [],
+    score: item.resonanceScore ?? undefined,
+    author: item.author || null,
+    status: item.status,
+    badges,
+    meta: {
+      moderationItem: item,
+      feedSlug: item.feedSlug,
+      streamSlug: item.streamSlug,
+      privacy: item.privacy,
+      rejectReason: item.rejectReason,
     },
   };
 }

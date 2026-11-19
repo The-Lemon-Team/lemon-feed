@@ -1,4 +1,4 @@
-import React, { RefObject } from 'react';
+import React, { RefObject, Suspense, lazy } from 'react';
 import dayjs from 'dayjs';
 import { Radio, Inbox, Plus, Settings2 } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedItem } from '../adapters/feeds/types';
@@ -8,6 +8,10 @@ import { TelegramStreamView } from './TelegramStreamView';
 import { PeriodItem } from '../utils/periods';
 import { FeedModeOption } from './toolbar/types';
 import { SymbolIcon } from './common/SymbolIcon';
+
+const FeedWatchersView = lazy(() =>
+  import('@feed-watchers/FeedWatchersView').then((m) => ({ default: m.FeedWatchersView }))
+);
 
 export interface FeedStreamViewProps {
   streamSource: FeedSourceMode;
@@ -42,6 +46,8 @@ export interface FeedStreamViewProps {
   allPeriods?: PeriodItem[];
   selectedPeriodId?: string;
   onSelectPeriod?: (periodId: string) => void;
+  isDarkMode?: boolean;
+  onToggleTheme?: () => void;
 }
 
 /**
@@ -81,6 +87,8 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
   allPeriods,
   selectedPeriodId,
   onSelectPeriod,
+  isDarkMode = false,
+  onToggleTheme,
 }) => {
   const isStreamOnly = layoutMode === 'stream';
 
@@ -108,6 +116,23 @@ export const FeedStreamView: React.FC<FeedStreamViewProps> = ({
           selectedFolderSlug={selectedFeedSlug}
           onSelectFolderSlug={onSelectFeed}
         />
+      ) : streamSource === 'watchers' ? (
+        <Suspense
+          fallback={
+            <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-2">
+              <Radio className="w-5 h-5 animate-pulse text-[#2481cc]" />
+              <span className="text-xs font-mono">Загрузка потока Lemon Watchers...</span>
+            </div>
+          }
+        >
+          <FeedWatchersView
+            embedded
+            isDarkMode={isDarkMode}
+            toggleTheme={onToggleTheme || (() => {})}
+            selectedCategory={selectedFeedSlug || ''}
+            onCategoryChange={onSelectFeed}
+          />
+        </Suspense>
       ) : (
         <>
           {isLoading ? (

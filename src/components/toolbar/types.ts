@@ -141,6 +141,15 @@ export const PUBLIC_STREAM_PRESETS: FeedModeOption[] = [
     description: 'Внешние папки и каналы из telegram-web-reader',
     isBuiltin: true,
   },
+  {
+    id: 'watchers',
+    label: 'Watchers',
+    emoji: '📡',
+    badge: 'live',
+    privacy: 'public',
+    description: 'Премодерация новостей и управление RSS/Atom-вотчерами',
+    isBuiltin: true,
+  },
 ];
 
 export const PRIVATE_STREAM_PRESETS: FeedModeOption[] = [
@@ -196,6 +205,7 @@ export interface FeedToolbarProps {
   onNavigateToCalendar?: () => void;
   onNavigateToTimeline?: () => void;
   onOpenFeedBus?: () => void;
+  onOpenWatchers?: () => void;
 
   layoutMode?: 'split' | 'stream';
   onToggleLayoutMode?: () => void;

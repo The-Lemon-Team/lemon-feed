@@ -1,164 +1,118 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LemonModerationItem,
-  ModerationQueryOptions,
-  ModerationStats,
   ModerationStatus,
 } from '@lenta/lemon-bus';
+import {
+  ModerationApiClient,
+  ModerationNeuron,
+  ModerationNeuronState,
+} from '@lenta/seasons-neurons';
+import { useCoreFeedSelection } from '../../core';
 import { feedBusApi } from '../api/feedBusApi';
 import { useFeedBusLiveSse, FeedBusLiveEvent } from './useFeedBusLiveSse';
 
 export function useFeedBusState() {
-  const [items, setItems] = useState<LemonModerationItem[]>([]);
-  const [total, setTotal] = useState<number>(0);
-  const [stats, setStats] = useState<ModerationStats | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [offset, setOffset] = useState<number>(0);
-  const [hasMore, setHasMore] = useState<boolean>(false);
+  const neuronRef = useRef<ModerationNeuron | null>(null);
+  if (!neuronRef.current) {
+    neuronRef.current = new ModerationNeuron({
+      apiClient: feedBusApi as unknown as ModerationApiClient,
+      pageSize: 30,
+      initialFilter: { status: 'PENDING' },
+    });
+  }
+  const neuron = neuronRef.current;
+
+  const [neuronState, setNeuronState] = useState<ModerationNeuronState>(() => neuron.state);
 
   // Filters
   const [selectedStatus, setSelectedStatus] = useState<ModerationStatus | 'ALL'>('PENDING');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const {
+    selectedIds,
+    toggleSelect: toggleSelectId,
+    selectAll: selectAllByIds,
+    clearSelection,
+  } = useCoreFeedSelection();
 
   // Modals state
   const [rejectingItem, setRejectingItem] = useState<LemonModerationItem | null>(null);
   const [editingItem, setEditingItem] = useState<LemonModerationItem | null>(null);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await feedBusApi.getStats();
-      setStats(res);
-    } catch {
-      // Ignore background error
-    }
-  }, []);
+  useEffect(() => {
+    const sub = neuron.stateObservable.subscribe((next) => {
+      setNeuronState(next);
+    });
+    return () => sub.unsubscribe();
+  }, [neuron]);
 
-  const fetchPage = useCallback(
-    async (resetOffset = true) => {
-      setIsLoading(true);
-      const nextOffset = resetOffset ? 0 : offset;
-
-      const query: ModerationQueryOptions = {
+  useEffect(() => {
+    clearSelection();
+    neuron
+      .loadInitial({
         status: selectedStatus,
         category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
         search: searchQuery.trim() || undefined,
-        limit: 30,
-        offset: nextOffset,
         sortBy: 'createdAt',
         sortOrder: 'desc',
-      };
-
-      try {
-        const [page, _stats] = await Promise.all([
-          feedBusApi.queryItems(query),
-          feedBusApi.getStats().catch(() => null),
-        ]);
-
-        if (resetOffset) {
-          setItems(page.items);
-          setOffset(0);
-        } else {
-          setItems((prev) => {
-            const existing = new Set(prev.map((i) => i.id));
-            const fresh = page.items.filter((i) => !existing.has(i.id));
-            return [...prev, ...fresh];
-          });
-          setOffset(nextOffset);
-        }
-
-        setTotal(page.total);
-        setHasMore(page.hasMore);
-        if (_stats) setStats(_stats);
-      } catch (err) {
+      })
+      .catch((err) => {
         console.warn('[FeedBus] Failed to fetch items:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [selectedStatus, selectedCategory, searchQuery, offset]
-  );
-
-  useEffect(() => {
-    fetchPage(true);
-    setSelectedIds(new Set());
-  }, [selectedStatus, selectedCategory, searchQuery]);
+      });
+  }, [neuron, selectedStatus, selectedCategory, searchQuery, clearSelection]);
 
   const loadMore = useCallback(() => {
-    if (isLoading || !hasMore) return;
-    setOffset((prev) => prev + items.length);
-    fetchPage(false);
-  }, [isLoading, hasMore, items.length, fetchPage]);
+    neuron.loadMore().catch((err) => {
+      console.warn('[FeedBus] Failed to load more items:', err);
+    });
+  }, [neuron]);
 
-  // Actions
+  const refresh = useCallback(() => {
+    neuron.refresh().catch((err) => {
+      console.warn('[FeedBus] Failed to refresh items:', err);
+    });
+  }, [neuron]);
+
+  // Actions via ModerationNeuron
   const handleApprove = useCallback(
     async (id: string, overrides?: Partial<LemonModerationItem>) => {
       try {
-        // Optimistic UI removal if viewing pending
-        if (selectedStatus === 'PENDING') {
-          setItems((prev) => prev.filter((i) => i.id !== id));
-          setTotal((prev) => Math.max(0, prev - 1));
-          setStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  pendingCount: Math.max(0, prev.pendingCount - 1),
-                  approvedCount: prev.approvedCount + 1,
-                }
-              : null
-          );
-        }
-
-        await feedBusApi.approveItem(id, overrides, 'curator');
-        fetchStats();
+        await neuron.approve(id, overrides, 'curator');
+        neuron.refreshStats().catch(() => {});
       } catch (err: any) {
         console.error('[FeedBus] Approve error:', err);
-        fetchPage(true);
+        refresh();
       }
     },
-    [selectedStatus, fetchStats, fetchPage]
+    [neuron, refresh]
   );
 
   const handleReject = useCallback(
     async (id: string, reason?: string) => {
       try {
-        if (selectedStatus === 'PENDING') {
-          setItems((prev) => prev.filter((i) => i.id !== id));
-          setTotal((prev) => Math.max(0, prev - 1));
-          setStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  pendingCount: Math.max(0, prev.pendingCount - 1),
-                  rejectedCount: prev.rejectedCount + 1,
-                }
-              : null
-          );
-        }
-
-        await feedBusApi.rejectItem(id, reason, 'curator');
+        await neuron.reject(id, reason, 'curator');
         setRejectingItem(null);
-        fetchStats();
+        neuron.refreshStats().catch(() => {});
       } catch (err: any) {
         console.error('[FeedBus] Reject error:', err);
-        fetchPage(true);
+        refresh();
       }
     },
-    [selectedStatus, fetchStats, fetchPage]
+    [neuron, refresh]
   );
 
   const handleUpdate = useCallback(
     async (id: string, patch: Partial<LemonModerationItem>) => {
       try {
-        const res = await feedBusApi.updateItem(id, patch);
-        setItems((prev) => prev.map((i) => (i.id === id ? res.item : i)));
+        await neuron.updateItem(id, patch);
         setEditingItem(null);
       } catch (err: any) {
         console.error('[FeedBus] Update error:', err);
       }
     },
-    []
+    [neuron]
   );
 
   const handleBatchApprove = useCallback(async () => {
@@ -166,19 +120,13 @@ export function useFeedBusState() {
     if (ids.length === 0) return;
 
     try {
-      if (selectedStatus === 'PENDING') {
-        const idSet = new Set(ids);
-        setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
-        setTotal((prev) => Math.max(0, prev - ids.length));
-      }
-      setSelectedIds(new Set());
-      await feedBusApi.batchApprove(ids, 'curator');
-      fetchPage(true);
+      clearSelection();
+      await neuron.batchApprove(ids, 'curator');
     } catch (err: any) {
       console.error('[FeedBus] Batch approve error:', err);
-      fetchPage(true);
+      refresh();
     }
-  }, [selectedIds, selectedStatus, fetchPage]);
+  }, [neuron, selectedIds, clearSelection, refresh]);
 
   const handleBatchReject = useCallback(
     async (reason?: string) => {
@@ -186,86 +134,58 @@ export function useFeedBusState() {
       if (ids.length === 0) return;
 
       try {
-        if (selectedStatus === 'PENDING') {
-          const idSet = new Set(ids);
-          setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
-          setTotal((prev) => Math.max(0, prev - ids.length));
-        }
-        setSelectedIds(new Set());
-        await feedBusApi.batchReject(ids, reason, 'curator');
-        fetchPage(true);
+        clearSelection();
+        await neuron.batchReject(ids, reason, 'curator');
       } catch (err: any) {
         console.error('[FeedBus] Batch reject error:', err);
-        fetchPage(true);
+        refresh();
       }
     },
-    [selectedIds, selectedStatus, fetchPage]
+    [neuron, selectedIds, clearSelection, refresh]
   );
 
   const handleImportWatchers = useCallback(
     async (limit = 100) => {
       try {
-        setIsLoading(true);
-        await feedBusApi.importWatcherItems(limit);
-        await fetchPage(true);
+        const res = await neuron.importWatcherItems(limit);
+        if (res.imported === 0) {
+          await neuron.refresh();
+        }
       } catch (err: any) {
         console.error('[FeedBus] Import watchers error:', err);
-      } finally {
-        setIsLoading(false);
       }
     },
-    [fetchPage]
+    [neuron]
   );
 
-  // Selection toggles
-  const toggleSelectId = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const selectAll = useCallback(() => {
-    setSelectedIds(new Set(items.map((i) => i.id)));
-  }, [items]);
+    selectAllByIds(neuronState.items.map((i) => i.id));
+  }, [selectAllByIds, neuronState.items]);
 
-  const clearSelection = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
-
-  // Live SSE listener
+  // Live SSE listener routed directly into ModerationNeuron
   const handleLiveEvent = useCallback(
     (ev: FeedBusLiveEvent) => {
-      if (ev.type === 'MODERATION_ITEM_ADDED' && ev.item) {
-        if (selectedStatus === 'PENDING' || selectedStatus === 'ALL') {
-          setItems((prev) => {
-            if (prev.some((i) => i.id === ev.item!.id)) return prev;
-            return [ev.item!, ...prev];
-          });
-          setTotal((prev) => prev + 1);
-        }
-        fetchStats();
-      } else if (ev.type === 'MODERATION_ITEM_APPROVED' || ev.type === 'MODERATION_ITEM_REJECTED') {
-        if (ev.noteId && selectedStatus === 'PENDING') {
-          setItems((prev) => prev.filter((i) => i.id !== ev.noteId));
-          setTotal((prev) => Math.max(0, prev - 1));
-        }
-        fetchStats();
+      neuron.handleImpulse(ev);
+      if (
+        ev.type === 'MODERATION_ITEM_ADDED' ||
+        ev.type === 'MODERATION_ITEM_APPROVED' ||
+        ev.type === 'MODERATION_ITEM_REJECTED' ||
+        ev.type === 'MODERATION_ITEMS_IMPORTED'
+      ) {
+        neuron.refreshStats().catch(() => {});
       }
     },
-    [selectedStatus, fetchStats]
+    [neuron]
   );
 
   useFeedBusLiveSse({ onEvent: handleLiveEvent });
 
   return {
-    items,
-    total,
-    stats,
-    isLoading,
-    hasMore,
+    items: neuronState.items,
+    total: neuronState.total,
+    stats: neuronState.stats,
+    isLoading: neuronState.isLoading,
+    hasMore: neuronState.hasMore,
     loadMore,
     selectedStatus,
     setSelectedStatus,
@@ -287,6 +207,6 @@ export function useFeedBusState() {
     handleBatchApprove,
     handleBatchReject,
     handleImportWatchers,
-    refresh: () => fetchPage(true),
+    refresh,
   };
 }

@@ -40,6 +40,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
   onNavigateToCalendar,
   onNavigateToTimeline,
   onOpenFeedBus,
+  onOpenWatchers,
   layoutMode = 'split',
   onToggleLayoutMode,
   appMode = 'dev',
@@ -83,6 +84,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
         onNavigateToCalendar={onNavigateToCalendar}
         onOpenLemonSeasons={onOpenLemonSeasons}
         onOpenFeedBus={onOpenFeedBus}
+        onOpenWatchers={onOpenWatchers}
       />
 
       {/* 2. Stream Mode Switcher Row (All, IT & Dev, Seasons, Entertainment, Holidays, TG Live) */}
@@ -97,7 +99,7 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
       />
 
       {/* 3. Thematic Tabs Row (Category & Folder chips) */}
-      {streamSource !== 'telegram' && (
+      {streamSource !== 'telegram' && streamSource !== 'watchers' && (
         <FeedCategoryTabsRow
           streamSource={streamSource}
           activeMode={sourceModes?.find((m) => m.id === streamSource)}
@@ -114,24 +116,26 @@ export const FeedToolbar: React.FC<FeedToolbarProps> = ({
       )}
 
       {/* 4. Search & Period Navigation Controls Toolbar */}
-      <FeedSearchBar
-        streamSource={streamSource}
-        searchQuery={searchQuery}
-        onSearchChange={onSearchChange}
-        selectedMonth={selectedMonth}
-        isMonthFilterActive={isMonthFilterActive}
-        onPrevMonth={onPrevMonth}
-        onNextMonth={onNextMonth}
-        onSelectMonth={onSelectMonth}
-        onResetMonthFilter={onResetMonthFilter}
-        onToday={onToday}
-        horizon={horizon}
-        onChangeHorizon={onChangeHorizon}
-        upcomingCount={upcomingCount}
-        appMode={appMode}
-        filterUnassigned={filterUnassigned}
-        onToggleFilterUnassigned={onToggleFilterUnassigned}
-      />
+      {streamSource !== 'watchers' && (
+        <FeedSearchBar
+          streamSource={streamSource}
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          selectedMonth={selectedMonth}
+          isMonthFilterActive={isMonthFilterActive}
+          onPrevMonth={onPrevMonth}
+          onNextMonth={onNextMonth}
+          onSelectMonth={onSelectMonth}
+          onResetMonthFilter={onResetMonthFilter}
+          onToday={onToday}
+          horizon={horizon}
+          onChangeHorizon={onChangeHorizon}
+          upcomingCount={upcomingCount}
+          appMode={appMode}
+          filterUnassigned={filterUnassigned}
+          onToggleFilterUnassigned={onToggleFilterUnassigned}
+        />
+      )}
     </div>
   );
 };

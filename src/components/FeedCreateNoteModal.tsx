@@ -105,7 +105,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const [pendingPosters, setPendingPosters] = useState<PendingPosterItem[]>([]);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Initialize or reset form on open
+  // Initialize or reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setTitle('');
@@ -121,36 +121,35 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setTargetStatus(appMode === 'staging' ? 'DRAFT' : 'PUBLISHED');
       setPendingPosters([]);
       setFeedback(null);
+      setFeedId('');
+    }
+  }, [isOpen, defaultDate, appMode, notesPrivacy]);
 
-      // Pre-select feed if matching defaultFeedSlug or activeStreamSource / activeStreamMode
-      const normalizeSlug = (s: string) => s.toLowerCase().trim().replace(/-/g, '_');
-      if (feeds.length > 0) {
-        let matched = defaultFeedSlug
-          ? feeds.find((f) => f.slug === defaultFeedSlug || normalizeSlug(f.slug) === normalizeSlug(defaultFeedSlug))
-          : undefined;
+  // Pre-select feed once feeds load without wiping user-edited title or startDate
+  useEffect(() => {
+    if (!isOpen || feeds.length === 0) return;
 
-        if (!matched && activeStreamSource && activeStreamSource !== 'all' && activeStreamSource !== 'private_feeds' && activeStreamSource !== 'telegram') {
-          matched = feeds.find((f) => normalizeSlug(f.slug) === normalizeSlug(activeStreamSource));
-        }
+    const normalizeSlug = (s: string) => s.toLowerCase().trim().replace(/-/g, '_');
+    let matched = defaultFeedSlug
+      ? feeds.find((f) => f.slug === defaultFeedSlug || normalizeSlug(f.slug) === normalizeSlug(defaultFeedSlug))
+      : undefined;
 
-        if (!matched && activeStreamMode?.filterConfig?.feedSlugs && activeStreamMode.filterConfig.feedSlugs.length === 1) {
-          const singleSlug = activeStreamMode.filterConfig.feedSlugs[0];
-          matched = feeds.find((f) => f.slug === singleSlug || normalizeSlug(f.slug) === normalizeSlug(singleSlug));
-        }
+    if (!matched && activeStreamSource && activeStreamSource !== 'all' && activeStreamSource !== 'private_feeds' && activeStreamSource !== 'telegram') {
+      matched = feeds.find((f) => normalizeSlug(f.slug) === normalizeSlug(activeStreamSource));
+    }
 
-        if (matched) {
-          setFeedId(matched.id);
-          if (appMode !== 'staging' && appMode !== 'public' && matched.privacy) {
-            setTargetPrivacy(matched.privacy === 'public' ? 'public' : 'private');
-          }
-        } else {
-          setFeedId('');
-        }
-      } else {
-        setFeedId('');
+    if (!matched && activeStreamMode?.filterConfig?.feedSlugs && activeStreamMode.filterConfig.feedSlugs.length === 1) {
+      const singleSlug = activeStreamMode.filterConfig.feedSlugs[0];
+      matched = feeds.find((f) => f.slug === singleSlug || normalizeSlug(f.slug) === normalizeSlug(singleSlug));
+    }
+
+    if (matched) {
+      setFeedId((prev) => prev || matched!.id);
+      if (appMode !== 'staging' && appMode !== 'public' && matched.privacy) {
+        setTargetPrivacy(matched.privacy === 'public' ? 'public' : 'private');
       }
     }
-  }, [isOpen, defaultDate, defaultFeedSlug, activeStreamSource, activeStreamMode, appMode, notesPrivacy, feeds]);
+  }, [isOpen, defaultFeedSlug, activeStreamSource, activeStreamMode, appMode, feeds]);
 
   // Escape key handler complying with AGENTS.md rule 7
   useEffect(() => {

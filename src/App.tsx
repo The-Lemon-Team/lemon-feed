@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useEffect } from 'react';
 import { useFeedTheme } from './hooks/useFeedTheme';
 import { FeedBusView } from './feed-bus';
 import { FeedStandardView } from './views/FeedStandardView';
@@ -27,6 +27,15 @@ export const App: React.FC = () => {
 
   const [feedEnv, setFeedEnv] = useState<FeedAppEnvironment>(() => resolveFeedEnvironment());
   const [isFeedBusMode, setIsFeedBusMode] = useState<boolean>(() => isFeedBusEnvironment());
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setFeedEnv(resolveFeedEnvironment());
+      setIsFeedBusMode(isFeedBusEnvironment());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleToggleFeedBus = useCallback((active?: boolean) => {
     setIsFeedBusMode((prev) => {

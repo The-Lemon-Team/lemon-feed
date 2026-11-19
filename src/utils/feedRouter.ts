@@ -133,7 +133,11 @@ export function useFeedRouter() {
               url: newUrl,
               pathname: newUrl.split('?')[0],
               streamSource: source,
-              selectedFeedSlug: effectiveFeedSlug ? composeFeedSlug(effectiveFeedSlug, effectiveSubtopic) : undefined,
+              selectedFeedSlug: effectiveFeedSlug
+                ? source === 'watchers'
+                  ? effectiveFeedSlug
+                  : composeFeedSlug(effectiveFeedSlug, effectiveSubtopic)
+                : undefined,
               subtopicSlug: effectiveSubtopic,
               noteId: newNoteId,
             });
@@ -143,7 +147,11 @@ export function useFeedRouter() {
         return {
           ...curr,
           streamSource: source,
-          selectedFeedSlug: effectiveFeedSlug ? composeFeedSlug(effectiveFeedSlug, effectiveSubtopic) : undefined,
+          selectedFeedSlug: effectiveFeedSlug
+            ? source === 'watchers'
+              ? effectiveFeedSlug
+              : composeFeedSlug(effectiveFeedSlug, effectiveSubtopic)
+            : undefined,
           subtopicSlug: effectiveSubtopic,
           noteId: newNoteId,
           layoutMode,

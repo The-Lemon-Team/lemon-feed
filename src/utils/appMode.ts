@@ -5,10 +5,11 @@ export type FeedAppProfile = 'standard' | 'feed-bus';
 export type FeedAppEnvironment = 'notes' | 'watchers';
 
 /**
- * Determines whether the app is running in the Watchers Pre-Moderation environment:
+ * Determines whether the app is running in the standalone Watchers environment:
  * - Vite build/dev mode `watchers` or `VITE_FEED_ENV=watchers`
  * - Port 5182 or 5177
- * - URL param ?env=watchers or pathname /watchers
+ * - Explicit URL param ?env=watchers
+ * Note: pathname `/watchers` inside `feed-app` routes to the built-in Watchers tab.
  */
 export function isWatchersEnvironment(): boolean {
   const envVal = (
@@ -22,9 +23,6 @@ export function isWatchersEnvironment(): boolean {
     const paramEnv = (sp.get('env') || '').toLowerCase();
     if (paramEnv === 'watchers') return true;
     if (paramEnv === 'notes') return false;
-    if (window.location.pathname === '/watchers' || window.location.pathname.startsWith('/watchers/')) {
-      return true;
-    }
     if (window.location.port === '5182' || window.location.port === '5177') {
       return true;
     }
@@ -81,14 +79,21 @@ export function setFeedBusProfile(isFeedBus: boolean): void {
     localStorage.setItem('lenta_feed_profile', target);
     const url = new URL(window.location.href);
     if (isFeedBus) {
-      url.searchParams.set('profile', 'feed-bus');
+      url.pathname = '/feed-bus';
+      url.searchParams.delete('profile');
     } else {
+      if (url.pathname === '/bus' || url.pathname.startsWith('/feed-bus')) {
+        url.pathname = '/all';
+      }
       url.searchParams.delete('profile');
       if (url.searchParams.get('mode') === 'feed-bus') {
         url.searchParams.delete('mode');
       }
     }
-    window.history.replaceState({}, '', url.toString());
+    const nextUrl = url.pathname + url.search;
+    if (nextUrl !== window.location.pathname + window.location.search) {
+      window.history.pushState(null, '', nextUrl);
+    }
   } catch (err) {
     console.warn('Failed to set feed profile:', err);
   }

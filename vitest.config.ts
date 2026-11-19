@@ -7,7 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@feed-core': path.resolve(__dirname, './src/core'),
+      '@feed-watchers': path.resolve(__dirname, '../feed-watchers/src'),
       '@lenta/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@lenta/lemon-bus': path.resolve(__dirname, '../../packages/lemon-bus/dist'),
+      '@lenta/seasons-neurons': path.resolve(__dirname, '../../packages/seasons-neurons/dist'),
     },
     dedupe: ['react', 'react-dom'],
   },
