@@ -145,6 +145,19 @@ describe('FeedEditNoteModal', () => {
       expect(api.body!.startDate).toBe(new Date('2026-10-31T09:15').toISOString());
     });
 
+    it('sets eventDate to current local date and time when clicking "Сейчас"', async () => {
+      mockPatch();
+      renderWithProviders(<FeedEditNoteModal item={makeFeedItem()} onClose={vi.fn()} />);
+      expect(dateInput().value.startsWith('2026-10-31T')).toBe(true);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const expectedPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T`;
+      expect(dateInput().value.startsWith(expectedPrefix)).toBe(true);
+    });
+
     it('normalises edited hashtags', async () => {
       const api = mockPatch();
       renderWithProviders(<FeedEditNoteModal item={makeFeedItem()} onClose={vi.fn()} />);

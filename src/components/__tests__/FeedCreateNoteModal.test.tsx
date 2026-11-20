@@ -195,7 +195,24 @@ describe('FeedCreateNoteModal', () => {
       await userEvent.click(submit());
 
       expect(await screen.findByText('Запись успешно создана!')).toBeInTheDocument();
-      expect(api.getBody()!.startDate).toBe(new Date('2026-11-18T14:45').toISOString());
+      const expectedIso = new Date('2026-11-18T14:45').toISOString();
+      expect(api.getBody()!.startDate).toBe(expectedIso);
+      expect(api.getBody()!.publishAt).toBe(expectedIso);
+    });
+
+    it('resets startDate to current local date and time when clicking "Сейчас"', async () => {
+      mockApi();
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} defaultDate="2020-01-01" />);
+
+      const dateTimeInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+      expect(dateTimeInput.value.startsWith('2020-01-01T')).toBe(true);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const expectedPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T`;
+      expect(dateTimeInput.value.startsWith(expectedPrefix)).toBe(true);
     });
 
     it('closes itself shortly after a successful save', async () => {
@@ -374,6 +391,168 @@ describe('FeedCreateNoteModal', () => {
             }),
           ],
         })
+      );
+    });
+  });
+
+  describe('Note presets & YouTube link auto-parsing', () => {
+    it('activates YouTube Видео preset and applies folderPath & hashtags on submit', async () => {
+      const api = mockApi();
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'YouTube Видео' }));
+      expect(screen.getByLabelText('Ссылка на YouTube видео')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/#технологии/)).toHaveValue('#youtube #video');
+
+      await userEvent.type(titleInput(), 'My Saved Video');
+      await userEvent.click(submit());
+
+      await screen.findByText('Запись успешно создана!');
+      expect(api.getBody()).toMatchObject({
+        title: 'My Saved Video',
+        folderPath: 'Videos',
+        hashtags: ['youtube', 'video'],
+      });
+    });
+
+    it('applies a saved QuickAddMacro preset from /macros', async () => {
+      const api = mockApi();
+      server.use(
+        http.get('*/macros', () =>
+          HttpResponse.json([
+            {
+              id: 'macro-yt',
+              name: 'YT Digest',
+              feedId: 'feed-2',
+              folderPath: 'Videos/AI',
+              folderPaths: ['Videos/AI'],
+              noteType: 'EVENT',
+              hashtags: ['youtube', 'ai'],
+            },
+          ])
+        )
+      );
+
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);
+      const macroBtn = await screen.findByRole('button', { name: 'YT Digest' });
+      await userEvent.click(macroBtn);
+
+      await userEvent.type(titleInput(), 'Macro Video');
+      await userEvent.click(submit());
+
+      await screen.findByText('Запись успешно создана!');
+      expect(api.getBody()).toMatchObject({
+        title: 'Macro Video',
+        feedId: 'feed-2',
+        folderPath: 'Videos/AI',
+        type: 'EVENT',
+        hashtags: ['youtube', 'ai'],
+      });
+    });
+
+    it('auto-parses initialSourceLink (YouTube) into title, short description, preview poster, and attaches thumbnail on create', async () => {
+      const api = mockApi();
+      let attachedUrls: any[] = [];
+
+      server.use(
+        http.post('*/notes/parse-link', async () =>
+          HttpResponse.json({
+            kind: 'youtube',
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            videoId: 'dQw4w9WgXcQ',
+            title: 'Parsed YouTube Title',
+            shortDescription: 'Concise video summary for the feed card.',
+            description: 'Concise video summary for the feed card.',
+            thumbnailUrl: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+            author: 'Veritasium',
+            durationSeconds: 612,
+            suggestedHashtags: ['youtube', 'video'],
+          })
+        ),
+        http.post('*/notes/:id/images/from-urls', async ({ request }) => {
+          const body = (await request.json()) as { items: any[] };
+          attachedUrls = body.items;
+          return HttpResponse.json([
+            {
+              id: 'img-yt-1',
+              url: '/uploads/media/yt-preview.webp',
+              isMain: true,
+              order: 0,
+            },
+          ]);
+        })
+      );
+
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          initialSourceLink="https://youtu.be/dQw4w9WgXcQ?t=15"
+        />
+      );
+
+      await waitFor(() => {
+        expect(titleInput()).toHaveValue('Parsed YouTube Title');
+      });
+      expect(screen.getByPlaceholderText(/Короткая выжимка/)).toHaveValue(
+        'Concise video summary for the feed card.'
+      );
+      expect(screen.getByPlaceholderText('Имя автора...')).toHaveValue('Veritasium');
+      expect(screen.getByText('Распознано и заполнено в форму')).toBeInTheDocument();
+
+      await userEvent.click(submit());
+      await screen.findByText('Запись успешно создана!');
+
+      expect(api.getBody()).toMatchObject({
+        title: 'Parsed YouTube Title',
+        summary: 'Concise video summary for the feed card.',
+        sourceLink: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        folderPath: 'Videos',
+        author: 'Veritasium',
+        hashtags: ['youtube', 'video'],
+      });
+      expect(attachedUrls).toEqual([
+        expect.objectContaining({
+          url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+          isMain: true,
+        }),
+      ]);
+    });
+
+    it('recognizes a pasted YouTube link in the title input and parses it into the form', async () => {
+      mockApi();
+      server.use(
+        http.post('*/notes/parse-link', async () =>
+          HttpResponse.json({
+            kind: 'youtube',
+            url: 'https://www.youtube.com/watch?v=AbCdEf12345',
+            canonicalUrl: 'https://www.youtube.com/watch?v=AbCdEf12345',
+            videoId: 'AbCdEf12345',
+            title: 'Pasted Link Title',
+            shortDescription: 'Pasted link short summary',
+            description: 'Pasted link short summary',
+            thumbnailUrl: 'https://i.ytimg.com/vi/AbCdEf12345/hqdefault.jpg',
+            author: 'Channel X',
+            suggestedHashtags: ['youtube', 'video'],
+          })
+        )
+      );
+
+      renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} />);
+
+      fireEvent.paste(titleInput(), {
+        clipboardData: {
+          getData: () => 'https://www.youtube.com/watch?v=AbCdEf12345',
+        },
+      });
+
+      await waitFor(() => {
+        expect(titleInput()).toHaveValue('Pasted Link Title');
+      });
+      expect(screen.getByPlaceholderText(/Короткая выжимка/)).toHaveValue('Pasted link short summary');
+      expect(screen.getByPlaceholderText('https://...')).toHaveValue(
+        'https://www.youtube.com/watch?v=AbCdEf12345'
       );
     });
   });

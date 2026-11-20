@@ -268,6 +268,7 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
     selectedDetailItem,
     editingItem,
     isCreateNoteOpen,
+    initialCreateSourceLink,
     aiCoverItem,
     aiCoverTemplateId,
     isLemonSeasonsModalOpen,
@@ -504,6 +505,7 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
         onOpenEdit={handleOpenEdit}
         onCloseEdit={handleCloseEdit}
         isCreateNoteOpen={isCreateNoteOpen}
+        initialCreateSourceLink={initialCreateSourceLink}
         onCloseCreateNote={handleCloseCreateNote}
         selectedFeedSlug={selectedFeedSlug}
         activeStreamSource={streamSource}

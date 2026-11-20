@@ -12,8 +12,11 @@ import { feedApi } from '../api/client';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 import { FeedModeOption, resolveStreamPrivacy } from './toolbar/types';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
+import { useNotePresetAndLinkParser } from '../hooks/useNotePresetAndLinkParser';
 import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
 import { NotePosterPicker } from './notes/NotePosterPicker';
+import { FeedNotePresetBar } from './notes/FeedNotePresetBar';
+import { YouTubeQuickImportBar } from './notes/YouTubeQuickImportBar';
 import {
   X,
   PlusCircle,
@@ -42,6 +45,7 @@ export interface FeedCreateNoteModalProps {
   defaultDate?: string;
   appMode?: FeedAppRuntimeMode;
   notesPrivacy?: 'all' | 'public' | 'private';
+  initialSourceLink?: string | null;
   onCreated?: (newNote: Note) => void;
 }
 
@@ -65,6 +69,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   defaultDate,
   appMode = 'dev',
   notesPrivacy,
+  initialSourceLink,
   onCreated,
 }) => {
   const queryClient = useQueryClient();
@@ -112,7 +117,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setDescription('');
       setSummary('');
       setAuthor('Admin');
-      setSourceLink('');
+      setSourceLink(initialSourceLink || '');
       setHashtagsStr('');
       setType('SINGLE');
       setStartDate(getDefaultDateTimeLocal(defaultDate));
@@ -123,7 +128,42 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setFeedback(null);
       setFeedId('');
     }
-  }, [isOpen, defaultDate, appMode, notesPrivacy]);
+  }, [isOpen, defaultDate, appMode, notesPrivacy, initialSourceLink]);
+
+  const {
+    macros,
+    activeTemplateId,
+    activeMacroId,
+    presetFolderPath,
+    youtubeUrlInput,
+    setYoutubeUrlInput,
+    parsedPreview,
+    isParsingLink,
+    linkParseError,
+    applyTemplate,
+    applyMacro,
+    parseAndApplyLink,
+    handleTitlePaste,
+    handleSourceLinkPaste,
+    isYouTubeMode,
+  } = useNotePresetAndLinkParser({
+    isOpen,
+    initialSourceLink,
+    title,
+    setTitle,
+    description,
+    setDescription,
+    summary,
+    setSummary,
+    author,
+    setAuthor,
+    sourceLink,
+    setSourceLink,
+    setHashtagsStr,
+    setType,
+    setFeedId,
+    setPendingPosters,
+  });
 
   // Pre-select feed once feeds load without wiping user-edited title or startDate
   useEffect(() => {
@@ -194,9 +234,12 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       }
 
       const resolvedFolderPath =
-        !feedId && activeStreamMode?.filterConfig?.folderPaths && activeStreamMode.filterConfig.folderPaths.length > 0
+        presetFolderPath ||
+        (!feedId && activeStreamMode?.filterConfig?.folderPaths && activeStreamMode.filterConfig.folderPaths.length > 0
           ? activeStreamMode.filterConfig.folderPaths[0]
-          : undefined;
+          : undefined);
+
+      const resolvedStartDate = fromDateTimeLocalInput(startDate, true)!;
 
       const newNote = await createNoteMutation.mutateAsync({
         title: title.trim(),
@@ -205,7 +248,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         type,
         feedId: feedId || undefined,
         folderPath: resolvedFolderPath,
-        startDate: fromDateTimeLocalInput(startDate, true)!,
+        startDate: resolvedStartDate,
         endDate: type === 'PERIOD' && endDate ? fromDateTimeLocalInput(endDate) : undefined,
         privacy: targetPrivacy,
         status: targetStatus,
@@ -213,7 +256,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         curator: author.trim() || undefined,
         sourceLink: sourceLink.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
-        publishAt: targetStatus === 'PUBLISHED' ? new Date().toISOString() : null,
+        publishAt: targetStatus === 'PUBLISHED' ? resolvedStartDate : null,
       });
 
       // Attach pending posters if selected during creation
@@ -258,7 +301,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
               })),
             };
           });
-          await Promise.all([
+          void Promise.all([
             queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] }),
             queryClient.invalidateQueries({ queryKey: ['feed', 'notes'] }),
             queryClient.invalidateQueries({ queryKey: queryKeys.noteDetail(newNote.id) }),
@@ -331,6 +374,27 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
             </div>
           )}
 
+          {/* Note Presets & Quick-Add Macros */}
+          <FeedNotePresetBar
+            activeTemplateId={activeTemplateId}
+            activeMacroId={activeMacroId}
+            macros={macros}
+            onSelectTemplate={applyTemplate}
+            onSelectMacro={applyMacro}
+          />
+
+          {/* YouTube Quick Import & Link Metadata Parser */}
+          {isYouTubeMode && (
+            <YouTubeQuickImportBar
+              urlValue={youtubeUrlInput}
+              onUrlChange={setYoutubeUrlInput}
+              onParseUrl={parseAndApplyLink}
+              isParsing={isParsingLink}
+              parseError={linkParseError}
+              parsedPreview={parsedPreview}
+            />
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
@@ -342,6 +406,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onPaste={handleTitlePaste}
               placeholder="Введите заголовок события или статьи..."
               className="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors"
             />
@@ -411,10 +476,20 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
           {/* Date & Privacy Settings */}
           <div className="grid grid-cols-1 sm:grid-cols-[1.25fr_1fr_1fr] gap-3">
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                <span>Дата и время события</span>
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Дата и время события</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setStartDate(getDefaultDateTimeLocal())}
+                  className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  title="Установить текущую дату и время"
+                >
+                  Сейчас
+                </button>
+              </div>
               <input
                 type="datetime-local"
                 required
@@ -498,6 +573,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
                 type="url"
                 value={sourceLink}
                 onChange={(e) => setSourceLink(e.target.value)}
+                onPaste={handleSourceLinkPaste}
                 placeholder="https://..."
                 className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
               />

@@ -353,7 +353,7 @@ export const NotePosterPicker: React.FC<NotePosterPickerProps> = ({
                 );
               })
             : pendingPosters.map((poster, idx) => {
-                const fullUrl = poster.thumbnailUrl || poster.url;
+                const fullUrl = resolveMediaUrl(poster.thumbnailUrl || poster.url);
                 return (
                   <div
                     key={poster.id}
@@ -367,7 +367,7 @@ export const NotePosterPicker: React.FC<NotePosterPickerProps> = ({
                       src={fullUrl}
                       alt={poster.title || 'Poster'}
                       className="w-full h-full object-cover cursor-pointer"
-                      onClick={() => setZoomedUrl(poster.url)}
+                      onClick={() => setZoomedUrl(fullUrl)}
                     />
 
                     {/* Main cover button */}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Note } from '@lenta/shared';
+import { Note, extractFirstYouTubeUrl } from '@lenta/shared';
 import { UnifiedFeedItem, FeedAdapter, FEED_ADAPTERS } from '../adapters/feeds';
 import { useUpdateNote } from '../api/queries';
 import { feedApi } from '../api/client';
@@ -36,6 +36,7 @@ export function useFeedModalsState({
   const [selectedDetailItem, setSelectedDetailItem] = useState<UnifiedFeedItem | null>(null);
   const [editingItem, setEditingItem] = useState<UnifiedFeedItem | null>(null);
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
+  const [initialCreateSourceLink, setInitialCreateSourceLink] = useState<string | null>(null);
   const [aiCoverItem, setAiCoverItem] = useState<UnifiedFeedItem | null>(null);
   const [aiCoverTemplateId, setAiCoverTemplateId] = useState<string | undefined>(undefined);
   const [isLemonSeasonsModalOpen, setIsLemonSeasonsModalOpen] = useState(() => {
@@ -120,12 +121,14 @@ export function useFeedModalsState({
     setEditingItem(null);
   }, []);
 
-  const handleOpenCreateNote = useCallback(() => {
+  const handleOpenCreateNote = useCallback((sourceLink?: unknown) => {
+    setInitialCreateSourceLink(typeof sourceLink === 'string' && sourceLink.trim() ? sourceLink.trim() : null);
     setIsCreateNoteOpen(true);
   }, []);
 
   const handleCloseCreateNote = useCallback(() => {
     setIsCreateNoteOpen(false);
+    setInitialCreateSourceLink(null);
   }, []);
 
   const handleOpenAiCover = useCallback((item: UnifiedFeedItem, templateId?: string) => {
@@ -288,11 +291,46 @@ export function useFeedModalsState({
 
       if (e.key === 'c' || e.key === 'n' || e.key === 'с' || e.key === 'т') {
         e.preventDefault();
+        setInitialCreateSourceLink(null);
         setIsCreateNoteOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPublicMode, appMode, isAnyModalOpen]);
+
+  // Global paste listener: pasting a YouTube link anywhere in feed-app opens Create Note with YouTube preset & auto-parses it
+  useEffect(() => {
+    if (isPublicMode || appMode === 'public') return;
+    const handlePaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      const hasOpenDialog =
+        typeof document !== 'undefined' &&
+        Boolean(document.querySelector('[role="dialog"], [aria-modal="true"]'));
+      if (isAnyModalOpen || hasOpenDialog) {
+        return;
+      }
+
+      const text = e.clipboardData?.getData('text/plain');
+      const ytMatch = extractFirstYouTubeUrl(text);
+      if (!ytMatch) return;
+
+      e.preventDefault();
+      setInitialCreateSourceLink(ytMatch.canonicalUrl);
+      setIsCreateNoteOpen(true);
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
   }, [isPublicMode, appMode, isAnyModalOpen]);
 
   // Moderation Mutations
@@ -340,6 +378,7 @@ export function useFeedModalsState({
     selectedDetailItem,
     editingItem,
     isCreateNoteOpen,
+    initialCreateSourceLink,
     aiCoverItem,
     aiCoverTemplateId,
     isLemonSeasonsModalOpen,

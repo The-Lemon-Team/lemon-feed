@@ -4,7 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedFeedItem } from '../adapters/feeds/types';
 import { useUpdateNote, useFeedSources, queryKeys } from '../api/queries';
 import { resolveMediaUrl, feedApi } from '../api/client';
-import { extractCleanSnippet, NoteImage, toDateTimeLocalInput } from '@lenta/shared';
+import {
+  extractCleanSnippet,
+  NoteImage,
+  toDateTimeLocalInput,
+  getDefaultDateTimeLocal,
+} from '@lenta/shared';
 import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
 import { NotePosterPicker } from './notes/NotePosterPicker';
@@ -151,6 +156,8 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 
   const handleSave = async (e: React.FormEvent) => {
@@ -365,9 +372,19 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
                     <Calendar className="w-3.5 h-3.5 text-[#2481cc]" />
                     <span>Дата и время заметки</span>
                   </label>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
-                    Заднее число ✓
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEventDate(getDefaultDateTimeLocal())}
+                      className="text-[10px] font-mono text-[#2481cc] dark:text-[#64b5f6] hover:underline cursor-pointer"
+                      title="Установить текущую дату и время"
+                    >
+                      Сейчас
+                    </button>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                      Заднее число ✓
+                    </span>
+                  </div>
                 </div>
                 <input
                   type="datetime-local"

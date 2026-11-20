@@ -251,4 +251,58 @@ describe('useFeedModalsState - Open Note by ID and Workspace integration', () =>
       document.body.removeChild(dialog);
     });
   });
+
+  describe('Global YouTube paste detection', () => {
+    it('opens create note modal with canonical YouTube URL when a YouTube link is pasted on the page', () => {
+      const { result } = renderHook(() =>
+        useFeedModalsState({
+          noteId: undefined,
+          openNote: openNoteMock,
+          closeNote: closeNoteMock,
+          allMappedNotes: [],
+          activeAdapter: { adaptNotes: vi.fn(() => []), getTabs: vi.fn(() => []) } as any,
+          isPublicMode: false,
+          appMode: 'dev',
+          refetch: refetchMock,
+        })
+      );
+
+      act(() => {
+        const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as any;
+        pasteEvent.clipboardData = {
+          getData: () => 'https://youtu.be/dQw4w9WgXcQ?t=30',
+        };
+        window.dispatchEvent(pasteEvent);
+      });
+
+      expect(result.current.isCreateNoteOpen).toBe(true);
+      expect(result.current.initialCreateSourceLink).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    });
+
+    it('ignores non-YouTube paste or paste in public mode', () => {
+      const { result } = renderHook(() =>
+        useFeedModalsState({
+          noteId: undefined,
+          openNote: openNoteMock,
+          closeNote: closeNoteMock,
+          allMappedNotes: [],
+          activeAdapter: { adaptNotes: vi.fn(() => []), getTabs: vi.fn(() => []) } as any,
+          isPublicMode: false,
+          appMode: 'dev',
+          refetch: refetchMock,
+        })
+      );
+
+      act(() => {
+        const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as any;
+        pasteEvent.clipboardData = {
+          getData: () => 'https://example.com/article',
+        };
+        window.dispatchEvent(pasteEvent);
+      });
+
+      expect(result.current.isCreateNoteOpen).toBe(false);
+      expect(result.current.initialCreateSourceLink).toBeNull();
+    });
+  });
 });

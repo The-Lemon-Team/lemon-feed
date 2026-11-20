@@ -17,4 +17,20 @@ export const handlers = [
     return HttpResponse.json({ id: params.id, ...body });
   }),
   http.get('*/notes/media/search-images', () => HttpResponse.json([])),
+  http.get('*/macros', () => HttpResponse.json([])),
+  http.post('*/notes/parse-link', async ({ request }) => {
+    const body = (await request.json()) as { url?: string };
+    return HttpResponse.json({
+      kind: 'youtube',
+      url: body.url || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      videoId: 'dQw4w9WgXcQ',
+      title: 'Parsed YouTube Video',
+      shortDescription: 'Short description of the parsed video.',
+      description: 'Short description of the parsed video.',
+      thumbnailUrl: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+      author: 'YouTube Channel',
+      suggestedHashtags: ['youtube', 'video'],
+    });
+  }),
 ];

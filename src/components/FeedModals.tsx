@@ -23,6 +23,7 @@ export interface FeedModalsProps {
   onCloseEdit: () => void;
   // Create Note Modal
   isCreateNoteOpen: boolean;
+  initialCreateSourceLink?: string | null;
   onCloseCreateNote: () => void;
   selectedFeedSlug?: string;
   activeStreamSource?: string;
@@ -70,6 +71,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
   onOpenEdit,
   onCloseEdit,
   isCreateNoteOpen,
+  initialCreateSourceLink,
   onCloseCreateNote,
   selectedFeedSlug,
   activeStreamSource,
@@ -160,6 +162,7 @@ export const FeedModals: React.FC<FeedModalsProps> = ({
           defaultDate={defaultDate}
           appMode={appMode}
           notesPrivacy={notesPrivacy}
+          initialSourceLink={initialCreateSourceLink}
           onCreated={onRefetch}
         />
       )}

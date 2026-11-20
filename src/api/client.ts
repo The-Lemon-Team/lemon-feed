@@ -12,6 +12,8 @@ import {
   Stream,
   CreateStreamPayload,
   UpdateStreamPayload,
+  ParsedLinkMetadata,
+  QuickAddMacro,
   resolveClientApiBaseUrl,
 } from '@lenta/shared';
 import { FeedAppRuntimeMode, resolveFeedAppMode } from '../utils/appMode';
@@ -127,7 +129,7 @@ export const resolveMediaUrl = (url?: string | null): string => {
       return `${base.replace(/\/$/, '')}${relativeUpload}`;
     }
   }
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
     return url;
   }
   const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002');
@@ -427,6 +429,16 @@ export const feedApi = {
 
   detachFeedFromStream: async (streamId: string, feedId: string): Promise<Stream> => {
     const res = await apiClient.delete<Stream>(`/streams/${streamId}/feeds/${feedId}`);
+    return res.data;
+  },
+
+  parseLinkMetadata: async (url: string): Promise<ParsedLinkMetadata> => {
+    const res = await apiClient.post<ParsedLinkMetadata>('/notes/parse-link', { url });
+    return res.data;
+  },
+
+  getQuickAddMacros: async (): Promise<QuickAddMacro[]> => {
+    const res = await apiClient.get<QuickAddMacro[]>('/macros');
     return res.data;
   },
 };

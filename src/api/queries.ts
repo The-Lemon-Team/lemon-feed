@@ -8,7 +8,15 @@ import {
   GenerateAiCoverPayload,
   GenerateAiBatchPayload,
 } from './client';
-import { QueryNotesParams, NotesResponse, ExternalImageItem, Stream, CreateStreamPayload, UpdateStreamPayload } from '@lenta/shared';
+import {
+  QueryNotesParams,
+  NotesResponse,
+  ExternalImageItem,
+  Stream,
+  CreateStreamPayload,
+  UpdateStreamPayload,
+  QuickAddMacro,
+} from '@lenta/shared';
 import { extractPeriodItems, PeriodItem } from '../utils/periods';
 import { FeedAppRuntimeMode } from '../utils/appMode';
 
@@ -21,6 +29,7 @@ export const queryKeys = {
   streams: (includePrivate?: boolean) => ['streams', { includePrivate }] as const,
   streamDetail: (slug: string) => ['streams', slug] as const,
   noteDetail: (id: string) => ['feed', 'note', id] as const,
+  macros: ['feed', 'macros'] as const,
 };
 
 export function useFeedPeriods(appMode: FeedAppRuntimeMode = 'dev') {
@@ -417,6 +426,25 @@ export function useDetachFeedFromStream() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['streams'] });
       queryClient.invalidateQueries({ queryKey: ['feed', 'stream'] });
+    },
+  });
+}
+
+export function useQuickAddMacros(enabled = true) {
+  return useQuery<QuickAddMacro[]>({
+    queryKey: queryKeys.macros,
+    enabled,
+    staleTime: 1000 * 60 * 5,
+    queryFn: async () => {
+      return await feedApi.getQuickAddMacros();
+    },
+  });
+}
+
+export function useParseLinkMetadata() {
+  return useMutation({
+    mutationFn: async (url: string) => {
+      return await feedApi.parseLinkMetadata(url);
     },
   });
 }
