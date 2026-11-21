@@ -20,6 +20,7 @@ export interface FeedBannersClusterProps {
   streamSource?: string;
   promotedPeriods: PeriodItem[];
   onSelectFeed: (slug?: string) => void;
+  onSelectChannel?: (feedSlug?: string, streamSlug?: string) => void;
   newEventsCount: number;
   groupedChannels: ChannelUpdateGroup[];
   onApplyLiveUpdates: () => void;
@@ -40,6 +41,7 @@ export const FeedBannersCluster: React.FC<FeedBannersClusterProps> = ({
   streamSource,
   promotedPeriods,
   onSelectFeed,
+  onSelectChannel,
   newEventsCount,
   groupedChannels,
   onApplyLiveUpdates,
@@ -83,9 +85,14 @@ export const FeedBannersCluster: React.FC<FeedBannersClusterProps> = ({
         groupedChannels={groupedChannels}
         onApply={onApplyLiveUpdates}
         onDismiss={onDismissLiveUpdates}
-        onSelectChannel={(slug) => {
-          onSelectFeed(slug);
-          onApplyLiveUpdates();
+        onSelectChannel={(slug, streamSlug) => {
+          if (onSelectChannel) {
+            onSelectChannel(slug, streamSlug);
+          } else {
+            const normalized = slug === 'general' || slug === 'all' ? undefined : slug;
+            onSelectFeed(normalized);
+            onApplyLiveUpdates();
+          }
         }}
       />
     </>

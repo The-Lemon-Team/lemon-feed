@@ -189,6 +189,7 @@ export interface CreateNotePayload {
   status?: 'DRAFT' | 'PUBLISHED' | 'SCHEDULED' | 'ARCHIVED';
   privacy?: 'private' | 'public';
   publishAt?: string | null;
+  metadata?: any;
 }
 
 export interface UpdateNotePayload {
@@ -206,6 +207,7 @@ export interface UpdateNotePayload {
   publishAt?: string | null;
   startDate?: string;
   endDate?: string | null;
+  metadata?: any;
 }
 
 export interface GenerateAiCoverPayload {

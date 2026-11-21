@@ -571,5 +571,130 @@ describe('FeedCreateNoteModal', () => {
         'https://www.youtube.com/watch?v=AbCdEf12345'
       );
     });
+
+    it('falls back to browser noembed.com when backend returns empty title, and keeps title empty if both fail', async () => {
+      mockApi();
+      server.use(
+        http.post('*/notes/parse-link', async () =>
+          HttpResponse.json({
+            kind: 'youtube',
+            url: 'https://www.youtube.com/watch?v=gyQXCtMrlF8',
+            canonicalUrl: 'https://www.youtube.com/watch?v=gyQXCtMrlF8',
+            videoId: 'gyQXCtMrlF8',
+            title: '',
+            thumbnailUrl: 'https://i.ytimg.com/vi/gyQXCtMrlF8/hqdefault.jpg',
+            previewUrl: '/notes/media/youtube-thumb/gyQXCtMrlF8',
+            suggestedHashtags: ['youtube', 'video'],
+          })
+        ),
+        http.get('https://noembed.com/embed', () =>
+          HttpResponse.json({
+            title: 'Критическая ошибка в Nginx: интернет в опасности',
+            author_name: 'Миша Ларченко',
+          })
+        )
+      );
+
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          initialSourceLink="https://www.youtube.com/shorts/gyQXCtMrlF8"
+        />
+      );
+
+      await waitFor(() => {
+        expect(titleInput()).toHaveValue('Критическая ошибка в Nginx: интернет в опасности');
+      });
+      expect(screen.getByPlaceholderText('Имя автора...')).toHaveValue('Миша Ларченко');
+    });
+
+    it('keeps title empty for manual entry instead of inserting video ID when all metadata sources fail', async () => {
+      mockApi();
+      server.use(
+        http.post('*/notes/parse-link', async () =>
+          HttpResponse.json({
+            kind: 'youtube',
+            url: 'https://www.youtube.com/watch?v=gyQXCtMrlF8',
+            canonicalUrl: 'https://www.youtube.com/watch?v=gyQXCtMrlF8',
+            videoId: 'gyQXCtMrlF8',
+            title: '',
+            thumbnailUrl: 'https://i.ytimg.com/vi/gyQXCtMrlF8/hqdefault.jpg',
+            previewUrl: '/notes/media/youtube-thumb/gyQXCtMrlF8',
+            suggestedHashtags: ['youtube', 'video'],
+          })
+        )
+      );
+
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          initialSourceLink="https://www.youtube.com/shorts/gyQXCtMrlF8"
+        />
+      );
+
+      expect(
+        await screen.findByText(/Не удалось получить название видео автоматически/i)
+      ).toBeInTheDocument();
+      expect(titleInput()).toHaveValue('');
+    });
+
+    it('activates TimelineActorSelector when creating in a Timeline feed and sends metadata', async () => {
+      let createdPayload: any = null;
+      server.use(
+        http.get('*/feeds', () =>
+          HttpResponse.json([
+            {
+              id: 'f-lemon-team',
+              title: 'The Lemon Team',
+              slug: 'the_lemon_team',
+              privacy: 'private',
+              hashtags: [{ name: 'mode:timeline' }, { name: 'board:the-lemon-team-bcd' }],
+            },
+          ])
+        ),
+        http.post('*/notes', async ({ request }) => {
+          createdPayload = await request.json();
+          return HttpResponse.json({ id: 'new-note-1', ...createdPayload });
+        })
+      );
+
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          defaultFeedSlug="the_lemon_team"
+        />
+      );
+
+      // Verify TimelineActorSelector is rendered
+      expect(await screen.findByTestId('timeline-actor-selector')).toBeInTheDocument();
+      expect(screen.getByText('Персонаж TimeLine')).toBeInTheDocument();
+
+      // Click Antigravity Agent
+      const antigravityBtn = screen.getByText('Antigravity Agent').closest('button');
+      fireEvent.click(antigravityBtn!);
+
+      // Enter title
+      fireEvent.change(titleInput(), { target: { value: 'Coding Session Report' } });
+
+      // Submit
+      fireEvent.click(submit());
+
+      await waitFor(() => {
+        expect(createdPayload).not.toBeNull();
+      });
+
+      expect(createdPayload.author).toBe('Antigravity Agent');
+      expect(createdPayload.metadata).toEqual(
+        expect.objectContaining({
+          actorId: 'actor-antigravity-agent',
+          actorName: 'Antigravity Agent',
+          boardMode: 'TIMELINE',
+          boardSlug: 'the-lemon-team-bcd',
+        })
+      );
+    });
   });
 });

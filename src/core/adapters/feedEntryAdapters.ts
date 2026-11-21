@@ -3,6 +3,7 @@ import { Globe, Lock } from 'lucide-react';
 import type { LemonModerationItem } from '@lenta/lemon-bus';
 import { UnifiedFeedItem } from '../../adapters/feeds/types';
 import { FeedAppRuntimeMode } from '../../utils/appMode';
+import { findTimelineActor, isTimelineFeed } from '../../utils/timelineFeeds';
 import {
   CoreWatcherStreamItem,
   FeedEntry,
@@ -122,6 +123,46 @@ export function unifiedItemToFeedEntry(
         }
   );
 
+  const rawMeta = (item.rawPayload as any)?.metadata || {};
+  const actorId = rawMeta.actorId || (item.author?.startsWith('actor-') ? item.author : null);
+  const actor = findTimelineActor(actorId || rawMeta.actorName || item.author);
+  const actorName = rawMeta.actorName || actor?.name;
+  const isTimelineNote = Boolean(
+    rawMeta.boardMode === 'TIMELINE' ||
+      rawMeta.boardSlug ||
+      actor ||
+      isTimelineFeed(item.rawPayload?.feed || { slug: item.feedSlug, hashtags: item.hashtags })
+  );
+
+  if (actorName || actor) {
+    badges.push({
+      id: 'timeline-actor',
+      label: actorName || actor?.name || 'Персонаж',
+      title: `Персонаж TimeLine: ${actorName || actor?.name || ''} (${rawMeta.actorTitle || actor?.title || ''})`,
+      tone:
+        actor?.accent === 'rose'
+          ? 'danger'
+          : actor?.accent === 'amber'
+          ? 'amber'
+          : actor?.accent === 'violet'
+          ? 'purple'
+          : 'info',
+      icon: actor?.emoji || '⏱️',
+      testId: 'timeline-actor-badge',
+    });
+  }
+
+  if (isTimelineNote) {
+    badges.push({
+      id: 'timeline-board',
+      label: 'TimeLine',
+      title: `Синхронизировано с TimeLine (${rawMeta.boardSlug || 'the-lemon-team-bcd'})`,
+      tone: 'info',
+      icon: '⏱️',
+      testId: 'timeline-board-badge',
+    });
+  }
+
   const coverUrl =
     item.coverUrl ||
     item.rawPayload?.images?.find((img: any) => img.isMain)?.url ||
@@ -133,6 +174,12 @@ export function unifiedItemToFeedEntry(
     : coverUrl
       ? [{ id: 'main', url: coverUrl, isMain: true }]
       : [];
+
+  const displayTitle = actorName
+    ? `${actorName} · ${item.channelTitle}`
+    : item.channelTitle;
+  const displayAvatar = actor?.emoji || item.avatarIcon;
+  const displayHandle = actor?.handle || item.channelHandle;
 
   return {
     id: item.id,
@@ -146,9 +193,9 @@ export function unifiedItemToFeedEntry(
     images,
     source: {
       id: item.feedSlug,
-      title: item.channelTitle,
-      handle: item.channelHandle,
-      avatarIcon: item.avatarIcon,
+      title: displayTitle,
+      handle: displayHandle,
+      avatarIcon: displayAvatar,
     },
     category: item.category,
     tags: item.hashtags,

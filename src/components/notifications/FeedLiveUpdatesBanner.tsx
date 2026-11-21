@@ -7,7 +7,7 @@ export interface FeedLiveUpdatesBannerProps {
   groupedChannels: ChannelUpdateGroup[];
   onApply: () => void;
   onDismiss: () => void;
-  onSelectChannel?: (feedSlug: string) => void;
+  onSelectChannel?: (feedSlug: string, streamSlug?: string) => void;
 }
 
 export const FeedLiveUpdatesBanner: React.FC<FeedLiveUpdatesBannerProps> = ({
@@ -35,9 +35,9 @@ export const FeedLiveUpdatesBanner: React.FC<FeedLiveUpdatesBannerProps> = ({
         <div className="flex items-center gap-1.5 flex-wrap">
           {groupedChannels.map((group) => (
             <button
-              key={group.feedSlug}
+              key={`${group.streamSlug || ''}_${group.feedSlug}`}
               type="button"
-              onClick={() => onSelectChannel?.(group.feedSlug)}
+              onClick={() => onSelectChannel?.(group.feedSlug, group.streamSlug)}
               title={`Открыть ленту ${group.feedTitle}`}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 hover:border-indigo-400 dark:hover:border-indigo-400 transition-colors cursor-pointer"
             >

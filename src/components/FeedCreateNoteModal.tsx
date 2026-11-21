@@ -18,6 +18,13 @@ import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
 import { NotePosterPicker } from './notes/NotePosterPicker';
 import { FeedNotePresetBar } from './notes/FeedNotePresetBar';
 import { YouTubeQuickImportBar } from './notes/YouTubeQuickImportBar';
+import { TimelineActorSelector } from './timeline/TimelineActorSelector';
+import {
+  isTimelineFeed,
+  extractTimelineBoardSlug,
+  TimelineActor,
+  TIMELINE_ACTORS,
+} from '../utils/timelineFeeds';
 import {
   X,
   PlusCircle,
@@ -98,6 +105,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const [description, setDescription] = useState('');
   const [summary, setSummary] = useState('');
   const [author, setAuthor] = useState('Admin');
+  const [selectedActor, setSelectedActor] = useState<TimelineActor | null>(null);
   const [sourceLink, setSourceLink] = useState('');
   const [hashtagsStr, setHashtagsStr] = useState('');
   const [type, setType] = useState<'SINGLE' | 'PERIOD' | 'EVENT' | 'FILM_RELEASE' | 'MENTION' | 'DONE'>('SINGLE');
@@ -118,6 +126,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
       setDescription('');
       setSummary('');
       setAuthor('Admin');
+      setSelectedActor(null);
       setSourceLink(initialSourceLink || '');
       setHashtagsStr('');
       setType('SINGLE');
@@ -191,6 +200,34 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
     }
   }, [isOpen, defaultFeedSlug, activeStreamSource, activeStreamMode, appMode, feeds]);
 
+  const selectedFeed = feeds.find((f) => f.id === feedId);
+  const isTimeline = Boolean(
+    isTimelineFeed(selectedFeed) ||
+      (!feedId &&
+        defaultFeedSlug &&
+        (slugsMatch(defaultFeedSlug, 'the_lemon_team') || slugsMatch(defaultFeedSlug, 'the-lemon-team'))) ||
+      (!feedId &&
+        activeStreamSource &&
+        (slugsMatch(activeStreamSource, 'the_lemon_team') || slugsMatch(activeStreamSource, 'the-lemon-team')))
+  );
+  const timelineBoardSlug = extractTimelineBoardSlug(selectedFeed);
+
+  useEffect(() => {
+    if (isTimeline && selectedActor === null && (author === 'Admin' || author === '')) {
+      setSelectedActor(TIMELINE_ACTORS[0]);
+      setAuthor(TIMELINE_ACTORS[0].name);
+    }
+  }, [isTimeline, feedId]);
+
+  const handleSelectActor = (actor: TimelineActor | null) => {
+    setSelectedActor(actor);
+    if (actor) {
+      setAuthor(actor.name);
+    } else {
+      setAuthor('Admin');
+    }
+  };
+
   // Escape key handler complying with AGENTS.md rule 7
   useEffect(() => {
     if (!isOpen) return;
@@ -241,6 +278,20 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
 
       const resolvedStartDate = fromDateTimeLocalInput(startDate, true)!;
 
+      const resolvedMetadata = selectedActor
+        ? {
+            actorId: selectedActor.id,
+            actorName: selectedActor.name,
+            actorAvatar: selectedActor.avatar,
+            actorAccent: selectedActor.accent,
+            actorTitle: selectedActor.title,
+            boardMode: 'TIMELINE',
+            boardSlug: timelineBoardSlug,
+            lemonUniverseKind: 'TimelineNote',
+            origin: 'NEURON_PARTY',
+          }
+        : undefined;
+
       const newNote = await createNoteMutation.mutateAsync({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -257,6 +308,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
         sourceLink: sourceLink.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
         publishAt: targetStatus === 'PUBLISHED' ? resolvedStartDate : null,
+        metadata: resolvedMetadata,
       });
 
       // Attach pending posters if selected during creation
@@ -549,36 +601,62 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
           </div>
 
           {/* Author & Source Link */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>Автор / Куратор</span>
-              </label>
-              <input
-                type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Имя автора..."
-                className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+          {isTimeline ? (
+            <div className="space-y-3">
+              <TimelineActorSelector
+                selectedActorId={selectedActor ? selectedActor.id : 'custom'}
+                onSelectActor={handleSelectActor}
+                customAuthor={author}
+                onCustomAuthorChange={setAuthor}
+                boardSlug={timelineBoardSlug}
               />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Ссылка на первоисточник</span>
+                </label>
+                <input
+                  type="url"
+                  value={sourceLink}
+                  onChange={(e) => setSourceLink(e.target.value)}
+                  onPaste={handleSourceLinkPaste}
+                  placeholder="https://..."
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Автор / Куратор</span>
+                </label>
+                <input
+                  type="text"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  placeholder="Имя автора..."
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
-                <LinkIcon className="w-3.5 h-3.5 text-blue-500" />
-                <span>Ссылка на первоисточник</span>
-              </label>
-              <input
-                type="url"
-                value={sourceLink}
-                onChange={(e) => setSourceLink(e.target.value)}
-                onPaste={handleSourceLinkPaste}
-                placeholder="https://..."
-                className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Ссылка на первоисточник</span>
+                </label>
+                <input
+                  type="url"
+                  value={sourceLink}
+                  onChange={(e) => setSourceLink(e.target.value)}
+                  onPaste={handleSourceLinkPaste}
+                  placeholder="https://..."
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Hashtags */}
           <div>

@@ -96,4 +96,40 @@ describe('feedEntryAdapters (@feed-core)', () => {
     expect(entry.badges?.some((b) => b.id === 'status' && b.label === 'На модерации')).toBe(true);
     expect(entry.badges?.some((b) => b.id === 'privacy' && b.label === 'Public')).toBe(true);
   });
+
+  it('maps timeline note with actor and board badges correctly', () => {
+    const adapter = createNoteScenarioAdapter('dev');
+    const timelineItem: UnifiedFeedItem = {
+      id: 'timeline-note-1',
+      title: 'Session Note',
+      description: 'Session description',
+      publishedAt: '2026-11-20T19:48:00.000Z',
+      sourceType: 'configured',
+      feedSlug: 'the_lemon_team',
+      channelTitle: 'The Lemon Team',
+      channelHandle: 'the_lemon_team',
+      avatarIcon: '🍋',
+      category: { label: 'Working Space', emoji: '💻', colorClass: 'bg-blue-500/10' },
+      curator: 'actor-alexey',
+      status: 'PUBLISHED',
+      rawPayload: {
+        privacy: 'private',
+        metadata: {
+          actorId: 'actor-alexey',
+          actorName: 'Алексей (в халате)',
+          actorAvatar: 'alexey',
+          actorAccent: 'rose',
+          boardMode: 'TIMELINE',
+          boardSlug: 'the-lemon-team-bcd',
+        },
+      },
+    };
+
+    const entry = adapter.mapItem(timelineItem);
+    expect(entry.id).toBe('timeline-note-1');
+    expect(entry.source.title).toBe('Алексей (в халате) · The Lemon Team');
+    expect(entry.source.avatarIcon).toBe('🌹');
+    expect(entry.badges?.some((b) => b.id === 'timeline-actor' && b.label === 'Алексей (в халате)')).toBe(true);
+    expect(entry.badges?.some((b) => b.id === 'timeline-board' && b.label === 'TimeLine')).toBe(true);
+  });
 });

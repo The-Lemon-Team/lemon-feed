@@ -366,6 +366,20 @@ export const NotePosterPicker: React.FC<NotePosterPickerProps> = ({
                     <img
                       src={fullUrl}
                       alt={poster.title || 'Poster'}
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        const fallback = resolveMediaUrl(poster.url);
+                        if (fallback && img.src !== fallback && !img.dataset.triedDirect) {
+                          img.dataset.triedDirect = '1';
+                          img.src = fallback;
+                        } else if (poster.id.startsWith('parsed-link-') && !img.dataset.triedWsrv) {
+                          const vid = poster.id.replace('parsed-link-', '');
+                          if (/^[a-zA-Z0-9_-]{11}$/.test(vid)) {
+                            img.dataset.triedWsrv = '1';
+                            img.src = `https://wsrv.nl/?url=i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+                          }
+                        }
+                      }}
                       className="w-full h-full object-cover cursor-pointer"
                       onClick={() => setZoomedUrl(fullUrl)}
                     />

@@ -21,6 +21,7 @@ import { FeedOverlaysCluster } from '../components/FeedOverlaysCluster';
 import { useFeedLiveEvents } from '../hooks/useFeedLiveEvents';
 import { navigateToHostCalendar, navigateToHostTimeline } from '../utils/hostNavigation';
 import { FeedSourceMode } from '../adapters/feeds/types';
+import { slugsMatch } from '@lenta/shared';
 
 export interface FeedStandardViewProps {
   isDarkMode: boolean;
@@ -340,6 +341,102 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
     [streamSource, visibleSourceModes, handleSaveSourceTab, navigateTo, setStreamSource, refetch]
   );
 
+  const handleSelectLiveChannel = useCallback(
+    (feedSlug?: string, streamSlug?: string) => {
+      const isGeneral = !feedSlug || feedSlug === 'general' || feedSlug === 'all';
+      const targetFeedSlug = isGeneral ? undefined : feedSlug;
+
+      // Determine target stream source
+      let targetSource: FeedSourceMode = (streamSlug as FeedSourceMode) || streamSource || 'all';
+
+      if (targetFeedSlug) {
+        // If the feed belongs to a specific stream mode, switch to that stream mode
+        const containingMode = visibleSourceModes.find((m) =>
+          m.filterConfig?.feedSlugs?.some((s) => slugsMatch(s, targetFeedSlug))
+        );
+        if (containingMode) {
+          targetSource = containingMode.id as FeedSourceMode;
+        } else if (targetSource === 'telegram' || targetSource === 'watchers') {
+          targetSource = 'all';
+        }
+      } else if (streamSlug && streamSlug !== 'all') {
+        targetSource = streamSlug as FeedSourceMode;
+      }
+
+      // Reset any active search or period or month filters that might hide the new notes
+      if (searchQuery) setSearchQuery('');
+      if (isMonthFilterActive) handleResetMonthFilter();
+      if (selectedPeriodId) handleSelectPeriod(undefined);
+
+      // Navigate to target stream and feed
+      navigateTo(targetSource, targetFeedSlug);
+
+      // Apply live updates: invalidate queries and clear banner
+      handleApplyLiveUpdates();
+
+      // Scroll to top to see newly arrived publications
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        try {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+          // ignore
+        }
+      }
+    },
+    [
+      streamSource,
+      visibleSourceModes,
+      searchQuery,
+      setSearchQuery,
+      isMonthFilterActive,
+      handleResetMonthFilter,
+      selectedPeriodId,
+      handleSelectPeriod,
+      navigateTo,
+      handleApplyLiveUpdates,
+    ]
+  );
+
+  const handleApplyLiveUpdatesWithScroll = useCallback(() => {
+    // If only one group exists and user is currently filtered into a different feed, navigate to that group
+    if (groupedChannels.length === 1) {
+      const singleGroup = groupedChannels[0];
+      const isGeneral = !singleGroup.feedSlug || singleGroup.feedSlug === 'general' || singleGroup.feedSlug === 'all';
+      if (isGeneral && selectedFeedSlug) {
+        setSelectedFeedSlug(undefined);
+      } else if (!isGeneral && selectedFeedSlug !== singleGroup.feedSlug) {
+        handleSelectLiveChannel(singleGroup.feedSlug, singleGroup.streamSlug);
+        return;
+      }
+    }
+
+    if (searchQuery) setSearchQuery('');
+    if (isMonthFilterActive) handleResetMonthFilter();
+    if (selectedPeriodId) handleSelectPeriod(undefined);
+
+    handleApplyLiveUpdates();
+
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      try {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch {
+        // ignore
+      }
+    }
+  }, [
+    groupedChannels,
+    selectedFeedSlug,
+    setSelectedFeedSlug,
+    handleSelectLiveChannel,
+    searchQuery,
+    setSearchQuery,
+    isMonthFilterActive,
+    handleResetMonthFilter,
+    selectedPeriodId,
+    handleSelectPeriod,
+    handleApplyLiveUpdates,
+  ]);
+
   const isPublicOnly = isPublicMode || appMode === 'public';
 
   return (
@@ -417,9 +514,10 @@ export const FeedStandardView: React.FC<FeedStandardViewProps> = ({
           streamSource={streamSource}
           promotedPeriods={promotedPeriods}
           onSelectFeed={handleSelectFeed}
+          onSelectChannel={handleSelectLiveChannel}
           newEventsCount={newEventsCount}
           groupedChannels={groupedChannels}
-          onApplyLiveUpdates={handleApplyLiveUpdates}
+          onApplyLiveUpdates={handleApplyLiveUpdatesWithScroll}
           onDismissLiveUpdates={handleDismissLiveUpdates}
         />
 

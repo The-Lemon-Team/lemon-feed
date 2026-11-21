@@ -130,17 +130,29 @@ export const YouTubeQuickImportBar: React.FC<YouTubeQuickImportBarProps> = ({
           {(parsedPreview.previewUrl || parsedPreview.thumbnailUrl) && (
             <img
               src={resolveMediaUrl(parsedPreview.previewUrl || parsedPreview.thumbnailUrl)}
-              alt={parsedPreview.title}
+              alt={parsedPreview.title || 'YouTube Preview'}
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (parsedPreview.thumbnailUrl && img.src !== parsedPreview.thumbnailUrl && !img.dataset.triedDirect) {
+                  img.dataset.triedDirect = '1';
+                  img.src = parsedPreview.thumbnailUrl;
+                } else if (parsedPreview.videoId && !img.dataset.triedWsrv) {
+                  img.dataset.triedWsrv = '1';
+                  img.src = `https://wsrv.nl/?url=i.ytimg.com/vi/${parsedPreview.videoId}/hqdefault.jpg`;
+                }
+              }}
               className="w-24 h-14 object-cover rounded-lg border border-slate-200 dark:border-white/10 shrink-0"
             />
           )}
           <div className="min-w-0 flex-1 space-y-0.5">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Распознано и заполнено в форму</span>
+              <span className="truncate">
+                {parsedPreview.title ? 'Распознано и заполнено в форму' : 'Превью загружено (укажите заголовок вручную)'}
+              </span>
             </div>
             <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
-              {parsedPreview.title}
+              {parsedPreview.title || parsedPreview.canonicalUrl}
             </p>
             <div className="flex items-center gap-2.5 text-[10px] text-slate-500 dark:text-slate-400">
               {parsedPreview.author && (

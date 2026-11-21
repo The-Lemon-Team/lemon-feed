@@ -166,7 +166,32 @@ export function useNotePresetAndLinkParser({
       lastParsedUrlRef.current = targetUrl;
 
       try {
-        const parsed = await parseLinkMutation.mutateAsync(targetUrl);
+        let parsed = await parseLinkMutation.mutateAsync(targetUrl);
+
+        // Browser-side CORS fallback via noembed.com when backend cannot reach YouTube (e.g. container without proxy)
+        if (ytMatch && !parsed.title?.trim()) {
+          try {
+            const noembedRes = await fetch(
+              `https://noembed.com/embed?url=${encodeURIComponent(ytMatch.canonicalUrl)}`,
+              { signal: AbortSignal.timeout(4500) },
+            );
+            if (noembedRes.ok) {
+              const ne = (await noembedRes.json()) as Record<string, any>;
+              if (typeof ne.title === 'string' && ne.title.trim()) {
+                parsed = {
+                  ...parsed,
+                  title: ne.title.trim(),
+                  author: parsed.author || (typeof ne.author_name === 'string' ? ne.author_name.trim() : undefined),
+                  channelUrl: parsed.channelUrl || (typeof ne.author_url === 'string' ? ne.author_url : undefined),
+                  thumbnailUrl: parsed.thumbnailUrl || (typeof ne.thumbnail_url === 'string' ? ne.thumbnail_url : undefined),
+                };
+              }
+            }
+          } catch {
+            // Keep backend response as-is
+          }
+        }
+
         setParsedPreview(parsed);
         setSourceLink(parsed.canonicalUrl || targetUrl);
         if (parsed.kind === 'youtube') {
@@ -175,14 +200,16 @@ export function useNotePresetAndLinkParser({
 
         const prevAuto = lastAutoFilledRef.current;
 
-        if (parsed.title) {
+        if (parsed.title?.trim()) {
           setTitle((curr) => {
             const c = curr.trim();
             if (!c || c === prevAuto.title || isYouTubeUrl(c)) {
-              return parsed.title;
+              return parsed.title.trim();
             }
             return curr;
           });
+        } else {
+          setLinkParseError('Не удалось получить название видео автоматически — укажите заголовок вручную');
         }
 
         if (parsed.shortDescription) {

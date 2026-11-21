@@ -23,6 +23,7 @@ export interface LiveNoteEvent {
 
 export interface ChannelUpdateGroup {
   feedSlug: string;
+  streamSlug?: string;
   feedTitle: string;
   feedIcon: string;
   feedColor: string;
@@ -102,18 +103,23 @@ export function useFeedLiveEvents() {
 
     for (const evt of events) {
       if (!evt.noteId) continue;
-      const slug = evt.feedSlug || 'general';
-      const title = evt.feedTitle || (slug === 'general' ? 'Общая лента' : slug);
-      const icon = evt.feedIcon || '📁';
+      const rawFeed = evt.feedSlug?.trim();
+      const isGeneral = !rawFeed || rawFeed === 'general' || rawFeed === 'all';
+      const slug = isGeneral ? 'general' : rawFeed;
+      const streamSlug = evt.streamSlug || ((evt as any).streamSlugs ? (evt as any).streamSlugs[0] : undefined);
+      const title = evt.feedTitle || (isGeneral ? 'Общая лента' : slug);
+      const icon = evt.feedIcon || (isGeneral ? '📁' : '📰');
       const color = evt.feedColor || '#6366f1';
 
-      const existing = groups.get(slug);
+      const groupKey = isGeneral ? `general_${streamSlug || 'all'}` : slug;
+      const existing = groups.get(groupKey);
       if (existing) {
         existing.count += 1;
         existing.notes.push({ noteId: evt.noteId, title: evt.title || '' });
       } else {
-        groups.set(slug, {
+        groups.set(groupKey, {
           feedSlug: slug,
+          streamSlug,
           feedTitle: title,
           feedIcon: icon,
           feedColor: color,

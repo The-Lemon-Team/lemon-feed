@@ -18,6 +18,7 @@ import {
   isNotebooklmNote,
   extractNotebooklmSubtopic,
 } from './devFeedSubtopics';
+import { isTimelineFeed } from '../../utils/timelineFeeds';
 
 export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAdapter {
   const filterConfig = modeOption.filterConfig || {};
@@ -422,6 +423,8 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
           const totalNotesForSlug = matchingCountKeys.reduce((acc, k) => acc + (countsBySlug[k] || 0), 0);
           const resolvedCount = Math.max(totalNotesForSlug, countsBySlug[slug] || 0, dbFeedCount, subtopicsSum);
 
+          const isTimeline = isTimelineFeed(matchedDbFeed || { slug });
+
           const tab: UnifiedFeedTab = {
             id: meta.id || `tab-cfg-${slug}`,
             slug,
@@ -435,6 +438,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
             badgeTextLight: '#1e6cb0',
             badgeBgDark: 'rgba(36, 129, 204, 0.25)',
             badgeTextDark: '#93c5fd',
+            badgeLabel: isTimeline ? '⏱️ TimeLine' : undefined,
             description: meta.description,
             subtopics,
           };

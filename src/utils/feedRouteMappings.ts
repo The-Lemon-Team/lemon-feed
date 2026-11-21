@@ -125,7 +125,7 @@ export function decomposeFeedSlug(slug?: string): {
   subtopic?: string;
   cleanFeedAlias?: string;
 } {
-  if (!slug) return {};
+  if (!slug || slug === 'general' || slug === 'all') return {};
 
   for (const entry of COMPOUND_PREFIXES) {
     if (slug.startsWith(entry.prefix)) {
@@ -193,10 +193,15 @@ export function getPathForFeedSource(
     const decomp = decomposeFeedSlug(feedSlug);
     if (decomp.feedSlug) {
       feedSlug = decomp.feedSlug;
+    } else if (feedSlug === 'general' || feedSlug === 'all') {
+      feedSlug = undefined;
     }
     if (decomp.subtopic && !subtopic) {
       subtopic = decomp.subtopic;
     }
+  }
+  if (feedSlug === 'general' || feedSlug === 'all') {
+    feedSlug = undefined;
   }
 
   const pathSegments = [basePath];
@@ -332,10 +337,11 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
     streamSource = primarySegment.replace(/-/g, '_') as FeedSourceMode;
   }
 
-  let selectedFeedSlug: string | undefined = feedParam || undefined;
+  let selectedFeedSlug: string | undefined =
+    feedParam === 'general' || feedParam === 'all' ? undefined : (feedParam || undefined);
   let subtopicSlug: string | undefined;
 
-  if (feedSegment) {
+  if (feedSegment && feedSegment !== 'all' && feedSegment !== 'general') {
     const rawFeed =
       streamSource === 'watchers'
         ? feedSegment
@@ -344,12 +350,15 @@ export function parseFeedRouteString(rawRoute: string): FeedRouteState {
       selectedFeedSlug = composeFeedSlug(rawFeed, subtopicSegment);
       subtopicSlug = subtopicSegment;
     } else {
-      selectedFeedSlug = rawFeed;
+      selectedFeedSlug = rawFeed === 'general' || rawFeed === 'all' ? undefined : rawFeed;
       const decomp = decomposeFeedSlug(selectedFeedSlug);
       if (decomp.subtopic) {
         subtopicSlug = decomp.subtopic;
       }
     }
+  }
+  if (selectedFeedSlug === 'general' || selectedFeedSlug === 'all') {
+    selectedFeedSlug = undefined;
   } else if (!modeParam && segments.length === 1 && primarySegment && !isKnownPreset) {
     // Single path segment not matching a known preset:
     // If known alias in ALIAS_TO_FEED_SLUG or compound prefix, treat as feed slug on 'all'.

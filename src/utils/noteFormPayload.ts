@@ -15,6 +15,7 @@ export interface NoteFormValues {
   targetPrivacy: 'private' | 'public';
   targetStatus: 'DRAFT' | 'PUBLISHED';
   feedId?: string | null;
+  metadata?: any;
 }
 
 /**
@@ -111,5 +112,10 @@ export function buildSafeNoteUpdatePayload(
     status: values.targetStatus,
     ...feedPayload,
     ...(publishAt !== undefined ? { publishAt } : {}),
+    ...(values.metadata !== undefined
+      ? { metadata: values.metadata }
+      : raw.metadata !== undefined
+      ? { metadata: raw.metadata }
+      : {}),
   };
 }

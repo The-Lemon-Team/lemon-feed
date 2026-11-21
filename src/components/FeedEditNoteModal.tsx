@@ -37,6 +37,14 @@ import { FEED_IT_WORKFLOW_TEMPLATES } from './cover-studio/feedCoverStudio.const
 import { FeedItEditAssistant } from './cover-studio/FeedItEditAssistant';
 import { FeedAiDescriptionAssistant } from './FeedAiDescriptionAssistant';
 import { FeedNoteDeleteButton } from './FeedNoteDeleteButton';
+import { TimelineActorSelector } from './timeline/TimelineActorSelector';
+import {
+  isTimelineFeed,
+  extractTimelineBoardSlug,
+  findTimelineActor,
+  TimelineActor,
+  TIMELINE_ACTORS,
+} from '../utils/timelineFeeds';
 
 export interface FeedEditNoteModalProps {
   item: UnifiedFeedItem | null;
@@ -64,6 +72,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
   const [description, setDescription] = useState('');
   const [summary, setSummary] = useState('');
   const [author, setAuthor] = useState('');
+  const [selectedActor, setSelectedActor] = useState<TimelineActor | null>(null);
   const [sourceLink, setSourceLink] = useState('');
   const [hashtagsStr, setHashtagsStr] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -82,13 +91,17 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
 
   useEffect(() => {
     if (item) {
+      const raw = (item.rawPayload as any) || {};
       setTitle(item.title || '');
       setDescription(item.description || '');
-      setSummary(item.summary || (item.rawPayload as any)?.summary || '');
+      setSummary(item.summary || raw.summary || '');
       setAuthor(item.author || item.curator || '');
+      const existingActor = findTimelineActor(
+        raw.metadata?.actorId || raw.metadata?.actorName || item.author
+      );
+      setSelectedActor(existingActor || null);
       setSourceLink(item.sourceLink || '');
       setHashtagsStr(item.hashtags?.map((h) => `#${h.replace(/^#/, '')}`).join(' ') || '');
-      const raw = (item.rawPayload as any) || {};
       const directFeedId = raw.feedId || raw.feed?.id || '';
       if (directFeedId) {
         setFeedId(directFeedId);
@@ -153,6 +166,28 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
 
   if (!item) return null;
 
+  const selectedFeed = feeds.find((f) => f.id === feedId);
+  const rawMeta = (item.rawPayload as any)?.metadata || {};
+  const isTimeline = Boolean(
+    isTimelineFeed(selectedFeed) ||
+      rawMeta.boardMode === 'TIMELINE' ||
+      rawMeta.boardSlug ||
+      selectedActor ||
+      (item.feedSlug &&
+        (slugsMatch(item.feedSlug, 'the_lemon_team') || slugsMatch(item.feedSlug, 'the-lemon-team')))
+  );
+  const timelineBoardSlug =
+    extractTimelineBoardSlug(selectedFeed) || rawMeta.boardSlug || 'the-lemon-team-bcd';
+
+  const handleSelectActor = (actor: TimelineActor | null) => {
+    setSelectedActor(actor);
+    if (actor) {
+      setAuthor(actor.name);
+    } else {
+      setAuthor(item.author || item.curator || 'Admin');
+    }
+  };
+
   const formattedEventDate = new Date(item.publishedAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
@@ -169,6 +204,20 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
     }
 
     try {
+      const resolvedMetadata = selectedActor
+        ? {
+            ...((item.rawPayload as any)?.metadata || {}),
+            actorId: selectedActor.id,
+            actorName: selectedActor.name,
+            actorAvatar: selectedActor.avatar,
+            actorAccent: selectedActor.accent,
+            actorTitle: selectedActor.title,
+            boardMode: 'TIMELINE',
+            boardSlug: timelineBoardSlug,
+            lemonUniverseKind: 'TimelineNote',
+          }
+        : (item.rawPayload as any)?.metadata;
+
       const payload = buildSafeNoteUpdatePayload(item, {
         title,
         description,
@@ -181,6 +230,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
         targetPrivacy,
         targetStatus,
         feedId,
+        metadata: resolvedMetadata,
       });
 
       await updateNoteMutation.mutateAsync({
@@ -526,35 +576,60 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
           </div>
 
           {/* Author & Source Link */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
-                <User className="w-3 h-3 text-slate-400" />
-                <span>Автор / Автор</span>
-              </label>
-              <input
-                type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Имя куратора или канала..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+          {isTimeline ? (
+            <div className="space-y-3">
+              <TimelineActorSelector
+                selectedActorId={selectedActor ? selectedActor.id : 'custom'}
+                onSelectActor={handleSelectActor}
+                customAuthor={author}
+                onCustomAuthorChange={setAuthor}
+                boardSlug={timelineBoardSlug}
               />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
+                  <LinkIcon className="w-3 h-3 text-slate-400" />
+                  <span>Ссылка на источник (URL)</span>
+                </label>
+                <input
+                  type="text"
+                  value={sourceLink}
+                  onChange={(e) => setSourceLink(e.target.value)}
+                  placeholder="https://t.me/... или https://github.com/..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+                />
+              </div>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
+                  <User className="w-3 h-3 text-slate-400" />
+                  <span>Автор / Автор</span>
+                </label>
+                <input
+                  type="text"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  placeholder="Имя куратора или канала..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
-                <LinkIcon className="w-3 h-3 text-slate-400" />
-                <span>Ссылка на источник (URL)</span>
-              </label>
-              <input
-                type="text"
-                value={sourceLink}
-                onChange={(e) => setSourceLink(e.target.value)}
-                placeholder="https://t.me/... или https://github.com/..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
+                  <LinkIcon className="w-3 h-3 text-slate-400" />
+                  <span>Ссылка на источник (URL)</span>
+                </label>
+                <input
+                  type="text"
+                  value={sourceLink}
+                  onChange={(e) => setSourceLink(e.target.value)}
+                  placeholder="https://t.me/... или https://github.com/..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-[#10171f] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#2481cc]/30 focus:border-[#2481cc]"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Hashtags */}
           <div>

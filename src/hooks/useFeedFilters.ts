@@ -149,7 +149,8 @@ export function useFeedFilters({
 
   const handleSelectFeed = useCallback(
     (slug?: string) => {
-      setSelectedFeedSlug((prev) => (prev === slug ? undefined : slug));
+      const normalizedSlug = slug === 'general' || slug === 'all' ? undefined : slug;
+      setSelectedFeedSlug((prev) => (prev === normalizedSlug ? undefined : normalizedSlug));
       onAfterSelectFeed?.();
       if (searchQuery) {
         setSearchQuery('');

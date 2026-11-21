@@ -33,4 +33,5 @@ export const handlers = [
       suggestedHashtags: ['youtube', 'video'],
     });
   }),
+  http.get('https://noembed.com/embed', () => HttpResponse.json({ error: 'Not Found' }, { status: 404 })),
 ];

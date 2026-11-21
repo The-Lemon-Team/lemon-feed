@@ -109,10 +109,11 @@ export function useFeedRouter() {
       replace = false
     ) => {
       setRouteState((curr) => {
+        const rawFeed = feedSlug === 'general' || feedSlug === 'all' ? undefined : feedSlug;
         const layoutMode = newLayoutMode ?? curr.layoutMode;
-        const decomp = decomposeFeedSlug(feedSlug);
+        const decomp = decomposeFeedSlug(rawFeed);
         const effectiveSubtopic = subtopic || decomp.subtopic;
-        const effectiveFeedSlug = decomp.feedSlug || feedSlug;
+        const effectiveFeedSlug = decomp.feedSlug || rawFeed;
 
         if (typeof window !== 'undefined') {
           const newUrl = getPathForFeedSource(source, {
@@ -171,7 +172,8 @@ export function useFeedRouter() {
   const setSelectedFeedSlug = useCallback(
     (feedSlug?: string | ((prev?: string) => string | undefined)) => {
       setRouteState((curr) => {
-        const nextSlug = typeof feedSlug === 'function' ? feedSlug(curr.selectedFeedSlug) : feedSlug;
+        const rawNext = typeof feedSlug === 'function' ? feedSlug(curr.selectedFeedSlug) : feedSlug;
+        const nextSlug = rawNext === 'general' || rawNext === 'all' ? undefined : rawNext;
         const decomp = decomposeFeedSlug(nextSlug);
         if (typeof window !== 'undefined') {
           const newUrl = getPathForFeedSource(curr.streamSource, {

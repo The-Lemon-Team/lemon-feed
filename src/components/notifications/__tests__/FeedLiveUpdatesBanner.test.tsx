@@ -77,7 +77,7 @@ describe('FeedLiveUpdatesBanner', () => {
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onSelectChannel with feedSlug when clicking a channel badge', async () => {
+  it('calls onSelectChannel with feedSlug and streamSlug when clicking a channel badge', async () => {
     const onSelectChannel = vi.fn();
     render(
       <FeedLiveUpdatesBanner
@@ -91,7 +91,36 @@ describe('FeedLiveUpdatesBanner', () => {
 
     const marvelChip = screen.getByTitle('Открыть ленту Marvel Universe');
     await userEvent.click(marvelChip);
-    expect(onSelectChannel).toHaveBeenCalledWith('marvel');
+    expect(onSelectChannel).toHaveBeenCalledWith('marvel', undefined);
+  });
+
+  it('correctly handles clicking general feed badge', async () => {
+    const onSelectChannel = vi.fn();
+    const generalGroup: ChannelUpdateGroup = {
+      feedSlug: 'general',
+      streamSlug: 'all',
+      feedTitle: 'Общая лента',
+      feedIcon: '📁',
+      feedColor: '#6366f1',
+      count: 2,
+      notes: [{ noteId: '10', title: 'Test note' }],
+    };
+
+    render(
+      <FeedLiveUpdatesBanner
+        newEventsCount={2}
+        groupedChannels={[generalGroup]}
+        onApply={vi.fn()}
+        onDismiss={vi.fn()}
+        onSelectChannel={onSelectChannel}
+      />
+    );
+
+    const generalChip = screen.getByTitle('Открыть ленту Общая лента');
+    expect(screen.getByText('Общая лента')).toBeInTheDocument();
+    expect(screen.getByText('(2)')).toBeInTheDocument();
+    await userEvent.click(generalChip);
+    expect(onSelectChannel).toHaveBeenCalledWith('general', 'all');
   });
 
   it('calls onDismiss when clicking close button', async () => {
