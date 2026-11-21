@@ -5,7 +5,7 @@ import { TimelineActorSelector } from '../TimelineActorSelector';
 import { TIMELINE_ACTORS } from '../../../utils/timelineFeeds';
 
 describe('TimelineActorSelector', () => {
-  it('renders all timeline actors and custom author option', () => {
+  it('renders select dropdown with all timeline actors and custom author option', () => {
     const handleSelect = vi.fn();
     render(
       <TimelineActorSelector
@@ -18,13 +18,18 @@ describe('TimelineActorSelector', () => {
     expect(screen.getByText('Персонаж TimeLine')).toBeInTheDocument();
     expect(screen.getByText(/В TimeLines/i)).toBeInTheDocument();
 
+    const select = screen.getByRole('combobox', { name: /Выбор персонажа TimeLine/i }) as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+    expect(select.value).toBe('actor-alexey');
+
+    const options = Array.from(select.options);
     for (const actor of TIMELINE_ACTORS) {
-      expect(screen.getByText(actor.name)).toBeInTheDocument();
+      expect(options.some((o) => o.value === actor.id)).toBe(true);
     }
-    expect(screen.getByText('Свой автор / Admin')).toBeInTheDocument();
+    expect(options.some((o) => o.value === 'custom')).toBe(true);
   });
 
-  it('calls onSelectActor when an actor card is clicked', () => {
+  it('calls onSelectActor when selecting a different actor from select dropdown', () => {
     const handleSelect = vi.fn();
     render(
       <TimelineActorSelector
@@ -34,20 +39,35 @@ describe('TimelineActorSelector', () => {
       />
     );
 
-    const antigravityBtn = screen.getByText('Antigravity Agent').closest('button');
-    expect(antigravityBtn).not.toBeNull();
-    fireEvent.click(antigravityBtn!);
+    const select = screen.getByRole('combobox', { name: /Выбор персонажа TimeLine/i });
+    fireEvent.change(select, { target: { value: 'actor-antigravity-agent' } });
 
     expect(handleSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'actor-antigravity-agent' })
     );
   });
 
-  it('renders custom author text input when custom mode is active', () => {
+  it('calls onSelectActor(null) and renders custom author input when "custom" is selected', () => {
     const handleSelect = vi.fn();
     const handleAuthorChange = vi.fn();
 
-    render(
+    const { rerender } = render(
+      <TimelineActorSelector
+        selectedActorId="actor-alexey"
+        onSelectActor={handleSelect}
+        customAuthor="MyCustomAuthor"
+        onCustomAuthorChange={handleAuthorChange}
+        boardSlug="the-lemon-team-bcd"
+      />
+    );
+
+    const select = screen.getByRole('combobox', { name: /Выбор персонажа TimeLine/i });
+    fireEvent.change(select, { target: { value: 'custom' } });
+
+    expect(handleSelect).toHaveBeenCalledWith(null);
+
+    // Re-render in custom mode
+    rerender(
       <TimelineActorSelector
         selectedActorId={null}
         onSelectActor={handleSelect}

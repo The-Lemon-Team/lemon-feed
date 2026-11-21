@@ -672,9 +672,9 @@ describe('FeedCreateNoteModal', () => {
       expect(await screen.findByTestId('timeline-actor-selector')).toBeInTheDocument();
       expect(screen.getByText('Персонаж TimeLine')).toBeInTheDocument();
 
-      // Click Antigravity Agent
-      const antigravityBtn = screen.getByText('Antigravity Agent').closest('button');
-      fireEvent.click(antigravityBtn!);
+      // Select Antigravity Agent from select dropdown
+      const actorSelect = screen.getByRole('combobox', { name: /Выбор персонажа TimeLine/i });
+      fireEvent.change(actorSelect, { target: { value: 'actor-antigravity-agent' } });
 
       // Enter title
       fireEvent.change(titleInput(), { target: { value: 'Coding Session Report' } });
