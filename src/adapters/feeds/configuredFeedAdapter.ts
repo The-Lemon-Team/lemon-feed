@@ -282,14 +282,20 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
 
         if (!isExplicitlySelected && !feedMatchesFilter(f)) continue;
 
-        countsBySlug[f.slug] = 0;
-        feedMetaBySlug[f.slug] = {
-          id: f.id,
-          title: f.title,
-          emoji: f.icon || modeOption.emoji || '📁',
-          color: f.color || '#2481cc',
-          description: f.description || undefined,
-        };
+        // Deduplicate feeds sharing equivalent slug variants (e.g. the-lemon-team vs the_lemon_team)
+        const existingKey = Object.keys(feedMetaBySlug).find((key) => slugsMatch(key, f.slug));
+        const effectiveKey = existingKey || f.slug;
+
+        countsBySlug[effectiveKey] = countsBySlug[effectiveKey] || 0;
+        if (!feedMetaBySlug[effectiveKey]) {
+          feedMetaBySlug[effectiveKey] = {
+            id: f.id,
+            title: f.title,
+            emoji: f.icon || modeOption.emoji || '📁',
+            color: f.color || '#2481cc',
+            description: f.description || undefined,
+          };
+        }
       }
 
       const allowsChangelogs =
