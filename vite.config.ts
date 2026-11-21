@@ -1,18 +1,45 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
+
+function readEnvFile(dir: string): Record<string, string> {
+  const envPath = path.resolve(dir, '.env');
+  const result: Record<string, string> = {};
+  if (!fs.existsSync(envPath)) return result;
+  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = trimmed.match(/^([A-Za-z0-9_]+)\s*=\s*(.*)$/);
+    if (match) {
+      let val = match[2].trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      result[match[1]] = val;
+    }
+  }
+  return result;
+}
 
 export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname, '../../');
-  const env = { ...loadEnv(mode, envDir, ''), ...(process.env as Record<string, string>) };
+  const rawFileEnv = readEnvFile(envDir);
+  const fileEnv = loadEnv(mode, envDir, '');
+  const env = { ...(process.env as Record<string, string>), ...fileEnv, ...rawFileEnv };
   const isPublicMode = mode === 'public' || env.VITE_FEED_APP_MODE === 'public';
   const isWatchersMode = mode === 'watchers' || env.VITE_FEED_ENV === 'watchers';
   const defaultPort = isWatchersMode ? 5182 : isPublicMode ? 5181 : 5180;
-  const port = Number(process.env.VITE_PORT || process.env.PORT || defaultPort);
+  const port = Number(env.VITE_PORT || env.PORT || defaultPort);
   const outDir = isWatchersMode ? 'dist-watchers' : isPublicMode ? 'dist-public' : 'dist';
   const watchersTarget = env.VITE_WATCHERS_PROXY_TARGET || 'http://127.0.0.1:3040';
+  const backendTarget = rawFileEnv.VITE_API_URL || env.VITE_API_URL || 'http://localhost:3002';
   return {
   envDir,
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(backendTarget),
+  },
   plugins: [react()],
   resolve: {
     alias: {
@@ -54,7 +81,7 @@ export default defineConfig(({ mode }) => {
         rewrite: (p) => p.replace(/^\/watchers-api/, ''),
       },
       '/_api': {
-        target: 'http://localhost:3002',
+        target: backendTarget,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/_api/, ''),
       },
@@ -66,23 +93,23 @@ export default defineConfig(({ mode }) => {
         target: 'http://127.0.0.1:3030',
         changeOrigin: true,
       },
-      '/notes': 'http://localhost:3002',
-      '/feeds': 'http://localhost:3002',
-      '/streams': 'http://localhost:3002',
-      '/taxonomy': 'http://localhost:3002',
-      '/hashtags': 'http://localhost:3002',
-      '/folders': 'http://localhost:3002',
-      '/sync': 'http://localhost:3002',
-      '/storage': 'http://localhost:3002',
-      '/uploads': 'http://localhost:3002',
-      '/keys': 'http://localhost:3002',
-      '/containers': 'http://localhost:3002',
-      '/health': 'http://localhost:3002',
-      '/stats': 'http://localhost:3002',
-      '/api': 'http://localhost:3002',
-      '/ingestion': 'http://localhost:3002',
-      '/workspaces': 'http://localhost:3002',
-      '/events': 'http://localhost:3002',
+      '/notes': backendTarget,
+      '/feeds': backendTarget,
+      '/streams': backendTarget,
+      '/taxonomy': backendTarget,
+      '/hashtags': backendTarget,
+      '/folders': backendTarget,
+      '/sync': backendTarget,
+      '/storage': backendTarget,
+      '/uploads': backendTarget,
+      '/keys': backendTarget,
+      '/containers': backendTarget,
+      '/health': backendTarget,
+      '/stats': backendTarget,
+      '/api': backendTarget,
+      '/ingestion': backendTarget,
+      '/workspaces': backendTarget,
+      '/events': backendTarget,
     },
   },
   build: {

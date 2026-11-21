@@ -9,7 +9,6 @@ import { PeriodItem } from '../utils/periods';
 // import { NotePinButton } from './workspace/NotePinButton';
 import { NoteMediaPlayer } from './media/NoteMediaPlayer';
 import {
-import {
   extractNoteMediaTracks,
   stripExtractedMediaFromMarkdown,
   isMediaUrl,

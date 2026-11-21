@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { slugsMatch } from '@lenta/shared';
 import {
   FEED_ADAPTERS,
   FeedSourceMode,
@@ -137,7 +138,7 @@ export function useFeedSourceTabs({
           if (f?.slug) feedSlugSet.add(f.slug);
         }
         for (const fid of s.feedIds || []) {
-          const matched = allFeeds.find((f: any) => f.id === fid || f.slug === fid);
+          const matched = allFeeds.find((f: any) => f.id === fid || f.slug === fid || slugsMatch(f.slug, fid));
           if (matched?.slug) feedSlugSet.add(matched.slug);
         }
         const feedSlugs = Array.from(feedSlugSet);
@@ -240,7 +241,7 @@ export function useFeedSourceTabs({
       const feedCandidates = extraFeed ? [...allFeeds, extraFeed] : allFeeds;
       if (tab.filterConfig?.feedSlugs && tab.filterConfig.feedSlugs.length > 0) {
         for (const slug of tab.filterConfig.feedSlugs) {
-          const matched = feedCandidates.find((f) => f.slug === slug || f.id === slug);
+          const matched = feedCandidates.find((f) => f.slug === slug || f.id === slug || slugsMatch(f.slug, slug));
           if (matched && !resolvedFeedIds.includes(matched.id)) {
             resolvedFeedIds.push(matched.id);
           }
@@ -410,7 +411,7 @@ export function useFeedSourceTabs({
 
   const handleOpenEditFeed = useCallback(
     (tab: UnifiedFeedTab) => {
-      const dbFeed = allFeeds.find((f) => f.id === tab.id || f.slug === tab.slug);
+      const dbFeed = allFeeds.find((f) => f.id === tab.id || f.slug === tab.slug || slugsMatch(f.slug, tab.slug));
       setEditingFeedTab(tab);
       setEditingDbFeed(dbFeed || null);
       setIsFeedEntityModalOpen(true);
@@ -488,13 +489,15 @@ export function useFeedSourceTabs({
     // If streamSource is neither a known stream/mode nor loading, check if it matches a known feed slug in allFeeds
     if (!isKnownBuiltinOrPreset && !isStreamsLoading && allFeeds.length > 0) {
       const matchedFeed = allFeeds.find(
-        (f) => f.slug && normalizeId(f.slug) === normalizeId(streamSource)
+        (f) => f.slug && (normalizeId(f.slug) === normalizeId(streamSource) || slugsMatch(f.slug, streamSource))
       );
       if (matchedFeed) {
-        const targetSource =
-          matchedFeed.privacy === 'private' || notesPrivacy === 'private'
-            ? 'private_feeds'
-            : 'all';
+        const containingStream = sourceModes.find((m) =>
+          m.filterConfig?.feedSlugs?.some((s) => slugsMatch(s, matchedFeed.slug))
+        );
+        const targetSource = containingStream
+          ? (containingStream.id as FeedSourceMode)
+          : (matchedFeed.privacy === 'private' || notesPrivacy === 'private' ? 'private_feeds' : 'all');
         setStreamSource(targetSource);
         setSelectedFeedSlug(matchedFeed.slug);
         return;
@@ -557,7 +560,7 @@ export function useFeedSourceTabs({
 
     const normalizeId = (id: string) => id.toLowerCase().replace(/-/g, '_');
     const customMode = sourceModes.find(
-      (m) => m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource)
+      (m) => m.id === streamSource || normalizeId(m.id) === normalizeId(streamSource) || slugsMatch(m.id, streamSource)
     );
     if (customMode) {
       return createConfiguredFeedAdapter(resolveEffectiveStreamMode(customMode, sourceModes));
@@ -571,7 +574,7 @@ export function useFeedSourceTabs({
 
   // Helper to match selected feed slug or alias/subtopic against tabs
   const matchesTabOrSubtopic = (tab: UnifiedFeedTab, targetSlug: string): boolean => {
-    if (tab.slug === targetSlug || tab.id === targetSlug) return true;
+    if (tab.slug === targetSlug || tab.id === targetSlug || slugsMatch(tab.slug, targetSlug)) return true;
     if (tab.slug === 'spark-changelogsfeed' && (targetSlug === 'changelogs' || targetSlug === 'changelog')) return true;
     if (tab.slug === 'spark-notebooklmai' && (targetSlug === 'notebooklm' || targetSlug === 'notebooklmai')) return true;
     if (tab.subtopics && tab.subtopics.length > 0) {
@@ -609,10 +612,10 @@ export function useFeedSourceTabs({
     for (const tab of rawTabs) {
       const tabKey = tab.slug || tab.id;
       const matchingStreamFeed = currentStream?.feeds?.find(
-        (f: any) => f.slug === tab.slug || f.id === tab.id
+        (f: any) => f.slug === tab.slug || f.id === tab.id || slugsMatch(f.slug, tab.slug)
       );
       const matchingAllFeed = allFeeds.find(
-        (f: any) => f.slug === tab.slug || f.id === tab.id
+        (f: any) => f.slug === tab.slug || f.id === tab.id || slugsMatch(f.slug, tab.slug)
       );
       const dbCount = Math.max(
         (matchingStreamFeed as any)?._count?.notes ?? 0,
@@ -659,9 +662,9 @@ export function useFeedSourceTabs({
       if (t.count > 0) return true;
       if (isEditMode) return true;
       if (isPrivateStream) return true; // keep preloaded scaffold tabs in private stream
-      const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug);
+      const isDbFeed = allFeeds.some((f) => f.id === t.id || f.slug === t.slug || slugsMatch(f.slug, t.slug));
       if (isDbFeed) return true;
-      if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug || matchesTabOrSubtopic(t, selectedFeedSlug))) {
+      if (selectedFeedSlug && (t.slug === selectedFeedSlug || t.id === selectedFeedSlug || slugsMatch(t.slug, selectedFeedSlug) || matchesTabOrSubtopic(t, selectedFeedSlug))) {
         return true;
       }
       return false;
@@ -670,7 +673,7 @@ export function useFeedSourceTabs({
     // If selectedFeedSlug matches a known DB feed that is not yet in rawTabs for this adapter,
     // inject it so the newly created or directly navigated feed tab is instantly visible and selectable
     if (selectedFeedSlug && !filtered.some((t) => matchesTabOrSubtopic(t, selectedFeedSlug))) {
-      const dbFeed = allFeeds.find((f) => f.slug === selectedFeedSlug || f.id === selectedFeedSlug);
+      const dbFeed = allFeeds.find((f) => f.slug === selectedFeedSlug || f.id === selectedFeedSlug || slugsMatch(f.slug, selectedFeedSlug));
       if (dbFeed) {
         filtered.push({
           id: dbFeed.id,
@@ -693,7 +696,7 @@ export function useFeedSourceTabs({
     if (currentStream?.feeds && currentStream.feeds.length > 0) {
       for (const tab of filtered) {
         const matchingFeed = currentStream.feeds.find(
-          (f: any) => f.slug === tab.slug || f.id === tab.id
+          (f: any) => f.slug === tab.slug || f.id === tab.id || slugsMatch(f.slug, tab.slug)
         );
         if (matchingFeed) {
           if (matchingFeed.customTitle) {

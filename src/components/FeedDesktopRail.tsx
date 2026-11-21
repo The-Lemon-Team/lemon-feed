@@ -15,6 +15,7 @@ import { PeriodItem } from '../utils/periods';
 import { FeedActivitiesRailSection } from './activities/FeedActivitiesRailSection';
 import { StreamPrivacyBadge } from './common/StreamPrivacyBadge';
 import { getCalendarAppBaseUrl } from '../utils/hostNavigation';
+import { slugsMatch } from '@lenta/shared';
 
 export interface FeedDesktopRailProps {
   sourceType: FeedSourceMode;
@@ -284,6 +285,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
                 className={`px-2 py-0.5 rounded-full font-mono text-[10px] transition-colors cursor-pointer ${
                   !selectedFeedSlug ||
                   selectedFeedSlug === activeFeed.slug ||
+                  slugsMatch(selectedFeedSlug, activeFeed.slug) ||
                   (activeFeed.slug === 'spark-changelogsfeed' && (selectedFeedSlug === 'changelogs' || selectedFeedSlug === 'changelog')) ||
                   (activeFeed.slug === 'spark-notebooklmai' && (selectedFeedSlug === 'notebooklm' || selectedFeedSlug === 'notebooklmai'))
                     ? 'bg-[#2481cc]/20 text-[#2481cc] dark:text-[#64b5f6] font-semibold border border-[#2481cc]/30 shadow-2xs'
@@ -428,6 +430,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
           {tabs.map((tab) => {
             const isSelected =
               selectedFeedSlug === tab.slug ||
+              slugsMatch(selectedFeedSlug, tab.slug) ||
               (tab.slug === 'spark-changelogsfeed' && (selectedFeedSlug === 'changelogs' || selectedFeedSlug === 'changelog')) ||
               (tab.slug === 'spark-notebooklmai' && (selectedFeedSlug === 'notebooklm' || selectedFeedSlug === 'notebooklmai')) ||
               Boolean(
@@ -435,6 +438,7 @@ export const FeedDesktopRail: React.FC<FeedDesktopRailProps> = ({
                   tab.subtopics.some(
                     (s) =>
                       s.slug === selectedFeedSlug ||
+                      slugsMatch(s.slug, selectedFeedSlug) ||
                       s.subfolder === selectedFeedSlug ||
                       (s.subfolder && selectedFeedSlug?.endsWith(`-${s.subfolder}`))
                   )

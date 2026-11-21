@@ -1,4 +1,4 @@
-import { Note } from '@lenta/shared';
+import { Note, slugsMatch, getCandidateSlugVariants } from '@lenta/shared';
 import {
   FeedAdapter,
   FeedAdapterContext,
@@ -24,7 +24,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
   const targetPrivacy = filterConfig.privacy || 'all';
   const targetSlugs =
     filterConfig.feedSlugs && filterConfig.feedSlugs.length > 0
-      ? new Set(filterConfig.feedSlugs.map((s) => s.toLowerCase()))
+      ? new Set(filterConfig.feedSlugs.flatMap((s) => getCandidateSlugVariants(s)))
       : null;
   const targetTags =
     filterConfig.tags && filterConfig.tags.length > 0
@@ -54,11 +54,13 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
     const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
     if (
       noteFeedSlug &&
-      (noteFeedSlug === normTabId ||
+      (slugsMatch(noteFeedSlug, normTabId) ||
+        noteFeedSlug === normTabId ||
         noteFeedSlug === normTabHyphen ||
         noteFeedSlug === normTabUnderscore ||
         noteFeedSlug.endsWith(`/${normTabId}`) ||
-        noteFeedSlug.endsWith(`/${normTabHyphen}`))
+        noteFeedSlug.endsWith(`/${normTabHyphen}`) ||
+        noteFeedSlug.endsWith(`/${normTabUnderscore}`))
     ) {
       return true;
     }
@@ -96,7 +98,10 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       // If the note belongs to an explicitly attached feed in this stream, allow it
       const noteFeedSlug = (note.feed?.slug || '').toLowerCase();
       const isExplicitlyAttachedFeed = Boolean(
-        hasSlugs && (targetSlugs!.has(noteFeedSlug) || (note.feed?.id && targetSlugs!.has(note.feed.id.toLowerCase())))
+        hasSlugs &&
+          (targetSlugs!.has(noteFeedSlug) ||
+            (note.feed?.id && targetSlugs!.has(note.feed.id.toLowerCase())) ||
+            Array.from(targetSlugs!).some((s) => slugsMatch(s, noteFeedSlug)))
       );
       if (isExplicitlyAttachedFeed) {
         return true;
@@ -130,7 +135,11 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
       // 1. Attached candidate feed slug match
       if (hasSlugs) {
         const slug = (note.feed?.slug || '').toLowerCase();
-        if (slug && (targetSlugs!.has(slug) || Array.from(targetSlugs!).some((s) => slug.includes(s)))) {
+        if (
+          slug &&
+          (targetSlugs!.has(slug) ||
+            Array.from(targetSlugs!).some((s) => slugsMatch(s, slug) || slug.includes(s) || s.includes(slug)))
+        ) {
           return true;
         }
         if (
@@ -235,7 +244,7 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
         const slug = f.slug.toLowerCase();
         if (hasSlugs) {
           if (targetSlugs!.has(slug)) return true;
-          if (Array.from(targetSlugs!).some((s) => slug.includes(s) || s.includes(slug))) return true;
+          if (Array.from(targetSlugs!).some((s) => slugsMatch(s, slug) || slug.includes(s) || s.includes(slug))) return true;
         }
         if (hasFolders && f.folderPaths && f.folderPaths.length > 0) {
           const matched = f.folderPaths.some((fp) => {
@@ -256,7 +265,10 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
 
       for (const f of context.allFeeds) {
         const isExplicitlySelected = Boolean(
-          hasSlugs && (targetSlugs!.has(f.slug.toLowerCase()) || targetSlugs!.has(f.id.toLowerCase()))
+          hasSlugs &&
+            (targetSlugs!.has(f.slug.toLowerCase()) ||
+              targetSlugs!.has(f.id.toLowerCase()) ||
+              Array.from(targetSlugs!).some((s) => slugsMatch(s, f.slug)))
         );
 
         if (!isExplicitlySelected) {
@@ -328,21 +340,27 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
             continue;
           }
 
-          const slug = n.feed?.slug || (targetPrivacy === 'private' ? 'private-notes' : 'general-notes');
-          const slugLower = slug.toLowerCase();
+          const rawSlug = n.feed?.slug || (targetPrivacy === 'private' ? 'private-notes' : 'general-notes');
+          const slugLower = rawSlug.toLowerCase();
           if (
             targetSlugs &&
             !targetSlugs.has(slugLower) &&
-            !Array.from(targetSlugs).some((s) => slugLower.includes(s) || s.includes(slugLower))
+            !Array.from(targetSlugs).some((s) => slugsMatch(s, slugLower) || slugLower.includes(s) || s.includes(slugLower))
           ) {
             continue;
           }
-          countsBySlug[slug] = (countsBySlug[slug] || 0) + 1;
-          if (!feedMetaBySlug[slug]) {
-            const matchedDbFeed = context.allFeeds.find((f) => f.slug === slug || f.id === n.feed?.id);
-            feedMetaBySlug[slug] = {
+
+          const canonicalSlug =
+            Object.keys(feedMetaBySlug).find((metaSlug) => slugsMatch(metaSlug, rawSlug) || metaSlug === rawSlug) ||
+            context.allFeeds.find((f) => slugsMatch(f.slug, rawSlug) || (n.feed?.id && f.id === n.feed.id))?.slug ||
+            rawSlug;
+
+          countsBySlug[canonicalSlug] = (countsBySlug[canonicalSlug] || 0) + 1;
+          if (!feedMetaBySlug[canonicalSlug]) {
+            const matchedDbFeed = context.allFeeds.find((f) => f.slug === canonicalSlug || slugsMatch(f.slug, canonicalSlug) || f.id === n.feed?.id);
+            feedMetaBySlug[canonicalSlug] = {
               id: matchedDbFeed?.id || n.feed?.id,
-              title: matchedDbFeed?.title || n.feed?.title || (slug === 'private-notes' ? 'Личные заметки' : slug),
+              title: matchedDbFeed?.title || n.feed?.title || (canonicalSlug === 'private-notes' ? 'Личные заметки' : canonicalSlug),
               emoji: matchedDbFeed?.icon || n.feed?.icon || modeOption.emoji || '📁',
               color: matchedDbFeed?.color || n.feed?.color || '#2481cc',
               description: matchedDbFeed?.description || n.feed?.description || undefined,
@@ -391,10 +409,12 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
             })).filter((s) => s.count > 0);
           }
 
-          const matchedDbFeed = context.allFeeds.find((f) => f.slug === slug || f.id === meta.id);
+          const matchedDbFeed = context.allFeeds.find((f) => f.slug === slug || slugsMatch(f.slug, slug) || f.id === meta.id);
           const dbFeedCount = (matchedDbFeed as any)?._count?.notes ?? 0;
           const subtopicsSum = subtopics ? subtopics.reduce((acc, s) => acc + s.count, 0) : 0;
-          const resolvedCount = Math.max(countsBySlug[slug] || 0, dbFeedCount, subtopicsSum);
+          const matchingCountKeys = Object.keys(countsBySlug).filter((k) => slugsMatch(k, slug) || k === slug);
+          const totalNotesForSlug = matchingCountKeys.reduce((acc, k) => acc + (countsBySlug[k] || 0), 0);
+          const resolvedCount = Math.max(totalNotesForSlug, countsBySlug[slug] || 0, dbFeedCount, subtopicsSum);
 
           const tab: UnifiedFeedTab = {
             id: meta.id || `tab-cfg-${slug}`,
@@ -487,7 +507,8 @@ export function createConfiguredFeedAdapter(modeOption: FeedModeOption): FeedAda
               const targetUnderscore = target.replace(/-/g, '_');
               const matchesSlug = Boolean(
                 slug &&
-                  (slug === target ||
+                  (slugsMatch(slug, target) ||
+                    slug === target ||
                     slug === targetHyphen ||
                     slug === targetUnderscore ||
                     slug.includes(targetHyphen) ||

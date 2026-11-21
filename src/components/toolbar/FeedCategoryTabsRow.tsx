@@ -14,6 +14,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { slugsMatch } from '@lenta/shared';
 import { Plus, Pencil, X, GripVertical } from 'lucide-react';
 import { FeedSourceMode, UnifiedFeedTab } from '../../adapters/feeds/types';
 import { FeedModeOption } from './types';
@@ -220,11 +221,13 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
       t.subtopics &&
       t.subtopics.length > 0 &&
       (activeFeedSlug === t.slug ||
+        slugsMatch(activeFeedSlug, t.slug) ||
         (t.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
         (t.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
         t.subtopics.some(
           (s) =>
             s.slug === activeFeedSlug ||
+            slugsMatch(s.slug, activeFeedSlug) ||
             s.subfolder === activeFeedSlug ||
             (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
         ))
@@ -332,6 +335,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
             {tabs.map((tab) => {
               const isSelected =
                 activeFeedSlug === tab.slug ||
+                slugsMatch(activeFeedSlug, tab.slug) ||
                 (tab.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
                 (tab.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai')) ||
                 Boolean(
@@ -339,6 +343,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
                     tab.subtopics.some(
                       (s) =>
                         s.slug === activeFeedSlug ||
+                        slugsMatch(s.slug, activeFeedSlug) ||
                         s.subfolder === activeFeedSlug ||
                         (s.subfolder && activeFeedSlug?.endsWith(`-${s.subfolder}`))
                     )
@@ -410,6 +415,7 @@ export const FeedCategoryTabsRow: React.FC<FeedCategoryTabsRowProps> = ({
             onClick={() => onSelectFeed(activeTabWithSubtopics.slug)}
             className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors select-none ${
               activeFeedSlug === activeTabWithSubtopics.slug ||
+              slugsMatch(activeFeedSlug, activeTabWithSubtopics.slug) ||
               (activeTabWithSubtopics.slug === 'spark-changelogsfeed' && (activeFeedSlug === 'changelogs' || activeFeedSlug === 'changelog')) ||
               (activeTabWithSubtopics.slug === 'spark-notebooklmai' && (activeFeedSlug === 'notebooklm' || activeFeedSlug === 'notebooklmai'))
                 ? 'bg-[#2481cc] text-white shadow-xs font-medium'

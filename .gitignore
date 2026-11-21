@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-watchers
 .turbo
 *.tsbuildinfo
 .DS_Store

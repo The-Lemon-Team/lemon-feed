@@ -355,4 +355,52 @@ describe('createConfiguredFeedAdapter with DEFAULT_FEED_MODES', () => {
     expect(myMusicTab?.count).toBe(0);
     expect(myMusicTab?.id).toBe('ef76023f-e39b-4fa2-8354-7efe8f9c2ca7');
   });
+
+  it('symmetrically matches hyphen and underscore slug variants (e.g. the_lemon_team vs the-lemon-team)', () => {
+    const streamMode = {
+      id: 'working_space',
+      label: 'Working Space',
+      emoji: '✨',
+      filterConfig: {
+        privacy: 'private' as const,
+        feedSlugs: ['the_lemon_team'],
+      },
+    };
+    const adapter = createConfiguredFeedAdapter(streamMode as any);
+
+    const allFeeds = [
+      {
+        id: 'f-lemon',
+        title: 'The Lemon Team',
+        slug: 'the_lemon_team',
+        privacy: 'private',
+        icon: '🔒',
+        color: '#2481cc',
+      },
+    ];
+
+    const noteWithHyphenSlug: Note = {
+      id: 'n-lemon-1',
+      title: 'Feature Gemini CLI',
+      description: 'Test body',
+      privacy: 'private',
+      status: 'PUBLISHED',
+      startDate: new Date('2026-11-21'),
+      feed: { id: 'f-lemon', slug: 'the-lemon-team', title: 'The Lemon Team', privacy: 'private' } as any,
+    } as any;
+
+    const tabs = adapter.getTabs({ allFeeds: allFeeds as any, notes: [noteWithHyphenSlug] });
+    const lemonTab = tabs.find((t) => t.slug === 'the_lemon_team' || t.slug === 'the-lemon-team');
+    expect(lemonTab).toBeDefined();
+    expect(lemonTab?.title).toBe('The Lemon Team');
+    expect(lemonTab?.count).toBe(1);
+
+    // adaptNotes with hyphen target
+    const adaptedHyphen = adapter.adaptNotes([noteWithHyphenSlug], 'the-lemon-team');
+    expect(adaptedHyphen.length).toBe(1);
+
+    // adaptNotes with underscore target
+    const adaptedUnderscore = adapter.adaptNotes([noteWithHyphenSlug], 'the_lemon_team');
+    expect(adaptedUnderscore.length).toBe(1);
+  });
 });

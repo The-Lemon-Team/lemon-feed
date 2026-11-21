@@ -6,6 +6,7 @@ import {
   PendingPosterItem,
   getDefaultDateTimeLocal,
   fromDateTimeLocalInput,
+  slugsMatch,
 } from '@lenta/shared';
 import { useCreateNote, useFeedSources, queryKeys } from '../api/queries';
 import { feedApi } from '../api/client';
@@ -80,7 +81,7 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   const resolveDefaultPrivacy = (): 'private' | 'public' => {
     if (appMode === 'staging' || appMode === 'public') return 'public';
     if (defaultFeedSlug && feeds.length > 0) {
-      const matched = feeds.find((f) => f.slug === defaultFeedSlug);
+      const matched = feeds.find((f) => f.slug === defaultFeedSlug || slugsMatch(f.slug, defaultFeedSlug));
       if (matched?.privacy === 'public') return 'public';
       if (matched?.privacy === 'private') return 'private';
     }
@@ -169,18 +170,17 @@ export const FeedCreateNoteModal: React.FC<FeedCreateNoteModalProps> = ({
   useEffect(() => {
     if (!isOpen || feeds.length === 0) return;
 
-    const normalizeSlug = (s: string) => s.toLowerCase().trim().replace(/-/g, '_');
     let matched = defaultFeedSlug
-      ? feeds.find((f) => f.slug === defaultFeedSlug || normalizeSlug(f.slug) === normalizeSlug(defaultFeedSlug))
+      ? feeds.find((f) => f.slug === defaultFeedSlug || slugsMatch(f.slug, defaultFeedSlug))
       : undefined;
 
     if (!matched && activeStreamSource && activeStreamSource !== 'all' && activeStreamSource !== 'private_feeds' && activeStreamSource !== 'telegram') {
-      matched = feeds.find((f) => normalizeSlug(f.slug) === normalizeSlug(activeStreamSource));
+      matched = feeds.find((f) => slugsMatch(f.slug, activeStreamSource));
     }
 
     if (!matched && activeStreamMode?.filterConfig?.feedSlugs && activeStreamMode.filterConfig.feedSlugs.length === 1) {
       const singleSlug = activeStreamMode.filterConfig.feedSlugs[0];
-      matched = feeds.find((f) => f.slug === singleSlug || normalizeSlug(f.slug) === normalizeSlug(singleSlug));
+      matched = feeds.find((f) => slugsMatch(f.slug, singleSlug));
     }
 
     if (matched) {

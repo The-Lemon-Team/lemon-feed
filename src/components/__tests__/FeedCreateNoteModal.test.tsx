@@ -74,6 +74,22 @@ describe('FeedCreateNoteModal', () => {
       await waitFor(() => expect(selects()[feedSelect]).toHaveValue('feed-2'));
     });
 
+    it('preselects the feed matching defaultFeedSlug with hyphen-underscore mismatch (the-lemon-team -> the_lemon_team) and sets private privacy', async () => {
+      mockApi({
+        feeds: [
+          makeFeed({ id: 'feed-lemon', slug: 'the_lemon_team', title: 'The Lemon Team', privacy: 'private' }),
+        ],
+      });
+      renderWithProviders(
+        <FeedCreateNoteModal
+          isOpen
+          onClose={vi.fn()}
+          defaultFeedSlug="the-lemon-team"
+        />
+      );
+      await waitFor(() => expect(selects()[feedSelect]).toHaveValue('feed-lemon'));
+    });
+
     it('leaves the feed empty when defaultFeedSlug matches nothing', async () => {
       mockApi();
       renderWithProviders(<FeedCreateNoteModal isOpen onClose={vi.fn()} defaultFeedSlug="nope" />);

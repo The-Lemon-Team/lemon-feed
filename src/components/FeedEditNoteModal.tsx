@@ -9,6 +9,7 @@ import {
   NoteImage,
   toDateTimeLocalInput,
   getDefaultDateTimeLocal,
+  slugsMatch,
 } from '@lenta/shared';
 import { buildSafeNoteUpdatePayload } from '../utils/noteFormPayload';
 import { useModalBackdrop } from '../hooks/useModalBackdrop';
@@ -92,7 +93,7 @@ export const FeedEditNoteModal: React.FC<FeedEditNoteModalProps> = ({
       if (directFeedId) {
         setFeedId(directFeedId);
       } else if (item.feedSlug && feeds.length > 0) {
-        const matched = feeds.find((f) => f.slug === item.feedSlug);
+        const matched = feeds.find((f) => f.slug === item.feedSlug || slugsMatch(f.slug, item.feedSlug));
         setFeedId(matched ? matched.id : '');
       } else {
         setFeedId('');

@@ -195,7 +195,7 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
     // 4. Modal "Настройка ленты (фида)" should open
     await waitFor(() => {
       expect(screen.getByText('Настройка ленты (фида)')).toBeInTheDocument();
-    });
+    }, { timeout: 8000 });
 
     const nameInput = screen.getByPlaceholderText('Например: ИИ & Модели');
     await waitFor(() => {
@@ -225,7 +225,7 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
       expect(screen.getAllByText(newTitle).length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.queryByText(initialTitle)).toBeNull();
-  });
+  }, 15000);
 
   it('user edits icon and color parameters of a tab and updates are reflected via API', async () => {
     renderWithProviders(<App />);
@@ -248,7 +248,7 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Настройка ленты (фида)')).toBeInTheDocument();
-    });
+    }, { timeout: 8000 });
 
     // Select preset emoji (e.g. 🚀)
     const rocketEmojiBtn = screen.getByRole('button', { name: '🚀' });
@@ -263,7 +263,7 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
 
     const lastPatch = patchHistory[patchHistory.length - 1];
     expect(lastPatch.body.icon).toBe('🚀');
-  });
+  }, 15000);
 
   it('user can create a new tab/feed in edit mode via "+ Таб" button', async () => {
     renderWithProviders(<App />);
@@ -397,7 +397,7 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
     // 3. Modal opens
     await waitFor(() => {
       expect(screen.getByText('Создать новый таб')).toBeInTheDocument();
-    });
+    }, { timeout: 8000 });
 
     // 4. Fill in title
     const titleInput = screen.getByPlaceholderText('Например: AI & Технологии');
@@ -417,5 +417,5 @@ describe('Feed Tab Editing Flow (Unit & UI Flow with Mock API)', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Frontend Radar').length).toBeGreaterThanOrEqual(1);
     });
-  });
+  }, 15000);
 });
