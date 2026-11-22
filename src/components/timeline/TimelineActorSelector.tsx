@@ -5,6 +5,7 @@ import {
   getTimelineWebUrl,
 } from '../../utils/timelineFeeds';
 import { Radio, ExternalLink } from 'lucide-react';
+import { AppSelect, AppSelectOption } from '../common/AppSelect';
 
 export interface TimelineActorSelectorProps {
   selectedActorId?: string | null;
@@ -24,11 +25,9 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
   className = '',
 }) => {
   const isCustomMode = selectedActorId === null || selectedActorId === 'custom';
-  const selectedActor = TIMELINE_ACTORS.find((a) => a.id === selectedActorId);
   const boardUrl = getTimelineWebUrl(boardSlug);
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const handleSelectChange = (val: string) => {
     if (val === 'custom') {
       onSelectActor(null);
     } else {
@@ -40,6 +39,31 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
   };
 
   const selectValue = isCustomMode ? 'custom' : selectedActorId || TIMELINE_ACTORS[0].id;
+
+  const actorOptions: AppSelectOption<string>[] = [
+    ...TIMELINE_ACTORS.map((actor) => ({
+      value: actor.id,
+      label: `${actor.emoji} ${actor.name}`,
+      description: actor.title,
+      icon: (
+        <span
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 border ${actor.avatarBgClass}`}
+        >
+          {actor.emoji}
+        </span>
+      ),
+    })),
+    {
+      value: 'custom',
+      label: '👤 Свой автор / Admin',
+      description: 'Произвольный ввод имени автора',
+      icon: (
+        <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300">
+          👤
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div
@@ -74,46 +98,19 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
         )}
       </div>
 
-      {/* Select Dropdown */}
-      <div>
-        <select
-          id="timeline-actor-select"
-          aria-label="Выбор персонажа TimeLine"
-          value={selectValue}
-          onChange={handleSelectChange}
-          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 transition-colors cursor-pointer"
-        >
-          {TIMELINE_ACTORS.map((actor) => (
-            <option key={actor.id} value={actor.id}>
-              {actor.emoji} {actor.name} — {actor.title}
-            </option>
-          ))}
-          <option value="custom">👤 Свой автор / Admin (произвольный ввод)</option>
-        </select>
-      </div>
-
-      {/* Character preview badge when a predefined actor is selected */}
-      {selectedActor && !isCustomMode && (
-        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white/80 dark:bg-[#151e28]/80 border border-slate-200/80 dark:border-white/10 animate-fade-in">
-          <div
-            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border ${selectedActor.avatarBgClass}`}
-          >
-            <span>{selectedActor.emoji}</span>
-          </div>
-          <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-900 dark:text-white">
-              {selectedActor.name}
-            </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              {selectedActor.title}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* AppSelect with rich styling and custom dropdown */}
+      <AppSelect
+        id="timeline-actor-select"
+        aria-label="Выбор персонажа TimeLine"
+        value={selectValue}
+        onChange={handleSelectChange}
+        variant="sky"
+        options={actorOptions}
+      />
 
       {/* If custom author mode is active, render the text input */}
       {isCustomMode && onCustomAuthorChange && (
-        <div className="pt-0.5 animate-fade-in">
+        <div className="pt-1 animate-fade-in">
           <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
             Имя автора
           </label>
@@ -122,7 +119,7 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
             value={customAuthor}
             onChange={(e) => onCustomAuthorChange(e.target.value)}
             placeholder="Введите имя автора..."
-            className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
+            className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#121922] border border-slate-200 dark:border-white/10 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
           />
         </div>
       )}
