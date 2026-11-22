@@ -43,7 +43,7 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
   const actorOptions: AppSelectOption<string>[] = [
     ...TIMELINE_ACTORS.map((actor) => ({
       value: actor.id,
-      label: `${actor.emoji} ${actor.name}`,
+      label: actor.name,
       description: actor.title,
       icon: (
         <span
@@ -55,7 +55,7 @@ export const TimelineActorSelector: React.FC<TimelineActorSelectorProps> = ({
     })),
     {
       value: 'custom',
-      label: '👤 Свой автор / Admin',
+      label: 'Свой автор / Admin',
       description: 'Произвольный ввод имени автора',
       icon: (
         <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300">
